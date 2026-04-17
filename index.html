@@ -1,0 +1,414 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Funil Tracker</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+
+  <!-- ===== HEADER ===== -->
+  <header class="header">
+    <div class="header-left">
+      <span class="logo">⚡ Funil Tracker</span>
+      <nav class="tabs" role="tablist">
+        <button class="tab-btn active" role="tab" data-tab="funis" id="tab-btn-funis">
+          Funis
+        </button>
+        <button class="tab-btn" role="tab" data-tab="analise" id="tab-btn-analise">
+          Análise
+        </button>
+      </nav>
+    </div>
+    <div class="header-actions">
+      <button class="btn btn-secondary btn-sm" id="btn-export-csv">
+        ↓ Exportar CSV
+      </button>
+      <label class="btn btn-secondary btn-sm" id="btn-import-label">
+        ↑ Importar CSV
+        <input type="file" id="input-import-csv" accept=".csv" hidden />
+      </label>
+    </div>
+  </header>
+
+  <!-- ===== MAIN ===== -->
+  <main class="main">
+
+    <!-- ========================================
+         TAB: FUNIS
+    ========================================= -->
+    <div class="tab-content active" id="tab-funis" role="tabpanel">
+
+      <!-- Mode selector -->
+      <div class="mode-selector" role="group" aria-label="Modo de entrada">
+        <button class="mode-btn active" id="mode-btn-text" data-mode="text">
+          Colar Texto
+        </button>
+        <button class="mode-btn" id="mode-btn-manual" data-mode="manual">
+          Adicionar Manual
+        </button>
+      </div>
+
+      <!-- ---- Section: Colar Texto ---- -->
+      <section class="card" id="section-text">
+        <h2 class="card-title">Colar texto do Google Docs</h2>
+
+        <textarea
+          id="paste-area"
+          placeholder="Cole aqui o bloco de texto copiado do Google Docs…"
+          spellcheck="false"
+        ></textarea>
+
+        <div class="btn-row" style="margin-top: 10px;">
+          <button class="btn btn-primary" id="btn-parse">Extrair campos</button>
+          <button class="btn btn-secondary" id="btn-clear-paste">Limpar</button>
+        </div>
+
+        <!-- Preview panel (hidden until parse) -->
+        <div id="preview-section" class="preview-section" hidden>
+          <div class="preview-header">
+            <span class="preview-title">Pré-visualização dos campos extraídos</span>
+            <div class="preview-date-row">
+              <label class="field-label" for="preview-data">Data</label>
+              <input type="date" id="preview-data" class="input-inline" />
+              <label class="field-label" for="preview-moeda">Moeda</label>
+              <select id="preview-moeda" class="input-inline">
+                <option value="BRL">R$ BRL</option>
+                <option value="USD">$ USD</option>
+                <option value="INR">₹ INR</option>
+              </select>
+            </div>
+          </div>
+
+          <div id="preview-grid" class="preview-grid"></div>
+
+          <div class="btn-row">
+            <button class="btn btn-primary" id="btn-confirm-parsed">
+              ✓ Salvar funil
+            </button>
+            <button class="btn btn-secondary" id="btn-cancel-preview">
+              Cancelar
+            </button>
+          </div>
+        </div>
+      </section>
+
+      <!-- ---- Section: Adicionar Manual ---- -->
+      <section class="card" id="section-manual" hidden>
+        <h2 class="card-title">Adicionar manualmente</h2>
+
+        <form id="manual-form" novalidate>
+          <div class="form-grid">
+
+            <div class="form-group">
+              <label class="field-label" for="m-data">Data *</label>
+              <input type="date" id="m-data" name="data" required />
+            </div>
+
+            <div class="form-group">
+              <label class="field-label" for="m-conta">Conta anunciante *</label>
+              <input type="text" id="m-conta" name="conta"
+                     placeholder="Dr. Danielle Morgan" required />
+            </div>
+
+            <div class="form-group">
+              <label class="field-label" for="m-nicho">Nicho *</label>
+              <select id="m-nicho" name="nicho" required>
+                <option value="">Selecionar…</option>
+                <option>WL</option><option>DB</option><option>ML</option>
+                <option>ED</option><option>NP</option><option>DA</option>
+                <option>PT</option><option>VL</option><option>TN</option>
+                <option>LG</option><option>RJ</option><option>RE</option>
+              </select>
+            </div>
+
+            <div class="form-group">
+              <label class="field-label" for="m-produto">Produto *</label>
+              <input type="text" id="m-produto" name="produto"
+                     placeholder="LEAN DROPS" required />
+            </div>
+
+            <div class="form-group form-group--wide">
+              <label class="field-label" for="m-urlAnuncio">URL do anúncio</label>
+              <input type="url" id="m-urlAnuncio" name="urlAnuncio"
+                     placeholder="https://www.facebook.com/…" />
+            </div>
+
+            <div class="form-group">
+              <label class="field-label" for="m-views">Views</label>
+              <input type="text" id="m-views" name="views"
+                     placeholder="4.4K  ou  458000" />
+            </div>
+
+            <div class="form-group">
+              <label class="field-label" for="m-famoso">Famoso</label>
+              <select id="m-famoso" name="famoso">
+                <option value="">Não informado</option>
+                <option value="sim">Sim</option>
+                <option value="não">Não</option>
+              </select>
+            </div>
+
+            <div class="form-group">
+              <label class="field-label" for="m-domAnuncio">Domínio no anúncio</label>
+              <input type="text" id="m-domAnuncio" name="domAnuncio"
+                     placeholder="TWR.HEALTHOFBRAIN.COM" />
+            </div>
+
+            <div class="form-group form-group--wide">
+              <label class="field-label" for="m-domAnuncioFull">
+                URL completa do domínio no anúncio
+              </label>
+              <input type="url" id="m-domAnuncioFull" name="domAnuncioFull"
+                     placeholder="https://twr.healthofbrain.com" />
+            </div>
+
+            <div class="form-group">
+              <label class="field-label" for="m-domFinal">Domínio final</label>
+              <input type="text" id="m-domFinal" name="domFinal"
+                     placeholder="SITE.COM  ou  SITE1.COM / SITE2.COM" />
+            </div>
+
+            <div class="form-group form-group--wide">
+              <label class="field-label" for="m-domFinalFull">
+                URL final completa
+                <span class="field-hint">(split: uma URL por linha)</span>
+              </label>
+              <textarea id="m-domFinalFull" name="domFinalFull" rows="2"
+                        placeholder="https://site.com/pagina/…"></textarea>
+            </div>
+
+            <div class="form-group">
+              <label class="field-label" for="m-split">Split test</label>
+              <select id="m-split" name="split">
+                <option value="false">Não</option>
+                <option value="true">Sim</option>
+              </select>
+            </div>
+
+            <div class="form-group form-group--wide">
+              <label class="field-label" for="m-obs">Observações</label>
+              <input type="text" id="m-obs" name="obs"
+                     placeholder="Anotações livres…" />
+            </div>
+
+          </div><!-- /form-grid -->
+
+          <div class="btn-row" style="margin-top: 14px;">
+            <button type="submit" class="btn btn-primary">Salvar funil</button>
+            <button type="button" class="btn btn-secondary" id="btn-reset-manual">
+              Limpar
+            </button>
+          </div>
+        </form>
+      </section>
+
+      <!-- ---- Dashboard ---- -->
+      <div class="dashboard-grid" id="dashboard">
+        <div class="stat-card" id="stat-total">
+          <div class="stat-label">Total de funis</div>
+          <div class="stat-value" id="stat-total-val">0</div>
+        </div>
+        <div class="stat-card" id="stat-doms">
+          <div class="stat-label">Dom. finais únicos</div>
+          <div class="stat-value" id="stat-doms-val">0</div>
+        </div>
+        <div class="stat-card" id="stat-contas">
+          <div class="stat-label">Contas únicas</div>
+          <div class="stat-value" id="stat-contas-val">0</div>
+        </div>
+        <div class="stat-card" id="stat-repetidos">
+          <div class="stat-label">Dom. finais repetidos</div>
+          <div class="stat-value" id="stat-repetidos-val">0</div>
+        </div>
+      </div>
+
+      <!-- ---- Filters ---- -->
+      <div class="filters-bar">
+        <input
+          type="search"
+          id="filter-search"
+          class="filter-input filter-search"
+          placeholder="Buscar em todos os campos…"
+          autocomplete="off"
+        />
+
+        <select id="filter-nicho" class="filter-input">
+          <option value="">Todos os nichos</option>
+          <option>WL</option><option>DB</option><option>ML</option>
+          <option>ED</option><option>NP</option><option>DA</option>
+          <option>PT</option><option>VL</option><option>TN</option>
+          <option>LG</option><option>RJ</option><option>RE</option>
+        </select>
+
+        <select id="filter-famoso" class="filter-input">
+          <option value="">Famoso: todos</option>
+          <option value="sim">Com famoso</option>
+          <option value="não">Sem famoso</option>
+        </select>
+
+        <select id="filter-split" class="filter-input">
+          <option value="">Split: todos</option>
+          <option value="true">Com split</option>
+          <option value="false">Sem split</option>
+        </select>
+
+        <select id="filter-repetido" class="filter-input">
+          <option value="">Repetido: todos</option>
+          <option value="sim">Dom. repetido</option>
+          <option value="nao">Dom. único</option>
+        </select>
+
+        <button class="btn btn-secondary btn-sm" id="btn-clear-filters">
+          Limpar filtros
+        </button>
+      </div>
+
+      <!-- ---- Table ---- -->
+      <div class="table-wrapper">
+        <table id="main-table">
+          <thead>
+            <tr>
+              <th>Data</th>
+              <th>Conta</th>
+              <th>Nicho</th>
+              <th>Produto</th>
+              <th>URL Anúncio</th>
+              <th>Views</th>
+              <th>Famoso</th>
+              <th>Dom. Anúncio</th>
+              <th>Dom. Final</th>
+              <th>Obs.</th>
+              <th>Performance</th>
+              <th aria-label="Ações"></th>
+            </tr>
+          </thead>
+          <tbody id="table-body">
+            <!-- rows injected by tabela.js -->
+            <tr id="table-empty-row">
+              <td colspan="12">
+                <div class="empty-state">
+                  <div class="empty-icon">📋</div>
+                  <h3>Nenhum funil cadastrado ainda</h3>
+                  <p>Cole um texto ou adicione manualmente para começar.</p>
+                </div>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+    </div><!-- /tab-funis -->
+
+
+    <!-- ========================================
+         TAB: ANÁLISE
+    ========================================= -->
+    <div class="tab-content" id="tab-analise" role="tabpanel" hidden>
+
+      <!-- Block 1: por domínio de anúncio -->
+      <div class="analysis-block">
+        <h3 class="analysis-block__title">
+          <span class="analysis-block__icon">🔍</span>
+          Buscar por domínio de anúncio
+        </h3>
+        <input
+          type="search"
+          id="search-dom-anuncio"
+          class="analysis-search"
+          placeholder="Ex: healthofbrain"
+          autocomplete="off"
+        />
+        <div id="result-dom-anuncio" class="analysis-result"></div>
+      </div>
+
+      <!-- Block 2: por domínio final -->
+      <div class="analysis-block">
+        <h3 class="analysis-block__title">
+          <span class="analysis-block__icon">🎯</span>
+          Buscar por domínio final
+        </h3>
+        <input
+          type="search"
+          id="search-dom-final"
+          class="analysis-search"
+          placeholder="Ex: mmemoryhealth"
+          autocomplete="off"
+        />
+        <div id="result-dom-final" class="analysis-result"></div>
+      </div>
+
+      <!-- Block 3: por produto -->
+      <div class="analysis-block">
+        <h3 class="analysis-block__title">
+          <span class="analysis-block__icon">📦</span>
+          Buscar por produto
+        </h3>
+        <input
+          type="search"
+          id="search-produto"
+          class="analysis-search"
+          placeholder="Ex: lean drops"
+          autocomplete="off"
+        />
+        <div id="result-produto" class="analysis-result"></div>
+      </div>
+
+    </div><!-- /tab-analise -->
+
+  </main><!-- /main -->
+
+  <!-- ===== TOAST ===== -->
+  <div id="toast" class="toast" role="alert" aria-live="polite"></div>
+
+  <!-- ===== PERFORMANCE POPUP (injected dynamically by tabela.js) ===== -->
+  <!--
+    Template for the inline performance form.
+    tabela.js clones and positions this near the target cell.
+  -->
+  <template id="tpl-perf-form">
+    <div class="perf-popup" role="dialog" aria-label="Registrar performance">
+      <div class="perf-popup__title">Performance</div>
+
+      <div class="form-group">
+        <label class="field-label" for="pf-moeda">Moeda</label>
+        <select id="pf-moeda" class="input-inline">
+          <option value="BRL">R$ BRL</option>
+          <option value="USD">$ USD</option>
+          <option value="INR">₹ INR</option>
+        </select>
+      </div>
+
+      <div class="form-group">
+        <label class="field-label" for="pf-gasto">Gasto total da campanha</label>
+        <input type="number" id="pf-gasto" step="0.01" min="0"
+               placeholder="0.00" class="input-inline" />
+      </div>
+
+      <div class="form-group">
+        <label class="field-label" for="pf-conversao">Valor total de conversão</label>
+        <input type="number" id="pf-conversao" step="0.01" min="0"
+               placeholder="0.00" class="input-inline" />
+      </div>
+
+      <div class="btn-row perf-popup__actions">
+        <button type="button" class="btn btn-primary btn-sm" data-action="save">
+          Salvar
+        </button>
+        <button type="button" class="btn btn-secondary btn-sm" data-action="cancel">
+          Cancelar
+        </button>
+      </div>
+    </div>
+  </template>
+
+  <!-- ===== SCRIPTS ===== -->
+  <script src="storage.js"></script>
+  <script src="parser.js"></script>
+  <script src="tabela.js"></script>
+  <script src="analise.js"></script>
+  <script src="main.js"></script>
+
+</body>
+</html>
