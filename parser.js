@@ -4,15 +4,15 @@
 
 const Parser = (() => {
 
-  // ── Invisible Unicode characters common in Google Docs copy-paste ──
-  const INVISIBLE_RE = /[\u200B\uFEFF\u202A\uFEFF\u202B\u202C\u202D\u202E\u200C\u200D\u200E\u200F\u00AD\u2028\u2029\u034F\u115F\u1160\u17B4\u17B5\u3164\uFFA0]/g;
+  // REGRA 0 — caracteres invisíveis a remover
+  const INVISIBLE_RE = /[\u200B\u200C\u200D\u200E\u200F\u202A\u202B\u202C\u202D\u202E\uFEFF\u2060\u2061\u2062\u2063\u2064\u00AD]/g;
 
   function stripInvisible(str) {
     return str.replace(INVISIBLE_RE, '');
   }
 
-  // ── Views parsing ──
-  // Suporta: "4,4K" → 4400 | "458K" → 458000 | "1.2M" → 1200000 | "4400" → 4400
+  // ── Views parsing ──────────────────────────────────────────────────────
+  // "4,4K" → 4400 | "1K" → 1000 | "1.2M" → 1200000 | "458000" → 458000
   function parseViews(str) {
     if (!str) return null;
     str = str.trim().toUpperCase().replace(/\s/g, '');
@@ -21,12 +21,11 @@ const Parser = (() => {
     if      (str.endsWith('M')) { mult = 1_000_000; str = str.slice(0, -1); }
     else if (str.endsWith('K')) { mult = 1_000;     str = str.slice(0, -1); }
 
-    // Vírgula como separador decimal (pt-BR: "4,4")
     const num = parseFloat(str.replace(',', '.'));
     return isNaN(num) ? null : Math.round(num * mult);
   }
 
-  // ── Views formatting ──
+  // ── Views formatting ───────────────────────────────────────────────────
   // 4400 → "4.4k" | 1200000 → "1.2M" | 500 → "500"
   function formatViews(n) {
     if (n == null || n === '') return '';
@@ -44,7 +43,6 @@ const Parser = (() => {
     return String(n);
   }
 
-  // ── Extract uppercase hostname from a URL ──
   function domainFromUrl(url) {
     try {
       return new URL(url.trim()).hostname.replace(/^www\./i, '').toUpperCase();
@@ -53,97 +51,94 @@ const Parser = (() => {
     }
   }
 
-  // ── Main parser ──
-  // Recebe o bloco de texto bruto colado do Google Docs e retorna um objeto
-  // com todos os campos do funil extraídos.
+  // ── Main parser ────────────────────────────────────────────────────────
   function parse(raw) {
-    const text  = stripInvisible(raw);
-    const lines = text.split('\n').map(l => l.trim()).filter(l => l.length > 0);
+    // REGRA 0 — pré-processamento
+    const lines = raw
+      .split('\n')
+      .map(l => stripInvisible(l).trim())
+      .filter(l => l.length > 0);
 
     const result = {
-      data:          new Date().toISOString().slice(0, 10),
-      conta:         null,
-      nicho:         null,
-      produto:       null,
-      urlAnuncio:    null,
+      adId:           null,
+      data:           new Date().toISOString().slice(0, 10),
+      conta:          null,
+      nicho:          null,
+      produto:        null,
+      urlAnuncio:     null,
       urlAnuncioFull: null,
-      views:         null,
-      famoso:        null,
-      domAnuncio:    null,
+      views:          null,
+      famoso:         null,
+      domAnuncio:     null,
       domAnuncioFull: null,
-      domFinal:      null,
-      domFinalFull:  null,
-      split:         false,
-      obs:           '',
-      gasto:         null,
-      conversao:     null,
-      moeda:         'BRL',
+      domFinal:       null,
+      domFinalFull:   null,
+      split:          false,
+      obs:            '',
+      gasto:          null,
+      conversao:      null,
+      moeda:          'BRL',
     };
 
     const finalUrls = [];
 
-    for (const line of lines) {
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i];
 
-      // ── Linha 1: ID - Nome | NICHO | PRODUTO ──────────────────────────
-      // Ex: "436439506228034 - Dr. Danielle Morgan | WL | LEAN DROPS"
-      if (!result.conta && /^\d+\s*-\s*/.test(line) && line.includes('|')) {
-        const afterDash = line.slice(line.indexOf('-') + 1).trim();
-        const parts     = afterDash.split('|').map(p => p.trim());
-        result.conta    = parts[0] || null;
-        result.nicho    = (parts[1] || '').toUpperCase().trim() || null;
-        result.produto  = (parts[2] || '').toUpperCase().trim() || null;
-        continue;
-      }
-
-      // ── Linhas com __URL__ ────────────────────────────────────────────
-      // Usamos match greedy para não parar em underscores dentro da URL.
-      const urlMatch = line.match(/__(.+)__/);
-      if (urlMatch) {
-        const url = urlMatch[1].trim();
-
-        if (/facebook\.com/i.test(url)) {
-          // URL do anúncio no Facebook + views + famoso
-          result.urlAnuncio     = url;
-          result.urlAnuncioFull = url;
-
-          // Tudo após o fechamento __ (Ex: "4,4K F")
-          const afterTag = line.slice(line.lastIndexOf('__') + 2).trim();
-          if (afterTag) {
-            // Views: primeiro token numérico com sufixo K/M opcional
-            const vm = afterTag.match(/^([\d,.]+\s*[KkMm]?)/);
-            if (vm) result.views = parseViews(vm[1]);
-
-            // Famoso: último token deve ser F ou S isolado
-            const tokens    = afterTag.trim().split(/\s+/);
-            const lastToken = tokens[tokens.length - 1];
-            if (/^[Ff]$/i.test(lastToken)) result.famoso = 'sim';
-            else if (/^[Ss]$/i.test(lastToken)) result.famoso = 'não';
-          }
-        } else {
-          // URL final do funil (pode haver mais de uma → split)
-          finalUrls.push(url);
+      // REGRA 1 — linha 0: adId | conta | nicho | produto
+      if (i === 0) {
+        const m = line.match(/^([\d]+)\s*-\s*(.+?)\s*\|\s*([A-Z]{2})\s*\|\s*(.+)$/i);
+        if (m) {
+          result.adId    = m[1];
+          result.conta   = m[2].trim();
+          result.nicho   = m[3].trim().toUpperCase();
+          result.produto = m[4].trim().toUpperCase();
         }
         continue;
       }
 
-      // ── Linha de domínio em maiúsculas sem http ───────────────────────
-      // Ex: "TWR.HEALTHOFBRAIN.COM"
-      // Critérios: sem espaços, sem "http", parece um domínio válido
-      if (
-        !result.domAnuncio &&
-        !line.includes(' ') &&
-        !/https?:/i.test(line) &&
-        /^[A-Z0-9][A-Z0-9._-]*\.[A-Z]{2,}$/i.test(line)
-      ) {
-        result.domAnuncio     = line.toUpperCase();
-        result.domAnuncioFull = 'https://' + line.toLowerCase();
+      // REGRA 2 / 4 — linhas com __https://
+      if (line.includes('__https://')) {
+        if (/facebook\.com/i.test(line)) {
+          // REGRA 2 — URL do anúncio no Facebook
+          // non-greedy: Facebook URLs não contêm __ internamente
+          const m = line.match(/__(.+?)__\s*(.*)/);
+          if (m) {
+            result.urlAnuncio     = m[1].replace(/^_+|_+$/g, '').trim();
+            result.urlAnuncioFull = result.urlAnuncio;
+
+            const rest = (m[2] || '').trim();
+            if (rest) {
+              // Views: número com separador decimal e/ou sufixo K/M
+              const vm = rest.match(/([\d]+[,.][\d]+\s*[KkMm]?|[\d]+\s*[KkMm]+)/i);
+              if (vm) result.views = parseViews(vm[1]);
+
+              // Famoso: último token isolado F → "sim", S → "nao"
+              const tokens = rest.trim().split(/\s+/);
+              const last   = tokens[tokens.length - 1];
+              if      (/^F$/i.test(last)) result.famoso = 'sim';
+              else if (/^S$/i.test(last)) result.famoso = 'nao';
+            }
+          }
+        } else {
+          // REGRA 4 — URL final do funil (strip leading/trailing underscores)
+          const url = line.replace(/^_+|_+$/g, '').trim();
+          if (url) finalUrls.push(url);
+        }
         continue;
       }
 
-      // Demais linhas (descrições, CTAs, etc.) → ignorar
+      // REGRA 3 — domínio no anúncio (primeira linha que bata, exceto linha 0 e URL lines)
+      if (!result.domAnuncio && !/https?:/i.test(line)) {
+        const token = line.split(/\s+/)[0];
+        if (/^[A-Z0-9][A-Z0-9\-]*\.[A-Z]{2,}/i.test(token)) {
+          result.domAnuncio     = token.toUpperCase();
+          result.domAnuncioFull = 'https://' + token.toLowerCase();
+        }
+      }
     }
 
-    // ── Processar URLs finais ──────────────────────────────────────────
+    // REGRA 4 — processar URLs finais coletadas
     if (finalUrls.length === 1) {
       result.domFinalFull = finalUrls[0];
       result.domFinal     = domainFromUrl(finalUrls[0]);
@@ -157,28 +152,27 @@ const Parser = (() => {
     return result;
   }
 
-  // ── Preview fields config ─────────────────────────────────────────────
-  // Descreve quais campos mostrar na pré-visualização e como formatá-los.
+  // ── Preview dos campos extraídos ───────────────────────────────────────
   const PREVIEW_FIELDS = [
-    { key: 'conta',         label: 'Conta' },
-    { key: 'nicho',         label: 'Nicho' },
-    { key: 'produto',       label: 'Produto' },
-    { key: 'urlAnuncio',    label: 'URL Anúncio',    truncate: 50 },
-    { key: 'views',         label: 'Views',          fmt: v => formatViews(v) },
-    { key: 'famoso',        label: 'Famoso' },
-    { key: 'domAnuncio',    label: 'Dom. Anúncio' },
-    { key: 'domAnuncioFull',label: 'URL Dom. Anúncio', truncate: 50 },
-    { key: 'domFinal',      label: 'Dom. Final' },
-    { key: 'domFinalFull',  label: 'URL Final',      truncate: 60 },
-    { key: 'split',         label: 'Split',          fmt: v => v ? 'Sim' : 'Não' },
+    { key: 'adId',           label: 'Ad ID' },
+    { key: 'conta',          label: 'Conta' },
+    { key: 'nicho',          label: 'Nicho' },
+    { key: 'produto',        label: 'Produto' },
+    { key: 'urlAnuncio',     label: 'URL Anúncio',       truncate: 50 },
+    { key: 'views',          label: 'Views',             fmt: v => formatViews(v) },
+    { key: 'famoso',         label: 'Famoso' },
+    { key: 'domAnuncio',     label: 'Dom. Anúncio' },
+    { key: 'domAnuncioFull', label: 'URL Dom. Anúncio',  truncate: 50 },
+    { key: 'domFinal',       label: 'Dom. Final' },
+    { key: 'domFinalFull',   label: 'URL Final',         truncate: 60 },
+    { key: 'split',          label: 'Split',             fmt: v => v ? 'Sim' : 'Não' },
   ];
 
-  // Constrói o HTML do grid de pré-visualização
   function buildPreviewHTML(data) {
     return PREVIEW_FIELDS.map(f => {
-      const raw   = data[f.key];
+      const raw     = data[f.key];
       const isEmpty = raw === null || raw === undefined || raw === '' || raw === false;
-      let display = isEmpty
+      let display   = isEmpty
         ? '(não encontrado)'
         : (f.fmt ? f.fmt(raw) : String(raw));
 
@@ -194,7 +188,6 @@ const Parser = (() => {
     }).join('');
   }
 
-  // Pequeno helper de escape — usado apenas aqui dentro
   function escHtml(s) {
     return String(s)
       .replace(/&/g, '&amp;')
