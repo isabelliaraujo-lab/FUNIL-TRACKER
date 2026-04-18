@@ -226,6 +226,106 @@ document.addEventListener('DOMContentLoaded', () => {
     this.value = '';  // permite reimportar o mesmo arquivo
   });
 
+  // ── Importar .txt / .docx ─────────────────────────────────────────────
+  let _importedParsed = [];
+
+  // Divide texto em blocos: cada linha que abre com NÚMEROS - Nome | NICHO | PRODUTO
+  // começa um novo funil.
+  function splitTextIntoBlocks(text) {
+    const FUNNEL_START = /^\d{5,}\s*-\s*.+\|.+\|/;
+    const lines  = text.replace(/\r\n/g, '\n').replace(/\r/g, '\n').split('\n');
+    const blocks = [];
+    let   current = [];
+
+    for (const line of lines) {
+      if (FUNNEL_START.test(line.trim()) && current.length > 0) {
+        blocks.push(current.join('\n'));
+        current = [line];
+      } else {
+        current.push(line);
+      }
+    }
+    if (current.some(l => l.trim())) blocks.push(current.join('\n'));
+
+    return blocks.filter(b => b.trim().length > 0);
+  }
+
+  function processImportedText(text) {
+    const blocks = splitTextIntoBlocks(text);
+
+    if (!blocks.length) {
+      showToast('Nenhum funil encontrado no arquivo.');
+      return;
+    }
+
+    _importedParsed = blocks
+      .map(b => Parser.parse(b))
+      .filter(f => f.conta);   // descarta blocos que não produziram uma conta válida
+
+    if (!_importedParsed.length) {
+      showToast('Nenhum funil reconhecido no arquivo. Verifique o formato.');
+      return;
+    }
+
+    // Montar resumo no modal
+    const esc = Storage.escHtml;
+    const listHTML = _importedParsed.map(f => `
+      <div class="modal-funnel-item">
+        <strong>${esc(f.conta)}</strong>
+        ${f.nicho ? `<span class="tag tag-nicho nicho-${esc(f.nicho)}">${esc(f.nicho)}</span>` : ''}
+        <span class="produto">— ${esc(f.produto || '(sem produto)')}</span>
+      </div>`).join('');
+
+    document.getElementById('import-text-summary').innerHTML = `
+      <p class="modal-summary-count">
+        <strong>${_importedParsed.length}</strong> funil(s) encontrado(s) — deseja importar todos?
+      </p>
+      <div class="modal-funnel-list">${listHTML}</div>`;
+
+    document.getElementById('import-text-modal').hidden = false;
+  }
+
+  document.getElementById('input-import-text').addEventListener('change', function () {
+    const file = this.files[0];
+    if (!file) return;
+    this.value = '';   // permite reimportar o mesmo arquivo
+
+    const ext = file.name.split('.').pop().toLowerCase();
+
+    if (ext === 'docx') {
+      const reader = new FileReader();
+      reader.onload = evt => {
+        mammoth.extractRawText({ arrayBuffer: evt.target.result })
+          .then(result => processImportedText(result.value))
+          .catch(() => showToast('Erro ao ler arquivo .docx. Verifique se o arquivo não está corrompido.'));
+      };
+      reader.readAsArrayBuffer(file);
+    } else {
+      const reader = new FileReader();
+      reader.onload = evt => processImportedText(evt.target.result);
+      reader.readAsText(file, 'utf-8');
+    }
+  });
+
+  document.getElementById('btn-confirm-import-text').addEventListener('click', () => {
+    if (!_importedParsed.length) return;
+
+    _importedParsed.forEach(f => { f.id = Storage.genId(); });
+    funnels = [..._importedParsed, ...funnels];
+    saveFunnels(funnels);
+    Tabela.renderTable();
+
+    const count = _importedParsed.length;
+    _importedParsed = [];
+    document.getElementById('import-text-modal').hidden = true;
+    showToast(`${count} funil(s) importado(s) com sucesso!`, 3500);
+  });
+
+  document.getElementById('btn-cancel-import-text').addEventListener('click', () => {
+    _importedParsed = [];
+    document.getElementById('import-text-modal').hidden = true;
+  });
+
   // ── Inicializar módulos ───────────────────────────────────────────────
   Tabela.init(getFunnels, saveFunnels, showToast);
   Analise.init(getFunnels);

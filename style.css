@@ -980,6 +980,80 @@ tbody tr.row-repeated:hover td {
 
 
 /* ============================================================
+   MODAL
+   ============================================================ */
+.modal-overlay {
+  position:        fixed;
+  inset:           0;
+  z-index:         800;
+  background:      rgba(0,0,0,.65);
+  display:         flex;
+  align-items:     center;
+  justify-content: center;
+  padding:         20px;
+}
+
+.modal-overlay[hidden] { display: none; }
+
+.modal-box {
+  background:    var(--surface2);
+  border:        1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding:       24px;
+  max-width:     520px;
+  width:         100%;
+  box-shadow:    var(--shadow-lg);
+  max-height:    80vh;
+  overflow-y:    auto;
+}
+
+.modal-box__title {
+  font-size:     15px;
+  font-weight:   700;
+  color:         var(--text);
+  margin-bottom: 16px;
+}
+
+.modal-summary-count {
+  font-size:     14px;
+  color:         var(--text);
+  margin-bottom: 12px;
+}
+
+.modal-funnel-list {
+  display:        flex;
+  flex-direction: column;
+  gap:            4px;
+  max-height:     320px;
+  overflow-y:     auto;
+  margin-bottom:  4px;
+}
+
+.modal-funnel-item {
+  display:       flex;
+  align-items:   center;
+  gap:           8px;
+  flex-wrap:     wrap;
+  padding:       8px 10px;
+  background:    var(--surface);
+  border:        1px solid var(--border);
+  border-radius: var(--radius);
+  font-size:     12.5px;
+  color:         var(--text-muted);
+}
+
+.modal-funnel-item strong {
+  color:       var(--text);
+  font-weight: 600;
+}
+
+.modal-funnel-item .produto {
+  color:     var(--text-muted);
+  font-size: 11px;
+}
+
+
+/* ============================================================
    TOAST
    ============================================================ */
 .toast {

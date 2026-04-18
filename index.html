@@ -29,6 +29,10 @@
         ↑ Importar CSV
         <input type="file" id="input-import-csv" accept=".csv" hidden />
       </label>
+      <label class="btn btn-secondary btn-sm" id="btn-import-text-label">
+        ↑ Importar .txt/.docx
+        <input type="file" id="input-import-text" accept=".txt,.docx" hidden />
+      </label>
     </div>
   </header>
 
@@ -403,7 +407,25 @@
     </div>
   </template>
 
+  <!-- ===== IMPORT TEXT MODAL ===== -->
+  <div id="import-text-modal" class="modal-overlay" hidden
+       role="dialog" aria-modal="true" aria-labelledby="import-modal-title">
+    <div class="modal-box">
+      <div class="modal-box__title" id="import-modal-title">Importar funis de arquivo</div>
+      <div id="import-text-summary"></div>
+      <div class="btn-row" style="margin-top: 16px;">
+        <button class="btn btn-primary" id="btn-confirm-import-text">
+          ✓ Importar todos
+        </button>
+        <button class="btn btn-secondary" id="btn-cancel-import-text">
+          Cancelar
+        </button>
+      </div>
+    </div>
+  </div>
+
   <!-- ===== SCRIPTS ===== -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.6.0/mammoth.browser.min.js"></script>
   <script src="storage.js"></script>
   <script src="parser.js"></script>
   <script src="tabela.js"></script>
