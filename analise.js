@@ -65,12 +65,12 @@ const Analise = (() => {
   // Lista:    contas que usam esse domínio + produtos + qtd de funis
 
   function searchDomAnuncio() {
-    const q  = document.getElementById('search-dom-anuncio').value.toLowerCase().trim();
+    const q  = document.getElementById('search-dom-anuncio').value.trim().toUpperCase();
     const el = document.getElementById('result-dom-anuncio');
     if (!q) { el.innerHTML = ''; return; }
 
     const matched = _getFunnels().filter(
-      f => f.domAnuncio && f.domAnuncio.toLowerCase().includes(q)
+      f => (f.domAnuncio || '').toUpperCase().includes(q)
     );
 
     if (!matched.length) {
@@ -116,13 +116,13 @@ const Analise = (() => {
   // Lista:    contas + dom. anúncio que cada uma usa + produtos + qtd funis
 
   function searchDomFinal() {
-    const q  = document.getElementById('search-dom-final').value.toLowerCase().trim();
+    const q  = document.getElementById('search-dom-final').value.trim().toUpperCase();
     const el = document.getElementById('result-dom-final');
     if (!q) { el.innerHTML = ''; return; }
 
     // Busca em todos os dom. finais, incluindo cada metade de splits
     const matched = _getFunnels().filter(
-      f => f.domFinal && f.domFinal.toLowerCase().includes(q)
+      f => (f.domFinal || '').toUpperCase().includes(q)
     );
 
     if (!matched.length) {
@@ -169,12 +169,12 @@ const Analise = (() => {
   // Lista B:  dom. finais → contas que chegam lá
 
   function searchProduto() {
-    const q  = document.getElementById('search-produto').value.toLowerCase().trim();
+    const q  = document.getElementById('search-produto').value.trim().toUpperCase();
     const el = document.getElementById('result-produto');
     if (!q) { el.innerHTML = ''; return; }
 
     const matched = _getFunnels().filter(
-      f => f.produto && f.produto.toLowerCase().includes(q)
+      f => (f.produto || '').toUpperCase().includes(q)
     );
 
     if (!matched.length) {
