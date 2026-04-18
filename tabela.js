@@ -348,9 +348,18 @@ const Tabela = (() => {
       });
     });
 
-    cell.appendChild(popup);
+    // Anexar ao body para escapar do overflow da tabela e posicionar com fixed
+    document.body.appendChild(popup);
+    const rect = cell.getBoundingClientRect();
+    popup.style.top   = (rect.bottom + 6) + 'px';
+    popup.style.right = (window.innerWidth - rect.right) + 'px';
+    popup.style.left  = 'auto';
+
     _perfEl = popup;
     _perfId = id;
+
+    // Fechar ao rolar a página
+    window.addEventListener('scroll', closePerfPopup, { once: true, passive: true });
 
     // Focar primeiro campo relevante
     setTimeout(() => inpGasto.focus(), 30);

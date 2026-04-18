@@ -821,11 +821,9 @@ tbody tr.row-repeated:hover td {
   gap:            4px;
 }
 
-/* Performance popup */
+/* Performance popup — appended to <body> by JS, positioned via getBoundingClientRect */
 .perf-popup {
-  position:      absolute;
-  right:         0;
-  top:           calc(100% + 6px);
+  position:      fixed;
   z-index:       500;
   background:    var(--surface2);
   border:        1px solid var(--border);
