@@ -217,8 +217,8 @@ const Tabela = (() => {
       return `<tr class="${repeated ? 'row-repeated' : ''}" data-id="${esc(f.id)}">
         <td style="white-space:nowrap;">${esc(formatarData(f.data))}</td>
         <td title="${esc(f.conta || '')}"
-            style="max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">
-          ${esc(truncate(f.conta || '—', 26))}
+            style="max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">
+          ${esc(truncate(f.conta || '—', 32))}
         </td>
         <td>${nichoTag(f.nicho)}</td>
         <td title="${esc(f.produto || '')}"

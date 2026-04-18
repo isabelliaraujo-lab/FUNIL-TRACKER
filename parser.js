@@ -94,7 +94,7 @@ const Parser = (() => {
       const m = lines[0].match(/^([\d]+)\s*-\s*(.+?)\s*\|\s*([A-Z]{2})\s*\|\s*(.+)$/i);
       if (m) {
         adId    = m[1];
-        conta   = m[2].trim();
+        conta   = m[1].trim() + ' - ' + m[2].trim();
         nicho   = m[3].trim().toUpperCase();
         produto = m[4].trim().toUpperCase();
       }
