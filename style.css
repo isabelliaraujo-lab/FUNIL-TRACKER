@@ -995,6 +995,8 @@ tbody tr.row-repeated:hover td {
 
 .modal-overlay[hidden] { display: none; }
 
+.modal-box--wide { max-width: 720px; }
+
 .modal-box {
   background:    var(--surface2);
   border:        1px solid var(--border);

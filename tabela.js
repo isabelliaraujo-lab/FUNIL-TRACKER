@@ -232,7 +232,11 @@ const Tabela = (() => {
         <td class="perf-cell" data-id="${esc(f.id)}" style="min-width:120px;position:relative;">
           ${perfCellContent(f)}
         </td>
-        <td>
+        <td style="white-space:nowrap;">
+          <button class="btn btn-icon edit-btn"
+                  data-id="${esc(f.id)}"
+                  title="Editar funil"
+                  type="button">✏</button>
           <button class="btn btn-icon del-btn"
                   data-id="${esc(f.id)}"
                   title="Excluir funil"
@@ -240,6 +244,41 @@ const Tabela = (() => {
         </td>
       </tr>`;
     }).join('');
+  }
+
+  // ── Modal de edição ───────────────────────────────────────────────────
+
+  function closeEditModal() {
+    document.getElementById('edit-modal').hidden = true;
+  }
+
+  function openEditModal(id) {
+    const f = _getFunnels().find(x => x.id === id);
+    if (!f) return;
+
+    const set = (fieldId, val) => {
+      const el = document.getElementById(fieldId);
+      if (el) el.value = val != null ? String(val) : '';
+    };
+
+    set('e-id',           f.id);
+    set('e-data',         f.data         || '');
+    set('e-conta',        f.conta        || '');
+    set('e-nicho',        f.nicho        || '');
+    set('e-produto',      f.produto      || '');
+    set('e-urlAnuncio',   f.urlAnuncio || f.urlAnuncioFull || '');
+    set('e-views',        f.views != null ? Parser.formatViews(f.views) : '');
+    // Normaliza "nao" (sem acento, vindo do parser) para o valor do <select>
+    set('e-famoso',       f.famoso === 'nao' ? 'não' : (f.famoso || ''));
+    set('e-domAnuncio',   f.domAnuncio   || '');
+    set('e-domAnuncioFull', f.domAnuncioFull || '');
+    set('e-domFinal',     f.domFinal     || '');
+    set('e-domFinalFull', f.domFinalFull || '');
+    set('e-split',        isSplit(f) ? 'true' : 'false');
+    set('e-obs',          f.obs          || '');
+
+    document.getElementById('edit-modal').hidden = false;
+    setTimeout(() => document.getElementById('e-conta').focus(), 30);
   }
 
   // ── Performance popup ─────────────────────────────────────────────────
@@ -352,6 +391,13 @@ const Tabela = (() => {
       return;
     }
 
+    // Botão editar linha
+    const editBtn = e.target.closest('.edit-btn');
+    if (editBtn) {
+      openEditModal(editBtn.dataset.id);
+      return;
+    }
+
     // Botão excluir linha
     const delBtn = e.target.closest('.del-btn');
     if (delBtn) {
@@ -405,9 +451,70 @@ const Tabela = (() => {
     // Fechar popup ao clicar fora (captura no document, após todos os outros handlers)
     document.addEventListener('click', onDocClick);
 
-    // Escape fecha popup
+    // Escape fecha popup de performance ou modal de edição
     document.addEventListener('keydown', e => {
-      if (e.key === 'Escape' && _perfEl) closePerfPopup();
+      if (e.key === 'Escape') {
+        if (_perfEl) closePerfPopup();
+        if (!document.getElementById('edit-modal').hidden) closeEditModal();
+      }
+    });
+
+    // Fechar modal de edição ao clicar no overlay
+    document.getElementById('edit-modal').addEventListener('click', e => {
+      if (e.target === document.getElementById('edit-modal')) closeEditModal();
+    });
+
+    // Cancelar edição
+    document.getElementById('btn-cancel-edit').addEventListener('click', closeEditModal);
+
+    // Submit do formulário de edição
+    document.getElementById('edit-form').addEventListener('submit', e => {
+      e.preventDefault();
+
+      const id = document.getElementById('e-id').value;
+      const funnels = _getFunnels();
+      const f = funnels.find(x => x.id === id);
+      if (!f) return;
+
+      const val = fieldId => (document.getElementById(fieldId).value || '').trim();
+
+      const domAnuncio   = val('e-domAnuncio').toUpperCase();
+      const domFinalFull = val('e-domFinalFull');
+      const splitVal     = document.getElementById('e-split').value === 'true';
+      const viewsRaw     = val('e-views');
+      const urlAn        = val('e-urlAnuncio');
+
+      let domFinal = val('e-domFinal').toUpperCase();
+      if (!domFinal && domFinalFull) {
+        domFinal = domFinalFull
+          .split('\n').map(u => u.trim()).filter(Boolean)
+          .map(u => {
+            try { return new URL(u).hostname.replace(/^www\./i, '').toUpperCase(); }
+            catch { return u.toUpperCase(); }
+          }).join(' / ');
+      }
+
+      Object.assign(f, {
+        data:           val('e-data'),
+        conta:          val('e-conta'),
+        nicho:          val('e-nicho'),
+        produto:        val('e-produto').toUpperCase(),
+        urlAnuncio:     urlAn,
+        urlAnuncioFull: urlAn,
+        views:          viewsRaw ? Parser.parseViews(viewsRaw) : null,
+        famoso:         val('e-famoso') || null,
+        domAnuncio,
+        domAnuncioFull: val('e-domAnuncioFull') || (domAnuncio ? 'https://' + domAnuncio.toLowerCase() : ''),
+        domFinal,
+        domFinalFull,
+        split:          splitVal,
+        obs:            val('e-obs'),
+      });
+
+      _saveFunnels(funnels);
+      closeEditModal();
+      renderTable();
+      _showToast('Funil atualizado!');
     });
 
     // Filtros — atualizam tabela em tempo real

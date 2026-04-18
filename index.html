@@ -407,6 +407,107 @@
     </div>
   </template>
 
+  <!-- ===== EDIT MODAL ===== -->
+  <div id="edit-modal" class="modal-overlay" hidden
+       role="dialog" aria-modal="true" aria-labelledby="edit-modal-title">
+    <div class="modal-box modal-box--wide">
+      <div class="modal-box__title" id="edit-modal-title">Editar funil</div>
+      <form id="edit-form" novalidate>
+        <input type="hidden" id="e-id" />
+        <div class="form-grid">
+
+          <div class="form-group">
+            <label class="field-label" for="e-data">Data</label>
+            <input type="date" id="e-data" />
+          </div>
+
+          <div class="form-group">
+            <label class="field-label" for="e-conta">Conta anunciante *</label>
+            <input type="text" id="e-conta" placeholder="Dr. Danielle Morgan" />
+          </div>
+
+          <div class="form-group">
+            <label class="field-label" for="e-nicho">Nicho *</label>
+            <select id="e-nicho">
+              <option value="">Selecionar…</option>
+              <option>WL</option><option>DB</option><option>ML</option>
+              <option>ED</option><option>NP</option><option>DA</option>
+              <option>PT</option><option>VL</option><option>TN</option>
+              <option>LG</option><option>RJ</option><option>RE</option>
+            </select>
+          </div>
+
+          <div class="form-group">
+            <label class="field-label" for="e-produto">Produto *</label>
+            <input type="text" id="e-produto" placeholder="LEAN DROPS" />
+          </div>
+
+          <div class="form-group form-group--wide">
+            <label class="field-label" for="e-urlAnuncio">URL do anúncio</label>
+            <input type="url" id="e-urlAnuncio" placeholder="https://www.facebook.com/…" />
+          </div>
+
+          <div class="form-group">
+            <label class="field-label" for="e-views">Views</label>
+            <input type="text" id="e-views" placeholder="4.4K ou 458000" />
+          </div>
+
+          <div class="form-group">
+            <label class="field-label" for="e-famoso">Famoso</label>
+            <select id="e-famoso">
+              <option value="">Não informado</option>
+              <option value="sim">Sim</option>
+              <option value="não">Não</option>
+            </select>
+          </div>
+
+          <div class="form-group">
+            <label class="field-label" for="e-domAnuncio">Domínio no anúncio</label>
+            <input type="text" id="e-domAnuncio" placeholder="TWR.HEALTHOFBRAIN.COM" />
+          </div>
+
+          <div class="form-group form-group--wide">
+            <label class="field-label" for="e-domAnuncioFull">URL completa do domínio no anúncio</label>
+            <input type="url" id="e-domAnuncioFull" placeholder="https://twr.healthofbrain.com" />
+          </div>
+
+          <div class="form-group">
+            <label class="field-label" for="e-domFinal">Domínio final</label>
+            <input type="text" id="e-domFinal" placeholder="SITE.COM ou SITE1.COM / SITE2.COM" />
+          </div>
+
+          <div class="form-group form-group--wide">
+            <label class="field-label" for="e-domFinalFull">
+              URL final completa
+              <span class="field-hint">(split: uma URL por linha)</span>
+            </label>
+            <textarea id="e-domFinalFull" rows="2"
+                      placeholder="https://site.com/pagina/…"></textarea>
+          </div>
+
+          <div class="form-group">
+            <label class="field-label" for="e-split">Split test</label>
+            <select id="e-split">
+              <option value="false">Não</option>
+              <option value="true">Sim</option>
+            </select>
+          </div>
+
+          <div class="form-group form-group--wide">
+            <label class="field-label" for="e-obs">Observações</label>
+            <input type="text" id="e-obs" placeholder="Anotações livres…" />
+          </div>
+
+        </div><!-- /form-grid -->
+
+        <div class="btn-row" style="margin-top: 16px;">
+          <button type="submit" class="btn btn-primary">Salvar alterações</button>
+          <button type="button" class="btn btn-secondary" id="btn-cancel-edit">Cancelar</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
   <!-- ===== IMPORT TEXT MODAL ===== -->
   <div id="import-text-modal" class="modal-overlay" hidden
        role="dialog" aria-modal="true" aria-labelledby="import-modal-title">
