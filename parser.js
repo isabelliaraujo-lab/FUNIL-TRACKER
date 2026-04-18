@@ -51,6 +51,28 @@ const Parser = (() => {
     }
   }
 
+  // Detecta se uma linha contém URL (com ou sem underscores)
+  function isUrlLine(line) {
+    return /__https?:\/\//i.test(line) || /^\s*https?:\/\//i.test(line);
+  }
+
+  function isFacebookLine(line) {
+    return isUrlLine(line) && /facebook\.com/i.test(line);
+  }
+
+  function extractUrl(line) {
+    // Com underscores: __https://...__ ou __https://...
+    const m1 = line.match(/__+(https?:\/\/.+?)__+\s*$/i) ||
+                line.match(/__+(https?:\/\/.+?)__*/i);
+    if (m1) return m1[1].replace(/_+$/, '').trim();
+
+    // Sem underscores (mammoth): linha começa com https://
+    const m2 = line.match(/^\s*(https?:\/\/[^\s]+)/i);
+    if (m2) return m2[1].replace(/_+$/, '').trim();
+
+    return null;
+  }
+
   // ── Main parser ────────────────────────────────────────────────────────
   function parse(raw) {
     // REGRA 0 — pré-processamento
@@ -59,97 +81,78 @@ const Parser = (() => {
       .map(l => stripInvisible(l).trim())
       .filter(l => l.length > 0);
 
-    const result = {
-      adId:           null,
-      data:           new Date().toISOString().slice(0, 10),
-      conta:          null,
-      nicho:          null,
-      produto:        null,
-      urlAnuncio:     null,
-      urlAnuncioFull: null,
-      views:          null,
-      famoso:         null,
-      domAnuncio:     null,
-      domAnuncioFull: null,
-      domFinal:       null,
-      domFinalFull:   null,
-      split:          false,
-      obs:            '',
-      gasto:          null,
-      conversao:      null,
-      moeda:          'BRL',
-    };
+    let adId = null, data = new Date().toISOString().slice(0, 10);
+    let conta = null, nicho = null, produto = null;
+    let urlAnuncio = null, urlAnuncioFull = null;
+    let views = null, famoso = null;
+    let domAnuncio = null, domAnuncioFull = null;
+    let domFinal = null, domFinalFull = null, split = false;
+    let obs = '', gasto = null, conversao = null, moeda = 'BRL';
 
-    const finalUrls = [];
+    // REGRA 1 — linha 0: adId | conta | nicho | produto
+    if (lines.length > 0) {
+      const m = lines[0].match(/^([\d]+)\s*-\s*(.+?)\s*\|\s*([A-Z]{2})\s*\|\s*(.+)$/i);
+      if (m) {
+        adId    = m[1];
+        conta   = m[2].trim();
+        nicho   = m[3].trim().toUpperCase();
+        produto = m[4].trim().toUpperCase();
+      }
+    }
 
-    for (let i = 0; i < lines.length; i++) {
+    // REGRA 3 — domínio no anúncio (primeira linha que bata, exceto linha 0 e URL lines)
+    for (let i = 1; i < lines.length; i++) {
       const line = lines[i];
-
-      // REGRA 1 — linha 0: adId | conta | nicho | produto
-      if (i === 0) {
-        const m = line.match(/^([\d]+)\s*-\s*(.+?)\s*\|\s*([A-Z]{2})\s*\|\s*(.+)$/i);
-        if (m) {
-          result.adId    = m[1];
-          result.conta   = m[2].trim();
-          result.nicho   = m[3].trim().toUpperCase();
-          result.produto = m[4].trim().toUpperCase();
-        }
-        continue;
-      }
-
-      // REGRA 2 / 4 — linhas com __https://
-      if (line.includes('__https://')) {
-        if (/facebook\.com/i.test(line)) {
-          // REGRA 2 — URL do anúncio no Facebook
-          // non-greedy: Facebook URLs não contêm __ internamente
-          const m = line.match(/__(.+?)__\s*(.*)/);
-          if (m) {
-            result.urlAnuncio     = m[1].replace(/^_+|_+$/g, '').trim();
-            result.urlAnuncioFull = result.urlAnuncio;
-
-            const rest = (m[2] || '').trim();
-            if (rest) {
-              // Views: número com separador decimal e/ou sufixo K/M
-              const vm = rest.match(/([\d]+[,.][\d]+\s*[KkMm]?|[\d]+\s*[KkMm]+)/i);
-              if (vm) result.views = parseViews(vm[1]);
-
-              // Famoso: último token isolado F → "sim", S → "nao"
-              const tokens = rest.trim().split(/\s+/);
-              const last   = tokens[tokens.length - 1];
-              if      (/^F$/i.test(last)) result.famoso = 'sim';
-              else if (/^S$/i.test(last)) result.famoso = 'nao';
-            }
-          }
-        } else {
-          // REGRA 4 — URL final do funil (strip leading/trailing underscores)
-          const url = line.replace(/^_+|_+$/g, '').trim();
-          if (url) finalUrls.push(url);
-        }
-        continue;
-      }
-
-      // REGRA 3 — domínio no anúncio (primeira linha que bata, exceto linha 0 e URL lines)
-      if (!result.domAnuncio && !/https?:/i.test(line)) {
+      if (isUrlLine(line)) continue;
+      if (!domAnuncio) {
         const token = line.split(/\s+/)[0];
         if (/^[A-Z0-9][A-Z0-9\-]*\.[A-Z]{2,}/i.test(token)) {
-          result.domAnuncio     = token.toUpperCase();
-          result.domAnuncioFull = 'https://' + token.toLowerCase();
+          domAnuncio     = token.toUpperCase();
+          domAnuncioFull = 'https://' + token.toLowerCase();
         }
       }
     }
 
-    // REGRA 4 — processar URLs finais coletadas
-    if (finalUrls.length === 1) {
-      result.domFinalFull = finalUrls[0];
-      result.domFinal     = domainFromUrl(finalUrls[0]);
-      result.split        = false;
-    } else if (finalUrls.length > 1) {
-      result.domFinalFull = finalUrls.join('\n');
-      result.domFinal     = finalUrls.map(domainFromUrl).join(' / ');
-      result.split        = true;
+    // REGRA 2 — URL do anúncio (Facebook)
+    const fbLine = lines.find(isFacebookLine);
+    if (fbLine) {
+      urlAnuncio = extractUrl(fbLine) || '';
+      urlAnuncioFull = urlAnuncio;
+
+      // Remove a URL da linha para buscar views e famoso no restante
+      const after = fbLine
+        .replace(/__+(https?:\/\/.+?)(__+)?/i, '')
+        .replace(/^\s*https?:\/\/[^\s]+/i, '')
+        .trim();
+
+      const vm = after.match(/([\d]+[,.][\d]+\s*[KkMm]?|[\d]+\s*[KkMm]+)/i);
+      if (vm) views = parseViews(vm[1]);
+
+      const tokens = after.replace(vm ? vm[0] : '', '').trim().split(/\s+/);
+      for (const t of tokens) {
+        const c = stripInvisible(t).toUpperCase();
+        if (c === 'F') { famoso = 'sim'; break; }
+        if (c === 'S') { famoso = 'nao'; break; }
+      }
     }
 
-    return result;
+    // REGRA 4 — URLs finais (não Facebook)
+    const finalLines = lines.filter(l => isUrlLine(l) && !isFacebookLine(l));
+    const finalUrls  = finalLines.map(extractUrl).filter(Boolean);
+
+    if (finalUrls.length === 1) {
+      domFinalFull = finalUrls[0];
+      domFinal     = domainFromUrl(finalUrls[0]);
+      split        = false;
+    } else if (finalUrls.length >= 2) {
+      const domains = [...new Set(finalUrls.map(domainFromUrl))];
+      domFinal     = domains.join(' / ');
+      domFinalFull = finalUrls.join('\n');
+      split        = true;
+    }
+
+    return { adId, data, conta, nicho, produto, urlAnuncio, urlAnuncioFull, views, famoso,
+             domAnuncio, domAnuncioFull, domFinal, domFinalFull, split, obs, gasto, conversao, moeda };
   }
 
   // ── Preview dos campos extraídos ───────────────────────────────────────
