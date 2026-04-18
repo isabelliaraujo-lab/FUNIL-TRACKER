@@ -794,7 +794,7 @@ tbody tr.row-repeated:hover td {
 /* ============================================================
    PERFORMANCE CELL
    ============================================================ */
-.perf-cell { position: relative; }
+.perf-cell { position: relative; overflow: visible; }
 
 .perf-add-btn {
   padding:       5px 12px;
