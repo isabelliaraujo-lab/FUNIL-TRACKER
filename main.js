@@ -226,6 +226,42 @@ document.addEventListener('DOMContentLoaded', () => {
     this.value = '';  // permite reimportar o mesmo arquivo
   });
 
+  // ── Modal de confirmação de importação (retorna a data escolhida ou null se cancelou) ──
+  function pedirDataImport(qtd) {
+    return new Promise(resolve => {
+      const hoje = new Date().toISOString().slice(0, 10);
+      document.getElementById('import-modal-count').textContent = qtd;
+      document.getElementById('import-modal-date').value = hoje;
+
+      const modal = document.getElementById('import-text-modal');
+      modal.hidden = false;
+
+      function onConfirm() {
+        const data = document.getElementById('import-modal-date').value || hoje;
+        modal.hidden = true;
+        cleanup();
+        resolve(data);
+      }
+      function onCancel() {
+        modal.hidden = true;
+        cleanup();
+        resolve(null);
+      }
+      function cleanup() {
+        document.getElementById('btn-confirm-import-text').removeEventListener('click', onConfirm);
+        document.getElementById('btn-cancel-import-text').removeEventListener('click', onCancel);
+        modal.removeEventListener('click', onOverlay);
+      }
+      function onOverlay(e) {
+        if (e.target === modal) onCancel();
+      }
+
+      document.getElementById('btn-confirm-import-text').addEventListener('click', onConfirm);
+      document.getElementById('btn-cancel-import-text').addEventListener('click', onCancel);
+      modal.addEventListener('click', onOverlay);
+    });
+  }
+
   // ── Importar .txt / .docx ─────────────────────────────────────────────
   document.getElementById('input-import-text').addEventListener('change', async function (e) {
     const file = e.target.files[0];
@@ -283,12 +319,12 @@ document.addEventListener('DOMContentLoaded', () => {
       return;
     }
 
-    if (!confirm(`${parsed.length} funil(s) encontrado(s). Deseja importar todos?`)) return;
+    const dataEscolhida = await pedirDataImport(parsed.length);
+    if (dataEscolhida === null) return;   // usuário cancelou
 
-    const hoje = new Date().toISOString().slice(0, 10);
     parsed.forEach(f => {
       f.id   = Storage.genId();
-      f.data = f.data || hoje;
+      f.data = dataEscolhida;
     });
 
     funnels = [...parsed, ...funnels];

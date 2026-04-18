@@ -513,10 +513,17 @@
        role="dialog" aria-modal="true" aria-labelledby="import-modal-title">
     <div class="modal-box">
       <div class="modal-box__title" id="import-modal-title">Importar funis de arquivo</div>
-      <div id="import-text-summary"></div>
-      <div class="btn-row" style="margin-top: 16px;">
+      <p style="margin:0 0 16px;font-size:13px;color:var(--text-muted);">
+        <span id="import-modal-count"></span> funil(s) encontrado(s).
+        Todos receberão a data abaixo.
+      </p>
+      <div class="form-group">
+        <label class="field-label" for="import-modal-date">Data dos funis</label>
+        <input type="date" id="import-modal-date" />
+      </div>
+      <div class="btn-row" style="margin-top: 20px;">
         <button class="btn btn-primary" id="btn-confirm-import-text">
-          ✓ Importar todos
+          ✓ Confirmar importação
         </button>
         <button class="btn btn-secondary" id="btn-cancel-import-text">
           Cancelar
