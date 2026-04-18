@@ -29,6 +29,13 @@ const Tabela = (() => {
     return '<span style="color:var(--text-subtle)">—</span>';
   }
 
+  function formatarData(data) {
+    if (!data) return '—';
+    const partes = data.split('-');
+    if (partes.length < 3) return data;
+    return `${partes[2]}/${partes[1]}`;
+  }
+
   // ── Células de URL ────────────────────────────────────────────────────
   // Gera: link clicável truncado + tooltip CSS + botão copiar
   function urlCell(label, fullUrl, maxLen = 22) {
@@ -208,7 +215,7 @@ const Tabela = (() => {
         : dash();
 
       return `<tr class="${repeated ? 'row-repeated' : ''}" data-id="${esc(f.id)}">
-        <td style="white-space:nowrap;font-size:12px;">${esc(f.data || '')}</td>
+        <td style="white-space:nowrap;">${esc(formatarData(f.data))}</td>
         <td title="${esc(f.conta || '')}"
             style="max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">
           ${esc(truncate(f.conta || '—', 26))}
