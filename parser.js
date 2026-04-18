@@ -76,10 +76,22 @@ const Parser = (() => {
   // ── Main parser ────────────────────────────────────────────────────────
   function parse(raw, linkMap = {}) {
     // REGRA 0 — pré-processamento
-    const lines = raw
+    const rawLines = raw
       .split('\n')
       .map(l => stripInvisible(l).trim())
       .filter(l => l.length > 0);
+
+    // Normalizar linhas quebradas pelo mammoth: se uma linha começa com "- " ou "| ",
+    // pertence à linha anterior e deve ser juntada a ela.
+    const lines = [];
+    for (const linha of rawLines) {
+      const ultimo = lines[lines.length - 1];
+      if (ultimo && (linha.startsWith('- ') || linha.startsWith('| '))) {
+        lines[lines.length - 1] = ultimo + ' ' + linha;
+      } else {
+        lines.push(linha);
+      }
+    }
 
     let adId = null, data = new Date().toISOString().slice(0, 10);
     let conta = null, nicho = null, produto = null;
