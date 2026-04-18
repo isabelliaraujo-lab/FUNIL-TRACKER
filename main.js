@@ -227,103 +227,62 @@ document.addEventListener('DOMContentLoaded', () => {
   });
 
   // ── Importar .txt / .docx ─────────────────────────────────────────────
-  let _importedParsed = [];
-
-  // Divide texto em blocos: cada linha que abre com NÚMEROS - Nome | NICHO | PRODUTO
-  // começa um novo funil.
-  function splitTextIntoBlocks(text) {
-    const FUNNEL_START = /^\d{5,}\s*-\s*.+\|.+\|/;
-    const lines  = text.replace(/\r\n/g, '\n').replace(/\r/g, '\n').split('\n');
-    const blocks = [];
-    let   current = [];
-
-    for (const line of lines) {
-      if (FUNNEL_START.test(line.trim()) && current.length > 0) {
-        blocks.push(current.join('\n'));
-        current = [line];
-      } else {
-        current.push(line);
-      }
-    }
-    if (current.some(l => l.trim())) blocks.push(current.join('\n'));
-
-    return blocks.filter(b => b.trim().length > 0);
-  }
-
-  function processImportedText(text) {
-    const blocks = splitTextIntoBlocks(text);
-
-    if (!blocks.length) {
-      showToast('Nenhum funil encontrado no arquivo.');
-      return;
-    }
-
-    _importedParsed = blocks
-      .map(b => Parser.parse(b))
-      .filter(f => f.conta);   // descarta blocos que não produziram uma conta válida
-
-    if (!_importedParsed.length) {
-      showToast('Nenhum funil reconhecido no arquivo. Verifique o formato.');
-      return;
-    }
-
-    // Montar resumo no modal
-    const esc = Storage.escHtml;
-    const listHTML = _importedParsed.map(f => `
-      <div class="modal-funnel-item">
-        <strong>${esc(f.conta)}</strong>
-        ${f.nicho ? `<span class="tag tag-nicho nicho-${esc(f.nicho)}">${esc(f.nicho)}</span>` : ''}
-        <span class="produto">— ${esc(f.produto || '(sem produto)')}</span>
-      </div>`).join('');
-
-    document.getElementById('import-text-summary').innerHTML = `
-      <p class="modal-summary-count">
-        <strong>${_importedParsed.length}</strong> funil(s) encontrado(s) — deseja importar todos?
-      </p>
-      <div class="modal-funnel-list">${listHTML}</div>`;
-
-    document.getElementById('import-text-modal').hidden = false;
-  }
-
-  document.getElementById('input-import-text').addEventListener('change', function () {
-    const file = this.files[0];
+  document.getElementById('input-import-text').addEventListener('change', async function (e) {
+    const file = e.target.files[0];
     if (!file) return;
-    this.value = '';   // permite reimportar o mesmo arquivo
+    e.target.value = '';   // permite reimportar o mesmo arquivo
 
-    const ext = file.name.split('.').pop().toLowerCase();
-
-    if (ext === 'docx') {
-      const reader = new FileReader();
-      reader.onload = evt => {
-        mammoth.extractRawText({ arrayBuffer: evt.target.result })
-          .then(result => processImportedText(result.value))
-          .catch(() => showToast('Erro ao ler arquivo .docx. Verifique se o arquivo não está corrompido.'));
-      };
-      reader.readAsArrayBuffer(file);
-    } else {
-      const reader = new FileReader();
-      reader.onload = evt => processImportedText(evt.target.result);
-      reader.readAsText(file, 'utf-8');
+    let texto = '';
+    try {
+      if (file.name.toLowerCase().endsWith('.docx')) {
+        const arrayBuffer = await file.arrayBuffer();
+        const result = await mammoth.extractRawText({ arrayBuffer });
+        texto = result.value;
+      } else {
+        texto = await file.text();
+      }
+    } catch (err) {
+      showToast('Erro ao ler arquivo: ' + err.message);
+      return;
     }
-  });
 
-  document.getElementById('btn-confirm-import-text').addEventListener('click', () => {
-    if (!_importedParsed.length) return;
+    if (!texto.trim()) {
+      showToast('Arquivo vazio ou não foi possível extrair o texto.');
+      return;
+    }
 
-    _importedParsed.forEach(f => { f.id = Storage.genId(); });
-    funnels = [..._importedParsed, ...funnels];
+    // Divide em blocos onde começa novo funil (lookahead no padrão ID - Nome | NICHO | PRODUTO)
+    const blocos = texto
+      .split(/(?=\d{5,}\s*-\s*.+\|.+\|)/g)
+      .map(b => b.trim())
+      .filter(b => b.length > 0 && /\d{5,}\s*-\s*.+\|.+\|/.test(b));
+
+    if (!blocos.length) {
+      showToast('Nenhum funil encontrado. Verifique se o formato está correto.');
+      return;
+    }
+
+    const parsed = blocos
+      .map(b => Parser.parse(b))
+      .filter(f => f.conta || f.produto);
+
+    if (!parsed.length) {
+      showToast('Não foi possível extrair nenhum funil válido.');
+      return;
+    }
+
+    if (!confirm(`${parsed.length} funil(s) encontrado(s). Deseja importar todos?`)) return;
+
+    const hoje = new Date().toISOString().slice(0, 10);
+    parsed.forEach(f => {
+      f.id   = Storage.genId();
+      f.data = f.data || hoje;
+    });
+
+    funnels = [...parsed, ...funnels];
     saveFunnels(funnels);
     Tabela.renderTable();
-
-    const count = _importedParsed.length;
-    _importedParsed = [];
-    document.getElementById('import-text-modal').hidden = true;
-    showToast(`${count} funil(s) importado(s) com sucesso!`, 3500);
-  });
-
-  document.getElementById('btn-cancel-import-text').addEventListener('click', () => {
-    _importedParsed = [];
-    document.getElementById('import-text-modal').hidden = true;
+    showToast(`${parsed.length} funil(s) importado(s) com sucesso!`, 3500);
   });
 
   // ── Inicializar módulos ───────────────────────────────────────────────
