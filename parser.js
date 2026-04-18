@@ -113,6 +113,16 @@ const Parser = (() => {
       }
     }
 
+    // REGRA 3B — Link nativo do Facebook (l.facebook.com) → sobrescreve domAnuncioFull
+    const linkNativo = lines.find(l =>
+      /https?:\/\/l\.facebook\.com\/l\.php/i.test(l)
+    );
+    if (linkNativo) {
+      const m = linkNativo.match(/__?(https?:\/\/l\.facebook\.com\/l\.php[^\s_]+)__?/i) ||
+                linkNativo.match(/(https?:\/\/l\.facebook\.com\/l\.php[^\s]+)/i);
+      if (m) domAnuncioFull = m[1].replace(/_+$/, '').trim();
+    }
+
     // REGRA 2 — URL do anúncio (Facebook)
     const fbLine = lines.find(isFacebookLine);
     if (fbLine) {
