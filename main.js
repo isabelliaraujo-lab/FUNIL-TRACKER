@@ -233,11 +233,23 @@ document.addEventListener('DOMContentLoaded', () => {
     e.target.value = '';   // permite reimportar o mesmo arquivo
 
     let texto = '';
+    let linkMap = {};
     try {
       if (file.name.toLowerCase().endsWith('.docx')) {
         const arrayBuffer = await file.arrayBuffer();
-        const result = await mammoth.extractRawText({ arrayBuffer });
-        texto = result.value;
+
+        // Extrair HTML para capturar hiperlinks embutidos (ex: link nativo do Facebook)
+        const htmlResult = await mammoth.convertToHtml({ arrayBuffer });
+        const doc = new DOMParser().parseFromString(htmlResult.value, 'text/html');
+        doc.querySelectorAll('a[href]').forEach(a => {
+          const href  = a.getAttribute('href');
+          const label = a.textContent.trim().toUpperCase();
+          if (href && label) linkMap[label] = href;
+        });
+
+        // Extrair texto puro para o parser
+        const textResult = await mammoth.extractRawText({ arrayBuffer });
+        texto = textResult.value;
       } else {
         texto = await file.text();
       }
@@ -263,7 +275,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     const parsed = blocos
-      .map(b => Parser.parse(b))
+      .map(b => Parser.parse(b, linkMap))
       .filter(f => f.conta || f.produto);
 
     if (!parsed.length) {

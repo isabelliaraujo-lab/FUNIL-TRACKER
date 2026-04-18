@@ -74,7 +74,7 @@ const Parser = (() => {
   }
 
   // ── Main parser ────────────────────────────────────────────────────────
-  function parse(raw) {
+  function parse(raw, linkMap = {}) {
     // REGRA 0 — pré-processamento
     const lines = raw
       .split('\n')
@@ -113,14 +113,21 @@ const Parser = (() => {
       }
     }
 
-    // REGRA 3B — Link nativo do Facebook (l.facebook.com) → sobrescreve domAnuncioFull
-    const linkNativo = lines.find(l =>
-      /https?:\/\/l\.facebook\.com\/l\.php/i.test(l)
-    );
-    if (linkNativo) {
-      const m = linkNativo.match(/__?(https?:\/\/l\.facebook\.com\/l\.php[^\s_]+)__?/i) ||
-                linkNativo.match(/(https?:\/\/l\.facebook\.com\/l\.php[^\s]+)/i);
-      if (m) domAnuncioFull = m[1].replace(/_+$/, '').trim();
+    // REGRA 3B — URL nativa do Facebook para domAnuncioFull
+    // Prioridade 1: linkMap vindo do .docx (hiperlink embutido no domínio visível)
+    if (domAnuncio && linkMap[domAnuncio] &&
+        /l\.facebook\.com\/l\.php/i.test(linkMap[domAnuncio])) {
+      domAnuncioFull = linkMap[domAnuncio];
+    } else {
+      // Prioridade 2: link nativo presente no texto puro (colagem manual)
+      const linkNativo = lines.find(l =>
+        /https?:\/\/l\.facebook\.com\/l\.php/i.test(l)
+      );
+      if (linkNativo) {
+        const m = linkNativo.match(/__?(https?:\/\/l\.facebook\.com\/l\.php[^\s_]+)__?/i) ||
+                  linkNativo.match(/(https?:\/\/l\.facebook\.com\/l\.php[^\s]+)/i);
+        if (m) domAnuncioFull = m[1].replace(/_+$/, '').trim();
+      }
     }
 
     // REGRA 2 — URL do anúncio (Facebook)
