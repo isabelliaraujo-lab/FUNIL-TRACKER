@@ -262,6 +262,29 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
+  // ── Divisão de texto em blocos de funil ──────────────────────────────
+  function dividirEmBlocos(texto) {
+    const linhas = texto.split('\n');
+    const blocos = [];
+    let atual = [];
+
+    for (const linha of linhas) {
+      const ehInicio = /^\d{5,}\s*-\s*[^|]+\|\s*[A-Z]{2}\s*\|/i.test(linha.trim());
+      if (ehInicio) console.log('INÍCIO DE BLOCO DETECTADO:', linha.trim().substring(0, 80));
+      if (ehInicio && atual.length > 0) {
+        blocos.push(atual.join('\n'));
+        atual = [];
+      }
+      atual.push(linha);
+    }
+    if (atual.length > 0) blocos.push(atual.join('\n'));
+
+    console.log('TOTAL DE BLOCOS:', blocos.length);
+    blocos.forEach((b, i) => console.log(`BLOCO ${i}:`, b.split('\n')[0].substring(0, 80)));
+
+    return blocos.filter(b => /\d{5,}\s*-\s*[^|]+\|\s*[A-Z]{2}\s*\|/i.test(b));
+  }
+
   // ── Importar .txt / .docx ─────────────────────────────────────────────
   document.getElementById('input-import-text').addEventListener('change', async function (e) {
     console.log('LOG 1 — arquivo selecionado:', e.target.files[0]?.name);
@@ -313,11 +336,7 @@ document.addEventListener('DOMContentLoaded', () => {
       return;
     }
 
-    // Divide em blocos onde começa novo funil (lookahead no padrão ID - Nome | NICHO | PRODUTO)
-    const blocos = texto
-      .split(/(?=\d{5,}\s*-\s*.+\|.+\|)/g)
-      .map(b => b.trim())
-      .filter(b => b.length > 0 && /\d{5,}\s*-\s*.+\|.+\|/.test(b));
+    const blocos = dividirEmBlocos(texto);
 
     if (!blocos.length) {
       showToast('Nenhum funil encontrado. Verifique se o formato está correto.');
