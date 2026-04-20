@@ -597,6 +597,9 @@ thead th {
   white-space:    nowrap;
 }
 
+th.sortable { cursor: pointer; user-select: none; }
+th.sortable:hover { color: var(--accent); }
+
 tbody td {
   padding:        10px 12px;
   border-bottom:  1px solid var(--border);

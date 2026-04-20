@@ -9,6 +9,23 @@ const Tabela = (() => {
   let _saveFunnels = () => {};
   let _showToast   = () => {};
 
+  // ── Ordenação ─────────────────────────────────────────────────────────
+  let sortOrder = 'desc';   // 'desc' = mais recente primeiro
+
+  function ordenarPorData(funis, ordem) {
+    return [...funis].sort((a, b) => {
+      const da = new Date(a.data || '1970-01-01');
+      const db = new Date(b.data || '1970-01-01');
+      return ordem === 'desc' ? db - da : da - db;
+    });
+  }
+
+  function toggleSort() {
+    sortOrder = sortOrder === 'desc' ? 'asc' : 'desc';
+    document.getElementById('sort-icon').textContent = sortOrder === 'desc' ? '↓' : '↑';
+    renderTable();
+  }
+
   // ── Estado do popup de performance ────────────────────────────────────
   let _perfId  = null;   // id do funil com popup aberto
   let _perfEl  = null;   // elemento DOM do popup
@@ -180,7 +197,7 @@ const Tabela = (() => {
     const funnels   = _getFunnels();
     const domCounts = Storage.getDomainCounts(funnels);
     const filters   = readFilters();
-    const filtered  = applyFilters(funnels, filters, domCounts);
+    const filtered  = ordenarPorData(applyFilters(funnels, filters, domCounts), sortOrder);
     const tbody     = document.getElementById('table-body');
 
     renderDashboard(funnels);
@@ -555,5 +572,5 @@ const Tabela = (() => {
   }
 
   // ── API pública ───────────────────────────────────────────────────────
-  return { init, renderTable, renderDashboard };
+  return { init, renderTable, renderDashboard, toggleSort };
 })();
