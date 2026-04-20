@@ -1062,6 +1062,48 @@ tbody tr.row-repeated:hover td {
 }
 .af-funil-link:hover { background: rgba(0,212,255,.08); }
 
+/* Conta clicável */
+.conta-clicavel { cursor: pointer; transition: background 0.15s, color 0.15s; }
+.conta-clicavel:hover { background: var(--accent) !important; color: #0d0d0d !important; border-color: var(--accent) !important; }
+
+/* Linha de funil clicável */
+.af-funil-row[data-funnel-id] { cursor: pointer; border-radius: 4px; transition: background 0.1s; }
+.af-funil-row[data-funnel-id]:hover { background: var(--surface2); }
+
+/* Modal detalhe funil */
+.mfd-grid {
+  display:               grid;
+  grid-template-columns: 1fr 1fr;
+  gap:                   14px;
+  margin-top:            14px;
+}
+.mfd-campo {
+  display:        flex;
+  flex-direction: column;
+  gap:            4px;
+}
+.mfd-campo--full { grid-column: 1 / -1; }
+.mfd-label {
+  font-size:      10px;
+  color:          var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+}
+.mfd-valor {
+  font-size:   13px;
+  color:       var(--text);
+  font-weight: 500;
+}
+.mfd-link {
+  font-size:   12px;
+  color:       var(--accent);
+  text-decoration: none;
+  word-break:  break-all;
+}
+.mfd-link:hover { text-decoration: underline; }
+.mfd-gasto { color: #ff8080; }
+.mfd-conv  { color: #00d464; }
+
 .analysis-no-results {
   font-size: 13px;
   color:     var(--text-muted);

@@ -65,6 +65,8 @@ const Analise = (() => {
     return p.length === 3 ? `${p[2]}/${p[1]}` : d;
   }
 
+  // ── Linha de funil no corpo expandido ────────────────────────────────
+
   function funilRowHtml(f) {
     const meta = [
       fmtData(f.data),
@@ -79,10 +81,93 @@ const Analise = (() => {
       ? `<a class="af-funil-link" href="${esc(f.urlAnuncioFull || f.urlAnuncio)}" target="_blank" rel="noopener">Ver anúncio</a>`
       : '';
 
-    return `<div class="af-funil-row">
+    return `<div class="af-funil-row" data-funnel-id="${esc(f.id)}">
       <span class="af-funil-meta">${meta}</span>
       ${perf}${url}
     </div>`;
+  }
+
+  // ── Modal de detalhe ──────────────────────────────────────────────────
+
+  function abrirModalFunil(id) {
+    const f = _getFunnels().find(x => x.id === id);
+    if (!f) return;
+
+    const s   = SIMBOLOS[f.moeda || 'BRL'] || 'R$';
+    const fmt = v => v != null
+      ? `${s} ${parseFloat(v).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`
+      : '—';
+
+    const urlA  = f.urlAnuncioFull || f.urlAnuncio || '';
+    const urlDA = f.domAnuncioFull || '';
+    const urlF  = (f.domFinalFull || '').split('\n')[0] || '';
+
+    document.getElementById('mfd-titulo').textContent = f.conta || '—';
+    document.getElementById('mfd-conteudo').innerHTML = `
+      <div class="mfd-grid">
+        <div class="mfd-campo">
+          <span class="mfd-label">Data</span>
+          <span class="mfd-valor">${esc(f.data || '—')}</span>
+        </div>
+        <div class="mfd-campo">
+          <span class="mfd-label">Nicho</span>
+          <span class="mfd-valor">${esc(f.nicho || '—')}</span>
+        </div>
+        <div class="mfd-campo">
+          <span class="mfd-label">Produto</span>
+          <span class="mfd-valor">${esc(f.produto || '—')}</span>
+        </div>
+        <div class="mfd-campo">
+          <span class="mfd-label">Views</span>
+          <span class="mfd-valor">${f.views ? esc(Parser.formatViews(f.views)) : '—'}</span>
+        </div>
+        <div class="mfd-campo">
+          <span class="mfd-label">Famoso</span>
+          <span class="mfd-valor">${f.famoso === 'sim' ? 'Sim' : f.famoso === 'nao' ? 'Não' : '—'}</span>
+        </div>
+        <div class="mfd-campo">
+          <span class="mfd-label">Split</span>
+          <span class="mfd-valor">${(f.split === true || f.split === 'true') ? 'Sim' : 'Não'}</span>
+        </div>
+        <div class="mfd-campo mfd-campo--full">
+          <span class="mfd-label">URL do anúncio</span>
+          ${urlA ? `<a class="mfd-link" href="${esc(urlA)}" target="_blank" rel="noopener">${esc(urlA)}</a>` : '<span class="mfd-valor">—</span>'}
+        </div>
+        <div class="mfd-campo">
+          <span class="mfd-label">Dom. anúncio</span>
+          <span class="mfd-valor">${esc(f.domAnuncio || '—')}</span>
+        </div>
+        <div class="mfd-campo mfd-campo--full">
+          <span class="mfd-label">URL nativa (dom. anúncio)</span>
+          ${urlDA ? `<a class="mfd-link" href="${esc(urlDA)}" target="_blank" rel="noopener">${esc(urlDA)}</a>` : '<span class="mfd-valor">—</span>'}
+        </div>
+        <div class="mfd-campo">
+          <span class="mfd-label">Dom. final</span>
+          <span class="mfd-valor">${esc(f.domFinal || '—')}</span>
+        </div>
+        <div class="mfd-campo mfd-campo--full">
+          <span class="mfd-label">URL final</span>
+          ${urlF ? `<a class="mfd-link" href="${esc(urlF)}" target="_blank" rel="noopener">${esc(urlF)}</a>` : '<span class="mfd-valor">—</span>'}
+        </div>
+        <div class="mfd-campo">
+          <span class="mfd-label">Gasto</span>
+          <span class="mfd-valor mfd-gasto">${esc(fmt(f.gasto))}</span>
+        </div>
+        <div class="mfd-campo">
+          <span class="mfd-label">Conversão</span>
+          <span class="mfd-valor mfd-conv">${esc(fmt(f.conversao))}</span>
+        </div>
+        ${f.obs ? `<div class="mfd-campo mfd-campo--full">
+          <span class="mfd-label">Obs.</span>
+          <span class="mfd-valor">${esc(f.obs)}</span>
+        </div>` : ''}
+      </div>`;
+
+    document.getElementById('modal-funil-detalhe').hidden = false;
+  }
+
+  function fecharModalFunil() {
+    document.getElementById('modal-funil-detalhe').hidden = true;
   }
 
   // ── Componentes HTML ──────────────────────────────────────────────────
@@ -97,23 +182,38 @@ const Analise = (() => {
     </div>`;
   }
 
-  // items = [{ title, pills: string[], funnels: Funnel[] }]
+  // pills: Array de string | { label, funnelId }
+  // items: [{ title, titleFunnelId?, pills, funnels }]
   function listHtml(items) {
     if (!items.length) return '<p class="analysis-no-results">Nenhum resultado.</p>';
     return `<div class="analysis-list">
       ${items.map(item => {
         const perfHtml = renderTotaisPerf(item.funnels || []);
         const hasBody  = (item.funnels || []).length > 0;
-        const bodyHtml = hasBody ? (item.funnels).map(funilRowHtml).join('') : '';
+        const bodyHtml = hasBody ? item.funnels.map(funilRowHtml).join('') : '';
+
+        const titleEl = item.titleFunnelId
+          ? `<span class="analysis-item__title conta-clicavel" data-funnel-id="${esc(item.titleFunnelId)}">${esc(item.title)}</span>`
+          : `<span class="analysis-item__title">${esc(item.title)}</span>`;
+
+        const pillsHtml = item.pills.map(p => {
+          if (typeof p === 'string') {
+            return `<span class="analysis-item__pill">${esc(p)}</span>`;
+          }
+          return p.funnelId
+            ? `<span class="analysis-item__pill conta-clicavel" data-funnel-id="${esc(p.funnelId)}">${esc(p.label)}</span>`
+            : `<span class="analysis-item__pill">${esc(p.label)}</span>`;
+        }).join('');
+
         return `
         <div class="analysis-item${hasBody ? ' analysis-item--expandable' : ''}">
           <div class="analysis-item__header">
             <div class="analysis-item__title-row">
-              <span class="analysis-item__title">${esc(item.title)}</span>
+              ${titleEl}
               ${hasBody ? '<span class="analysis-item__toggle">▸</span>' : ''}
             </div>
             <div class="analysis-item__meta">
-              ${item.pills.map(p => `<span class="analysis-item__pill">${esc(p)}</span>`).join('')}
+              ${pillsHtml}
               ${perfHtml}
             </div>
           </div>
@@ -136,14 +236,29 @@ const Analise = (() => {
     </div>`;
   }
 
-  // ── Expand/collapse via delegação ─────────────────────────────────────
+  // ── Delegação de eventos ──────────────────────────────────────────────
 
   function onAnaliseClick(e) {
+    // Abrir modal de detalhe do funil
+    const funiRow = e.target.closest('.af-funil-row[data-funnel-id]');
+    if (funiRow && !e.target.closest('a')) {
+      abrirModalFunil(funiRow.dataset.funnelId);
+      return;
+    }
+
+    const contaBtn = e.target.closest('.conta-clicavel[data-funnel-id]');
+    if (contaBtn) {
+      abrirModalFunil(contaBtn.dataset.funnelId);
+      return;
+    }
+
+    // Expand/collapse do card
     const header = e.target.closest('.analysis-item--expandable .analysis-item__header');
-    if (!header) return;
-    const item = header.closest('.analysis-item');
-    const expanded = item.classList.toggle('analysis-item--expanded');
-    header.querySelector('.analysis-item__toggle').textContent = expanded ? '▾' : '▸';
+    if (header) {
+      const item     = header.closest('.analysis-item');
+      const expanded = item.classList.toggle('analysis-item--expanded');
+      header.querySelector('.analysis-item__toggle').textContent = expanded ? '▾' : '▸';
+    }
   }
 
   // ── Bloco 1 — por domínio de anúncio ─────────────────────────────────
@@ -178,9 +293,10 @@ const Analise = (() => {
     const items = Object.entries(byContas)
       .sort((a, b) => b[1].funnels.length - a[1].funnels.length)
       .map(([conta, d]) => ({
-        title:   conta,
-        pills:   [`${d.funnels.length} funil(s)`, ...[...d.produtos]],
-        funnels: d.funnels,
+        title:        conta,
+        titleFunnelId: d.funnels[0]?.id,
+        pills:        [`${d.funnels.length} funil(s)`, ...[...d.produtos]],
+        funnels:      d.funnels,
       }));
 
     el.innerHTML =
@@ -224,9 +340,10 @@ const Analise = (() => {
     const items = Object.entries(byContas)
       .sort((a, b) => b[1].funnels.length - a[1].funnels.length)
       .map(([conta, d]) => ({
-        title:   conta,
-        pills:   [`${d.funnels.length} funil(s)`, ...[...d.domsAn], ...[...d.produtos]],
-        funnels: d.funnels,
+        title:         conta,
+        titleFunnelId: d.funnels[0]?.id,
+        pills:         [`${d.funnels.length} funil(s)`, ...[...d.domsAn], ...[...d.produtos]],
+        funnels:       d.funnels,
       }));
 
     el.innerHTML =
@@ -262,27 +379,35 @@ const Analise = (() => {
     const byDomAn = {};
     matched.forEach(f => {
       const k = f.domAnuncio || '(sem dom. anúncio)';
-      if (!byDomAn[k]) byDomAn[k] = { contas: new Set(), funnels: [] };
+      if (!byDomAn[k]) byDomAn[k] = { contas: new Map(), funnels: [] };
       byDomAn[k].funnels.push(f);
-      if (f.conta) byDomAn[k].contas.add(f.conta);
+      if (f.conta && !byDomAn[k].contas.has(f.conta)) byDomAn[k].contas.set(f.conta, f.id);
     });
 
     const byDomFin = {};
     matched.forEach(f => {
       finalDomains(f).forEach(d => {
-        if (!byDomFin[d]) byDomFin[d] = { contas: new Set(), funnels: [] };
+        if (!byDomFin[d]) byDomFin[d] = { contas: new Map(), funnels: [] };
         byDomFin[d].funnels.push(f);
-        if (f.conta) byDomFin[d].contas.add(f.conta);
+        if (f.conta && !byDomFin[d].contas.has(f.conta)) byDomFin[d].contas.set(f.conta, f.id);
       });
     });
 
     const domAnItems = Object.entries(byDomAn)
       .sort((a, b) => b[1].funnels.length - a[1].funnels.length)
-      .map(([dom, d]) => ({ title: dom, pills: [...d.contas], funnels: d.funnels }));
+      .map(([dom, d]) => ({
+        title:   dom,
+        pills:   [...d.contas.entries()].map(([label, funnelId]) => ({ label, funnelId })),
+        funnels: d.funnels,
+      }));
 
     const domFinItems = Object.entries(byDomFin)
       .sort((a, b) => b[1].funnels.length - a[1].funnels.length)
-      .map(([dom, d]) => ({ title: dom, pills: [...d.contas], funnels: d.funnels }));
+      .map(([dom, d]) => ({
+        title:   dom,
+        pills:   [...d.contas.entries()].map(([label, funnelId]) => ({ label, funnelId })),
+        funnels: d.funnels,
+      }));
 
     el.innerHTML =
       metricsHtml([
@@ -314,9 +439,13 @@ const Analise = (() => {
     document.getElementById('search-produto')
       .addEventListener('input', searchProduto);
 
-    // Delegação para expand/collapse dos cards
     ['result-dom-anuncio', 'result-dom-final', 'result-produto'].forEach(id => {
       document.getElementById(id).addEventListener('click', onAnaliseClick);
+    });
+
+    document.getElementById('btn-fechar-mfd').addEventListener('click', fecharModalFunil);
+    document.getElementById('modal-funil-detalhe').addEventListener('click', e => {
+      if (e.target === document.getElementById('modal-funil-detalhe')) fecharModalFunil();
     });
   }
 
