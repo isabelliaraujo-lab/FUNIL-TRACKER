@@ -268,9 +268,15 @@ document.addEventListener('DOMContentLoaded', () => {
     const blocos = [];
     let atual = [];
 
+    const ehInicioDeFunil = (linha) => {
+      const l = linha.trim();
+      if (/^https?:\/\//i.test(l)) return false;
+      if (/~\d+\s*result/i.test(l)) return false;
+      return /^\d{5,}\s*-\s*[^|]{3,}\|\s*[A-Z]{2}\s*\|\s*[^|]{2,}/.test(l);
+    };
+
     for (const linha of linhas) {
-      const ehInicio = /^\d{5,}\s*-\s*[^|]+\|\s*[A-Z]{2}\s*\|/i.test(linha.trim());
-      if (ehInicio && atual.length > 0) {
+      if (ehInicioDeFunil(linha) && atual.length > 0) {
         blocos.push(atual.join('\n'));
         atual = [];
       }
@@ -278,7 +284,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
     if (atual.length > 0) blocos.push(atual.join('\n'));
 
-    return blocos.filter(b => /\d{5,}\s*-\s*[^|]+\|\s*[A-Z]{2}\s*\|/i.test(b));
+    return blocos.filter(b => ehInicioDeFunil(b.split('\n').find(l => l.trim()) || ''));
   }
 
   // ── Importar .txt / .docx ─────────────────────────────────────────────
