@@ -270,7 +270,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
     for (const linha of linhas) {
       const ehInicio = /^\d{5,}\s*-\s*[^|]+\|\s*[A-Z]{2}\s*\|/i.test(linha.trim());
-      if (ehInicio) console.log('INÍCIO DE BLOCO DETECTADO:', linha.trim().substring(0, 80));
       if (ehInicio && atual.length > 0) {
         blocos.push(atual.join('\n'));
         atual = [];
@@ -279,54 +278,37 @@ document.addEventListener('DOMContentLoaded', () => {
     }
     if (atual.length > 0) blocos.push(atual.join('\n'));
 
-    console.log('TOTAL DE BLOCOS:', blocos.length);
-    blocos.forEach((b, i) => console.log(`BLOCO ${i}:`, b.split('\n')[0].substring(0, 80)));
-
     return blocos.filter(b => /\d{5,}\s*-\s*[^|]+\|\s*[A-Z]{2}\s*\|/i.test(b));
   }
 
   // ── Importar .txt / .docx ─────────────────────────────────────────────
   document.getElementById('input-import-text').addEventListener('change', async function (e) {
-    console.log('LOG 1 — arquivo selecionado:', e.target.files[0]?.name);
     const file = e.target.files[0];
     if (!file) return;
     e.target.value = '';   // permite reimportar o mesmo arquivo
-
-    console.log('LOG 2 — tipo do arquivo:', file.name, file.type, file.size, 'bytes');
 
     let texto = '';
     let linkMap = {};
     try {
       if (file.name.toLowerCase().endsWith('.docx')) {
-        console.log('LOG 3 — entrando no bloco .docx');
         const arrayBuffer = await file.arrayBuffer();
-        console.log('LOG 4 — arrayBuffer obtido, tamanho:', arrayBuffer.byteLength);
 
         // Extrair HTML para capturar hiperlinks embutidos (ex: link nativo do Facebook)
-        console.log('LOG 5 — chamando mammoth.convertToHtml');
         const htmlResult = await mammoth.convertToHtml({ arrayBuffer });
-        console.log('LOG 6 — HTML extraído, tamanho:', htmlResult.value.length);
         const doc = new DOMParser().parseFromString(htmlResult.value, 'text/html');
         doc.querySelectorAll('a[href]').forEach(a => {
           const href  = a.getAttribute('href');
           const label = a.textContent.trim().toUpperCase();
           if (href && label) linkMap[label] = href;
         });
-        console.log('LOG 7 — linkMap montado, entradas:', Object.keys(linkMap).length);
 
         // Extrair texto puro para o parser
-        console.log('LOG 8 — chamando mammoth.extractRawText');
         const textResult = await mammoth.extractRawText({ arrayBuffer });
         texto = textResult.value;
-        console.log('LOG 9 — texto extraído, tamanho:', texto.length);
-        console.log('=== TEXTO EXTRAÍDO DO DOCX ===');
-        console.log(texto.substring(0, 2000));
-        console.log('==============================');
       } else {
         texto = await file.text();
       }
     } catch (err) {
-      console.error('LOG ERRO —', err);
       showToast('Erro ao ler arquivo: ' + err.message);
       return;
     }
