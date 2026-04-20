@@ -965,12 +965,27 @@ tbody tr.row-repeated:hover td {
 
 .analysis-item:last-child { border-bottom: none; }
 
+.analysis-item--expandable .analysis-item__header { cursor: pointer; user-select: none; }
+
+.analysis-item__title-row {
+  display:     flex;
+  align-items: center;
+  gap:         6px;
+  margin-bottom: 5px;
+}
+
 .analysis-item__title {
   font-size:   13px;
   font-weight: 600;
   color:       var(--text);
-  margin-bottom: 5px;
   word-break:  break-all;
+}
+
+.analysis-item__toggle {
+  font-size:  11px;
+  color:      var(--text-muted);
+  flex-shrink: 0;
+  transition: transform 0.15s;
 }
 
 .analysis-item__meta {
@@ -990,6 +1005,62 @@ tbody tr.row-repeated:hover td {
   color:         var(--text-muted);
   border:        1px solid var(--border);
 }
+
+/* Performance pills no header do card */
+.af-perf-gasto,
+.af-perf-conv {
+  display:       inline-flex;
+  align-items:   center;
+  padding:       2px 9px;
+  border-radius: 20px;
+  font-size:     11px;
+  font-weight:   500;
+  border:        1px solid var(--border);
+}
+.af-perf-gasto { background: rgba(255,100,100,.08); color: #ff8080; border-color: rgba(255,100,100,.2); }
+.af-perf-conv  { background: rgba(0,212,100,.08);   color: #00d464; border-color: rgba(0,212,100,.2); }
+
+/* Corpo expandido */
+.analysis-item__body {
+  display:    none;
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid var(--border);
+}
+.analysis-item--expanded .analysis-item__body { display: block; }
+
+.af-funil-row {
+  display:     flex;
+  flex-wrap:   wrap;
+  align-items: center;
+  gap:         8px;
+  padding:     6px 0;
+  border-bottom: 1px solid var(--border);
+  font-size:   12px;
+}
+.af-funil-row:last-child { border-bottom: none; }
+
+.af-funil-meta { color: var(--text-muted); }
+
+.af-perf-individual {
+  font-size:    11px;
+  color:        #888;
+  background:   #1a1a1a;
+  border:       1px solid #2a2a2a;
+  padding:      2px 8px;
+  border-radius: 20px;
+  white-space:  nowrap;
+}
+
+.af-funil-link {
+  font-size:   11px;
+  color:       var(--accent);
+  text-decoration: none;
+  padding:     2px 8px;
+  border:      1px solid rgba(0,212,255,.25);
+  border-radius: 20px;
+}
+.af-funil-link:hover { background: rgba(0,212,255,.08); }
 
 .analysis-no-results {
   font-size: 13px;
