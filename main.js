@@ -286,6 +286,9 @@ document.addEventListener('DOMContentLoaded', () => {
         // Extrair texto puro para o parser
         const textResult = await mammoth.extractRawText({ arrayBuffer });
         texto = textResult.value;
+        console.log('=== TEXTO EXTRAÍDO DO DOCX ===');
+        console.log(texto.substring(0, 2000));
+        console.log('==============================');
       } else {
         texto = await file.text();
       }
