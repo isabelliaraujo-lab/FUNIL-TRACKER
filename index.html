@@ -13,7 +13,10 @@
     <div class="header-left">
       <span class="logo">⚡ Funil Tracker</span>
       <nav class="tabs" role="tablist">
-        <button class="tab-btn active" role="tab" data-tab="funis" id="tab-btn-funis">
+        <button class="tab-btn active" role="tab" data-tab="escalada" id="tab-btn-escalada">
+          Escalada
+        </button>
+        <button class="tab-btn" role="tab" data-tab="funis" id="tab-btn-funis">
           Funis
         </button>
         <button class="tab-btn" role="tab" data-tab="analise" id="tab-btn-analise">
@@ -41,9 +44,17 @@
   <main class="main">
 
     <!-- ========================================
+         TAB: ESCALADA
+    ========================================= -->
+    <div class="tab-content active" id="tab-escalada" role="tabpanel">
+      <!-- Rendered dynamically by escalada.js -->
+    </div><!-- /tab-escalada -->
+
+
+    <!-- ========================================
          TAB: FUNIS
     ========================================= -->
-    <div class="tab-content active" id="tab-funis" role="tabpanel">
+    <div class="tab-content" id="tab-funis" role="tabpanel" hidden>
 
       <!-- Mode selector -->
       <div class="mode-selector" role="group" aria-label="Modo de entrada">
@@ -558,6 +569,7 @@
   <script src="supabase.js"></script>
 
   <script src="parser.js"></script>
+  <script src="escalada.js"></script>
   <script src="tabela.js"></script>
   <script src="analise.js"></script>
   <script src="main.js"></script>

@@ -124,5 +124,25 @@ const SupabaseStorage = (() => {
     return local.length;
   }
 
-  return { loadFunnels, syncFunnels, migrarLocalStorage };
+  // ── Contas monitoradas ────────────────────────────────────────────────
+
+  async function loadMonitoradas() {
+    const { data, error } = await db.from('contas_monitoradas').select('conta').order('created_at');
+    if (error) { console.error('Error loading monitoradas:', error); return []; }
+    return (data || []).map(r => r.conta);
+  }
+
+  async function saveMonitorada(conta) {
+    const { error } = await db
+      .from('contas_monitoradas')
+      .upsert({ conta }, { onConflict: 'conta' });
+    if (error) console.error('Error saving monitorada:', error);
+  }
+
+  async function deleteMonitorada(conta) {
+    const { error } = await db.from('contas_monitoradas').delete().eq('conta', conta);
+    if (error) console.error('Error deleting monitorada:', error);
+  }
+
+  return { loadFunnels, syncFunnels, migrarLocalStorage, loadMonitoradas, saveMonitorada, deleteMonitorada };
 })();

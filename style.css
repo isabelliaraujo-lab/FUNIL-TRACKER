@@ -1216,6 +1216,95 @@ tbody tr.row-repeated:hover td {
 
 
 /* ============================================================
+   ESCALADA TAB
+   ============================================================ */
+
+.escalada-section {
+  margin-bottom: 28px;
+}
+
+.escalada-section__title {
+  font-size:      14px;
+  font-weight:    700;
+  color:          var(--text);
+  margin:         0 0 14px;
+  padding-bottom: 8px;
+  border-bottom:  1px solid var(--border);
+}
+
+.escalada-grid {
+  display:               grid;
+  grid-template-columns: 1fr 1fr;
+  gap:                   16px;
+}
+
+.escalada-card {
+  background:    var(--surface2);
+  border:        1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding:       16px 20px;
+}
+
+.escalada-card__title {
+  font-size:      11px;
+  font-weight:    700;
+  color:          var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  margin-bottom:  14px;
+}
+
+.rank-item {
+  display:       flex;
+  align-items:   center;
+  gap:           10px;
+  padding:       8px 0;
+  border-bottom: 1px solid var(--border);
+  font-size:     13px;
+}
+.rank-item:last-child { border-bottom: none; }
+
+.rank-pos {
+  font-size:   11px;
+  font-weight: 700;
+  color:       var(--text-muted);
+  min-width:   22px;
+  flex-shrink: 0;
+}
+.rank-pos.top { color: var(--accent); }
+
+.tag-status {
+  display:     inline-flex;
+  align-items: center;
+  gap:         4px;
+  font-size:   10px;
+  font-weight: 600;
+  padding:     2px 8px;
+  border-radius: 20px;
+  white-space: nowrap;
+}
+
+.btn-monitor {
+  background:  transparent;
+  border:      1px solid var(--border);
+  border-radius: var(--radius);
+  color:       var(--text-muted);
+  font-size:   12px;
+  padding:     3px 8px;
+  cursor:      pointer;
+  transition:  border-color .15s, color .15s;
+}
+.btn-monitor:hover,
+.btn-monitor.ativo {
+  border-color: #00d4ff;
+  color:        #00d4ff;
+}
+
+@media (max-width: 768px) {
+  .escalada-grid { grid-template-columns: 1fr; }
+}
+
+/* ============================================================
    RESPONSIVE
    ============================================================ */
 @media (max-width: 1100px) {

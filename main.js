@@ -7,9 +7,25 @@ document.addEventListener('DOMContentLoaded', async () => {
   // ── Estado global ─────────────────────────────────────────────────────
   let funnels     = [];
   let prevFunnels = [];   // snapshot anterior para detectar deleções
+  let monitoradas = [];   // contas monitoradas (gerenciadas aqui)
 
-  // Retorna o array atual (lido por Tabela e Analise)
-  function getFunnels() { return funnels; }
+  // Retorna o array atual (lido por Tabela, Analise e Escalada)
+  function getFunnels()    { return funnels; }
+  function getMonitoradas() { return monitoradas; }
+
+  async function toggleMonitorar(conta) {
+    if (monitoradas.includes(conta)) {
+      monitoradas = monitoradas.filter(c => c !== conta);
+      SupabaseStorage.deleteMonitorada(conta).catch(console.error);
+      showToast(`"${conta}" removida do monitoramento.`);
+    } else {
+      monitoradas = [...monitoradas, conta];
+      SupabaseStorage.saveMonitorada(conta).catch(console.error);
+      showToast(`"${conta}" adicionada ao monitoramento!`);
+    }
+    Tabela.renderTable();
+    if (!document.getElementById('tab-escalada').hidden) Escalada.refresh();
+  }
 
   // ── Status de sincronização ───────────────────────────────────────────
   function setSyncStatus(state) {
@@ -40,9 +56,8 @@ document.addEventListener('DOMContentLoaded', async () => {
       .then(ok => setSyncStatus(ok ? 'saved' : 'error'))
       .catch(() => setSyncStatus('error'));
 
-    if (!document.getElementById('tab-analise').hidden) {
-      Analise.refresh();
-    }
+    if (!document.getElementById('tab-analise').hidden)  Analise.refresh();
+    if (!document.getElementById('tab-escalada').hidden) Escalada.refresh();
   }
 
   // ── Toast ─────────────────────────────────────────────────────────────
@@ -72,6 +87,13 @@ document.addEventListener('DOMContentLoaded', async () => {
     funnels = Storage.load();
   }
   prevFunnels = [...funnels];
+
+  try {
+    monitoradas = await SupabaseStorage.loadMonitoradas();
+  } catch {
+    monitoradas = [];
+  }
+
   setSyncStatus('saved');
 
   // ── Navegação entre abas ──────────────────────────────────────────────
@@ -91,8 +113,9 @@ document.addEventListener('DOMContentLoaded', async () => {
       target.classList.add('active');
       target.hidden = false;
 
-      // Re-executar buscas da análise com dados atuais ao entrar na aba
-      if (tabId === 'analise') Analise.refresh();
+      // Re-executar conteúdo das abas ao entrar nelas
+      if (tabId === 'analise')  Analise.refresh();
+      if (tabId === 'escalada') Escalada.refresh();
     });
   });
 
@@ -428,7 +451,11 @@ document.addEventListener('DOMContentLoaded', async () => {
   });
 
   // ── Inicializar módulos ───────────────────────────────────────────────
+  Escalada.init(getFunnels, getMonitoradas, toggleMonitorar);
   Tabela.init(getFunnels, saveFunnels, showToast);
   Analise.init(getFunnels);
+
+  // Escalada é a aba padrão — renderizar conteúdo inicial
+  Escalada.refresh();
 
 });
