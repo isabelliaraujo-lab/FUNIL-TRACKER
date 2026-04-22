@@ -37,6 +37,26 @@ const Analise = (() => {
     return totais;
   }
 
+  function renderCardsTotais(funis) {
+    const totais = calcularTotaisPorMoeda(funis);
+    if (!Object.keys(totais).length) return '';
+    return Object.entries(totais).map(([moeda, t]) => {
+      const s   = t.simbolo;
+      const fmt = v => v > 0
+        ? `${s} ${v.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`
+        : '—';
+      return `
+        <div class="analysis-metric" style="border-top:2px solid #ff4d4d">
+          <div class="analysis-metric__val" style="color:#ff4d4d">${fmt(t.gasto)}</div>
+          <div class="analysis-metric__lbl">gasto total ${esc(moeda)}</div>
+        </div>
+        <div class="analysis-metric" style="border-top:2px solid #00c47a">
+          <div class="analysis-metric__val" style="color:#00c47a">${fmt(t.conversao)}</div>
+          <div class="analysis-metric__lbl">conversão total ${esc(moeda)}</div>
+        </div>`;
+    }).join('');
+  }
+
   function renderTotaisPerf(funis) {
     const totais = calcularTotaisPorMoeda(funis);
     if (!Object.keys(totais).length) return '';
@@ -172,13 +192,14 @@ const Analise = (() => {
 
   // ── Componentes HTML ──────────────────────────────────────────────────
 
-  function metricsHtml(metrics) {
+  function metricsHtml(metrics, extraHtml = '') {
     return `<div class="analysis-metrics">
       ${metrics.map(m => `
         <div class="analysis-metric">
           <div class="analysis-metric__val">${m.val}</div>
           <div class="analysis-metric__lbl">${esc(m.lbl)}</div>
         </div>`).join('')}
+      ${extraHtml}
     </div>`;
   }
 
@@ -305,7 +326,7 @@ const Analise = (() => {
         { val: matched.length, lbl: 'Funis'           },
         { val: produtos.size,  lbl: 'Produtos'        },
         { val: destinos.size,  lbl: 'Destinos finais' },
-      ]) + listHtml(items);
+      ], renderCardsTotais(matched)) + listHtml(items);
   }
 
   // ── Bloco 2 — por domínio final ───────────────────────────────────────
@@ -352,7 +373,7 @@ const Analise = (() => {
         { val: matched.length, lbl: 'Funis'         },
         { val: domsAn.size,    lbl: 'Dom. anúncio'  },
         { val: produtos.size,  lbl: 'Produtos'      },
-      ]) + listHtml(items);
+      ], renderCardsTotais(matched)) + listHtml(items);
   }
 
   // ── Bloco 3 — por produto ─────────────────────────────────────────────
@@ -415,7 +436,7 @@ const Analise = (() => {
         { val: domsAn.size,    lbl: 'Dom. anúncio'  },
         { val: domsFinal.size, lbl: 'Dom. finais'   },
         { val: matched.length, lbl: 'Funis'         },
-      ]) + twoColHtml(
+      ], renderCardsTotais(matched)) + twoColHtml(
         'Domínios de anúncio', domAnItems,
         'Domínios finais',     domFinItems
       );
