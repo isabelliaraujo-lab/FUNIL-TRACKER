@@ -26,9 +26,8 @@ const Tabela = (() => {
     renderTable();
   }
 
-  // ── Estado do popup de performance ────────────────────────────────────
-  let _perfId  = null;   // id do funil com popup aberto
-  let _perfEl  = null;   // elemento DOM do popup
+  // ── Estado do modal de performance ───────────────────────────────────
+  let _perfModalId = null;
 
   // ── Atalhos ───────────────────────────────────────────────────────────
   const esc = Storage.escHtml;
@@ -192,7 +191,6 @@ const Tabela = (() => {
 
   // ── Render da tabela ──────────────────────────────────────────────────
   function renderTable() {
-    closePerfPopup();   // limpar popup antes de substituir DOM
 
     const funnels   = _getFunnels();
     const domCounts = Storage.getDomainCounts(funnels);
@@ -305,81 +303,45 @@ const Tabela = (() => {
     setTimeout(() => document.getElementById('e-conta').focus(), 30);
   }
 
-  // ── Performance popup ─────────────────────────────────────────────────
+  // ── Modal de performance ──────────────────────────────────────────────
 
-  function closePerfPopup() {
-    if (_perfEl && _perfEl.parentNode) _perfEl.parentNode.removeChild(_perfEl);
-    _perfEl  = null;
-    _perfId  = null;
+  function closePerfModal() {
+    document.getElementById('modal-performance').hidden = true;
+    _perfModalId = null;
   }
 
-  function openPerfPopup(id) {
-    // Clique no mesmo botão → toggle (fecha)
-    if (_perfId === id) { closePerfPopup(); return; }
-    closePerfPopup();
+  function openPerfModal(id) {
+    const f = _getFunnels().find(x => x.id === id);
+    if (!f) return;
+
+    document.getElementById('perf-modal-moeda').value = f.moeda    || 'BRL';
+    document.getElementById('perf-modal-gasto').value = f.gasto    != null ? f.gasto    : '';
+    document.getElementById('perf-modal-conv').value  = f.conversao != null ? f.conversao : '';
+    document.getElementById('perf-modal-id').value    = id;
+
+    _perfModalId = id;
+    document.getElementById('modal-performance').hidden = false;
+    setTimeout(() => document.getElementById('perf-modal-gasto').focus(), 30);
+  }
+
+  function savePerfModal() {
+    const id    = document.getElementById('perf-modal-id').value;
+    const moeda = document.getElementById('perf-modal-moeda').value;
+    const gasto = document.getElementById('perf-modal-gasto').value;
+    const conv  = document.getElementById('perf-modal-conv').value;
 
     const funnels = _getFunnels();
     const f = funnels.find(x => x.id === id);
     if (!f) return;
 
-    const cell = document.querySelector(`.perf-cell[data-id="${id}"]`);
-    if (!cell) return;
+    f.moeda     = moeda;
+    f.gasto     = gasto !== '' ? parseFloat(gasto) : null;
+    f.conversao = conv  !== '' ? parseFloat(conv)  : null;
 
-    // Clonar o <template> do index.html
-    const tpl   = document.getElementById('tpl-perf-form');
-    const popup = tpl.content.cloneNode(true).querySelector('.perf-popup');
-
-    // Preencher valores existentes
-    const selMoeda  = popup.querySelector('#pf-moeda');
-    const inpGasto  = popup.querySelector('#pf-gasto');
-    const inpConv   = popup.querySelector('#pf-conversao');
-
-    selMoeda.value = f.moeda    || 'BRL';
-    inpGasto.value = f.gasto    != null ? f.gasto    : '';
-    inpConv.value  = f.conversao != null ? f.conversao : '';
-
-    // Salvar
-    popup.querySelector('[data-action="save"]').addEventListener('click', () => {
-      const updated = _getFunnels();
-      const target  = updated.find(x => x.id === id);
-      if (!target) return;
-
-      target.moeda     = selMoeda.value;
-      target.gasto     = inpGasto.value !== '' ? parseFloat(inpGasto.value)  : null;
-      target.conversao = inpConv.value  !== '' ? parseFloat(inpConv.value)   : null;
-
-      _saveFunnels(updated);
-      closePerfPopup();
-      renderTable();
-      _showToast('Performance salva!');
-    });
-
-    // Cancelar
-    popup.querySelector('[data-action="cancel"]').addEventListener('click', closePerfPopup);
-
-    // Fechar com Enter nos inputs de número
-    [inpGasto, inpConv].forEach(inp => {
-      inp.addEventListener('keydown', e => {
-        if (e.key === 'Enter') popup.querySelector('[data-action="save"]').click();
-        if (e.key === 'Escape') closePerfPopup();
-      });
-    });
-
-    // Anexar ao body para escapar do overflow da tabela e posicionar com fixed
-    document.body.appendChild(popup);
-    const rect = cell.getBoundingClientRect();
-    popup.style.top   = (rect.bottom + 6) + 'px';
-    popup.style.right = (window.innerWidth - rect.right) + 'px';
-    popup.style.left  = 'auto';
-
-    _perfEl = popup;
-    _perfId = id;
-
-    // Fechar ao rolar a página
-    window.addEventListener('scroll', closePerfPopup, { once: true, passive: true });
-
-    // Focar primeiro campo relevante
-    setTimeout(() => inpGasto.focus(), 30);
+    _saveFunnels(funnels);
+    closePerfModal();
+    renderTable();
+    _showToast('Performance salva!');
   }
 
   // ── Clipboard ─────────────────────────────────────────────────────────
@@ -416,11 +378,11 @@ const Tabela = (() => {
       return;
     }
 
-    // Abrir/fechar popup de performance (botão "+ adicionar" ou tags)
+    // Abrir modal de performance (botão "+ adicionar" ou tags)
     const perfTrigger = e.target.closest('[data-perf-id]');
     if (perfTrigger) {
       e.stopPropagation();
-      openPerfPopup(perfTrigger.dataset.perfId);
+      openPerfModal(perfTrigger.dataset.perfId);
       return;
     }
 
@@ -442,14 +404,6 @@ const Tabela = (() => {
         _showToast('Funil excluído.');
       }
     }
-  }
-
-  // Fechar popup ao clicar fora dele
-  function onDocClick(e) {
-    if (!_perfEl) return;
-    const clickedInsidePopup  = _perfEl.contains(e.target);
-    const clickedPerfTrigger  = Boolean(e.target.closest('[data-perf-id]'));
-    if (!clickedInsidePopup && !clickedPerfTrigger) closePerfPopup();
   }
 
   // Salvar obs ao perder foco ou pressionar Enter
@@ -481,15 +435,25 @@ const Tabela = (() => {
       if (e.target.matches('.obs-input') && e.key === 'Enter') e.target.blur();
     });
 
-    // Fechar popup ao clicar fora (captura no document, após todos os outros handlers)
-    document.addEventListener('click', onDocClick);
-
-    // Escape fecha popup de performance ou modal de edição
+    // Escape fecha modal de performance ou modal de edição
     document.addEventListener('keydown', e => {
       if (e.key === 'Escape') {
-        if (_perfEl) closePerfPopup();
+        if (!document.getElementById('modal-performance').hidden) { closePerfModal(); return; }
         if (!document.getElementById('edit-modal').hidden) closeEditModal();
       }
+    });
+
+    // Modal de performance
+    document.getElementById('btn-perf-save').addEventListener('click', savePerfModal);
+    document.getElementById('btn-perf-cancel').addEventListener('click', closePerfModal);
+    document.getElementById('modal-performance').addEventListener('click', e => {
+      if (e.target === document.getElementById('modal-performance')) closePerfModal();
+    });
+    ['perf-modal-gasto', 'perf-modal-conv'].forEach(id => {
+      document.getElementById(id).addEventListener('keydown', e => {
+        if (e.key === 'Enter')  savePerfModal();
+        if (e.key === 'Escape') closePerfModal();
+      });
     });
 
     // Fechar modal de edição ao clicar no overlay

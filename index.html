@@ -367,46 +367,34 @@
   <!-- ===== TOAST ===== -->
   <div id="toast" class="toast" role="alert" aria-live="polite"></div>
 
-  <!-- ===== PERFORMANCE POPUP (injected dynamically by tabela.js) ===== -->
-  <!--
-    Template for the inline performance form.
-    tabela.js clones and positions this near the target cell.
-  -->
-  <template id="tpl-perf-form">
-    <div class="perf-popup" role="dialog" aria-label="Registrar performance">
-      <div class="perf-popup__title">Performance</div>
-
+  <!-- ===== PERFORMANCE MODAL ===== -->
+  <div id="modal-performance" class="modal-overlay" hidden
+       role="dialog" aria-modal="true" aria-labelledby="perf-modal-title">
+    <div class="modal-box">
+      <div class="modal-box__title" id="perf-modal-title">Performance do funil</div>
+      <input type="hidden" id="perf-modal-id">
       <div class="form-group">
-        <label class="field-label" for="pf-moeda">Moeda</label>
-        <select id="pf-moeda" class="input-inline">
+        <label class="field-label" for="perf-modal-moeda">Moeda</label>
+        <select id="perf-modal-moeda">
           <option value="BRL">R$ BRL</option>
           <option value="USD">$ USD</option>
           <option value="INR">₹ INR</option>
         </select>
       </div>
-
       <div class="form-group">
-        <label class="field-label" for="pf-gasto">Gasto total da campanha</label>
-        <input type="number" id="pf-gasto" step="0.01" min="0"
-               placeholder="0.00" class="input-inline" />
+        <label class="field-label" for="perf-modal-gasto">Gasto total da campanha</label>
+        <input type="number" id="perf-modal-gasto" placeholder="0.00" step="0.01" min="0">
       </div>
-
       <div class="form-group">
-        <label class="field-label" for="pf-conversao">Valor total de conversão</label>
-        <input type="number" id="pf-conversao" step="0.01" min="0"
-               placeholder="0.00" class="input-inline" />
+        <label class="field-label" for="perf-modal-conv">Valor total de conversão</label>
+        <input type="number" id="perf-modal-conv" placeholder="0.00" step="0.01" min="0">
       </div>
-
-      <div class="btn-row perf-popup__actions">
-        <button type="button" class="btn btn-primary btn-sm" data-action="save">
-          Salvar
-        </button>
-        <button type="button" class="btn btn-secondary btn-sm" data-action="cancel">
-          Cancelar
-        </button>
+      <div class="btn-row" style="margin-top:20px">
+        <button class="btn btn-primary" id="btn-perf-save">✓ Salvar</button>
+        <button class="btn btn-secondary" id="btn-perf-cancel">Cancelar</button>
       </div>
     </div>
-  </template>
+  </div>
 
   <!-- ===== EDIT MODAL ===== -->
   <div id="edit-modal" class="modal-overlay" hidden
