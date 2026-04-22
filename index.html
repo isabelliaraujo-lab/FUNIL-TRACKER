@@ -513,18 +513,36 @@
   <div id="import-text-modal" class="modal-overlay" hidden
        role="dialog" aria-modal="true" aria-labelledby="import-modal-title">
     <div class="modal-box">
-      <div class="modal-box__title" id="import-modal-title">Importar funis de arquivo</div>
-      <p style="margin:0 0 16px;font-size:13px;color:var(--text-muted);">
-        <span id="import-modal-count"></span> funil(s) encontrado(s).
-        Todos receberão a data abaixo.
-      </p>
+      <div class="modal-box__title" id="import-modal-title">Importar funis</div>
+
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin:16px 0">
+        <div class="import-stat import-stat--new">
+          <span class="import-stat__num" id="import-count-novos">0</span>
+          <span class="import-stat__label">novos para importar</span>
+        </div>
+        <div class="import-stat import-stat--dup">
+          <span class="import-stat__num" id="import-count-dup">0</span>
+          <span class="import-stat__label">já cadastrados (ignorados)</span>
+        </div>
+      </div>
+
+      <div id="import-lista-duplicados" style="display:none;margin-bottom:16px">
+        <div style="font-size:11px;color:#555;text-transform:uppercase;letter-spacing:.8px;margin-bottom:8px">Já cadastrados</div>
+        <div id="import-dup-items" style="max-height:120px;overflow-y:auto"></div>
+      </div>
+
+      <div id="import-lista-novos" style="margin-bottom:16px">
+        <div style="font-size:11px;color:#555;text-transform:uppercase;letter-spacing:.8px;margin-bottom:8px">Novos funis</div>
+        <div id="import-new-items" style="max-height:120px;overflow-y:auto"></div>
+      </div>
+
       <div class="form-group">
         <label class="field-label" for="import-modal-date">Data dos funis</label>
         <input type="date" id="import-modal-date" />
       </div>
       <div class="btn-row" style="margin-top: 20px;">
         <button class="btn btn-primary" id="btn-confirm-import-text">
-          ✓ Confirmar importação
+          ✓ Importar <span id="import-btn-count">0</span> funil(s)
         </button>
         <button class="btn btn-secondary" id="btn-cancel-import-text">
           Cancelar

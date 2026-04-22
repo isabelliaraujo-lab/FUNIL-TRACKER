@@ -270,12 +270,35 @@ document.addEventListener('DOMContentLoaded', async () => {
     this.value = '';  // permite reimportar o mesmo arquivo
   });
 
-  // ── Modal de confirmação de importação (retorna a data escolhida ou null se cancelou) ──
-  function pedirDataImport(qtd) {
+  // ── Modal de importação com deduplicação por adId ─────────────────────
+  function pedirDataImport(novos, duplicados) {
     return new Promise(resolve => {
       const hoje = new Date().toISOString().slice(0, 10);
-      document.getElementById('import-modal-count').textContent = qtd;
-      document.getElementById('import-modal-date').value = hoje;
+      const esc  = Storage.escHtml;
+
+      document.getElementById('import-count-novos').textContent = novos.length;
+      document.getElementById('import-count-dup').textContent   = duplicados.length;
+      document.getElementById('import-btn-count').textContent   = novos.length;
+      document.getElementById('import-modal-date').value        = hoje;
+
+      const btnConfirm = document.getElementById('btn-confirm-import-text');
+      btnConfirm.disabled = novos.length === 0;
+
+      const dupSection = document.getElementById('import-lista-duplicados');
+      dupSection.style.display = duplicados.length ? 'block' : 'none';
+      document.getElementById('import-dup-items').innerHTML = duplicados.map(f =>
+        `<div style="font-size:12px;color:#555;padding:4px 0;border-bottom:1px solid #1a1a1a">
+          ${esc(f.conta || '—')} — ${esc(f.produto || '—')}
+        </div>`
+      ).join('');
+
+      document.getElementById('import-new-items').innerHTML = novos.length
+        ? novos.map(f =>
+            `<div style="font-size:12px;color:#ccc;padding:4px 0;border-bottom:1px solid #1a1a1a">
+              ${esc(f.conta || '—')} — ${esc(f.produto || '—')}
+            </div>`
+          ).join('')
+        : '<div style="font-size:12px;color:#555;padding:4px 0">Nenhum funil novo encontrado.</div>';
 
       const modal = document.getElementById('import-text-modal');
       modal.hidden = false;
@@ -283,16 +306,18 @@ document.addEventListener('DOMContentLoaded', async () => {
       function onConfirm() {
         const data = document.getElementById('import-modal-date').value || hoje;
         modal.hidden = true;
+        btnConfirm.disabled = false;
         cleanup();
         resolve(data);
       }
       function onCancel() {
         modal.hidden = true;
+        btnConfirm.disabled = false;
         cleanup();
         resolve(null);
       }
       function cleanup() {
-        document.getElementById('btn-confirm-import-text').removeEventListener('click', onConfirm);
+        btnConfirm.removeEventListener('click', onConfirm);
         document.getElementById('btn-cancel-import-text').removeEventListener('click', onCancel);
         modal.removeEventListener('click', onOverlay);
       }
@@ -300,7 +325,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         if (e.target === modal) onCancel();
       }
 
-      document.getElementById('btn-confirm-import-text').addEventListener('click', onConfirm);
+      btnConfirm.addEventListener('click', onConfirm);
       document.getElementById('btn-cancel-import-text').addEventListener('click', onCancel);
       modal.addEventListener('click', onOverlay);
     });
@@ -384,18 +409,22 @@ document.addEventListener('DOMContentLoaded', async () => {
       return;
     }
 
-    const dataEscolhida = await pedirDataImport(parsed.length);
+    const idsNoBanco = new Set(funnels.map(f => f.adId).filter(Boolean));
+    const novos      = parsed.filter(f => !f.adId || !idsNoBanco.has(f.adId));
+    const duplicados = parsed.filter(f =>  f.adId &&  idsNoBanco.has(f.adId));
+
+    const dataEscolhida = await pedirDataImport(novos, duplicados);
     if (dataEscolhida === null) return;   // usuário cancelou
 
-    parsed.forEach(f => {
+    novos.forEach(f => {
       f.id   = Storage.genId();
       f.data = dataEscolhida;
     });
 
-    funnels = [...parsed, ...funnels];
+    funnels = [...novos, ...funnels];
     saveFunnels(funnels);
     Tabela.renderTable();
-    showToast(`${parsed.length} funil(s) importado(s) com sucesso!`, 3500);
+    showToast(`${novos.length} funil(s) importado(s) com sucesso!`, 3500);
   });
 
   // ── Inicializar módulos ───────────────────────────────────────────────
