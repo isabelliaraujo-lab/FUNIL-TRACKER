@@ -115,6 +115,31 @@ input, select, textarea { font-family: inherit; font-size: inherit; color-scheme
   flex-shrink: 0;
 }
 
+.sync-status {
+  font-size:      11px;
+  letter-spacing: 0.3px;
+  padding:        3px 10px;
+  border-radius:  20px;
+  border:         1px solid transparent;
+  transition:     color 0.3s, background 0.3s, border-color 0.3s;
+  white-space:    nowrap;
+}
+.sync-status--saving {
+  color:        var(--text-muted);
+  background:   transparent;
+  border-color: var(--border);
+}
+.sync-status--saved {
+  color:        #00d464;
+  background:   rgba(0,212,100,.08);
+  border-color: rgba(0,212,100,.2);
+}
+.sync-status--error {
+  color:        #ff8080;
+  background:   rgba(255,100,100,.08);
+  border-color: rgba(255,100,100,.2);
+}
+
 
 /* ============================================================
    TABS

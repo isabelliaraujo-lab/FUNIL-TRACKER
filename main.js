@@ -2,18 +2,44 @@
    main.js — inicialização e conexão entre módulos
    ============================================================ */
 
-document.addEventListener('DOMContentLoaded', () => {
+document.addEventListener('DOMContentLoaded', async () => {
 
   // ── Estado global ─────────────────────────────────────────────────────
-  let funnels = Storage.load();
+  let funnels     = [];
+  let prevFunnels = [];   // snapshot anterior para detectar deleções
 
   // Retorna o array atual (lido por Tabela e Analise)
   function getFunnels() { return funnels; }
 
-  // Salva, atualiza referência local e re-executa análise se necessária
+  // ── Status de sincronização ───────────────────────────────────────────
+  function setSyncStatus(state) {
+    const el = document.getElementById('sync-status');
+    if (!el) return;
+    const map = {
+      loading: ['sync-status--saving', 'sincronizando...'],
+      saving:  ['sync-status--saving', 'salvando na nuvem...'],
+      saved:   ['sync-status--saved',  '✓ salvo na nuvem'],
+      error:   ['sync-status--error',  '⚠ erro ao salvar — verifique a conexão'],
+    };
+    const [cls, txt] = map[state] || map.saved;
+    el.className = 'sync-status ' + cls;
+    el.textContent = txt;
+  }
+
+  // Salva: atualiza memória + dispara sync na nuvem (fire-and-forget)
   function saveFunnels(updated) {
-    funnels = updated;
-    Storage.save(funnels);
+    const deletedIds = prevFunnels
+      .map(f => f.id)
+      .filter(id => !updated.find(f => f.id === id));
+
+    prevFunnels = funnels;
+    funnels     = updated;
+
+    setSyncStatus('saving');
+    SupabaseStorage.syncFunnels(updated, deletedIds)
+      .then(ok => setSyncStatus(ok ? 'saved' : 'error'))
+      .catch(() => setSyncStatus('error'));
+
     if (!document.getElementById('tab-analise').hidden) {
       Analise.refresh();
     }
@@ -29,6 +55,24 @@ document.addEventListener('DOMContentLoaded', () => {
     clearTimeout(_toastTimer);
     _toastTimer = setTimeout(() => el.classList.remove('show'), duration);
   }
+
+  // ── Carga inicial: migração + load do Supabase ─────────────────────────
+  setSyncStatus('loading');
+  try {
+    const migrados = await SupabaseStorage.migrarLocalStorage();
+    if (migrados > 0) showToast(`${migrados} funil(s) migrado(s) para a nuvem!`, 4000);
+  } catch (e) {
+    console.error('Erro na migração:', e);
+  }
+
+  try {
+    const cloud = await SupabaseStorage.loadFunnels();
+    funnels = cloud !== null ? cloud : Storage.load();
+  } catch {
+    funnels = Storage.load();
+  }
+  prevFunnels = [...funnels];
+  setSyncStatus('saved');
 
   // ── Navegação entre abas ──────────────────────────────────────────────
   document.querySelectorAll('.tab-btn').forEach(btn => {

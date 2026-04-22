@@ -22,6 +22,7 @@
       </nav>
     </div>
     <div class="header-actions">
+      <span id="sync-status" class="sync-status sync-status--saving">sincronizando...</span>
       <button class="btn btn-secondary btn-sm" id="btn-export-csv">
         ↓ Exportar CSV
       </button>
@@ -545,9 +546,11 @@
   </div>
 
   <!-- ===== SCRIPTS ===== -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.6.0/mammoth.browser.min.js"></script>
-  <script>console.log('mammoth:', typeof mammoth);</script>
   <script src="storage.js"></script>
+  <script src="supabase.js"></script>
+
   <script src="parser.js"></script>
   <script src="tabela.js"></script>
   <script src="analise.js"></script>
