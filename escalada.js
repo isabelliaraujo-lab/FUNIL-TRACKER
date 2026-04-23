@@ -76,7 +76,8 @@ const Escalada = (() => {
       return `<div class="rank-item">
         <span class="rank-pos ${i < 3 ? 'top' : ''}">#${i + 1}</span>
         <div style="flex:1;min-width:0;overflow:hidden">
-          <div style="font-weight:600;font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap"
+          <div class="rank-nome" data-analise-produto="${esc(p.produto)}"
+               style="font-weight:600;font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap"
                title="${esc(p.produto)}">${esc(p.produto)}</div>
           ${nichoTags ? `<div style="margin-top:3px;display:flex;flex-wrap:wrap;gap:3px">${nichoTags}</div>` : ''}
         </div>
@@ -98,7 +99,8 @@ const Escalada = (() => {
       return `<div class="rank-item">
         <span class="rank-pos ${i < 3 ? 'top' : ''}">#${i + 1}</span>
         <div style="flex:1;min-width:0;overflow:hidden">
-          <div style="font-weight:600;font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap"
+          <div class="rank-nome" data-analise-produto="${esc(p.produto)}"
+               style="font-weight:600;font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap"
                title="${esc(p.produto)}">${esc(p.produto)}</div>
           <div style="font-size:11px;color:var(--text-muted);margin-top:2px">
             ${fmtMoeda(p.gasto, p.moeda)} gasto · ${fmtMoeda(p.conversao, p.moeda)} conv.
@@ -367,6 +369,17 @@ const Escalada = (() => {
       secaoMonitoradas(funis);
   }
 
+  // ── Navegação para aba Análise ────────────────────────────────────────
+
+  function abrirAnaliseProduto(produto) {
+    document.querySelector('[data-tab="analise"]').click();
+    const input = document.getElementById('search-produto');
+    if (!input) return;
+    input.value = produto;
+    input.dispatchEvent(new Event('input', { bubbles: true }));
+    setTimeout(() => input.scrollIntoView({ behavior: 'smooth', block: 'center' }), 200);
+  }
+
   // ── Inicialização ─────────────────────────────────────────────────────
 
   function init(getFunnels, getMonitoradas, toggleMonitorar) {
@@ -374,10 +387,14 @@ const Escalada = (() => {
     _getMonitoradas  = getMonitoradas  || (() => []);
     _toggleMonitorar = toggleMonitorar || (() => {});
 
-    // Delegação para botões "Parar de monitorar" nos cards (renderizados dinamicamente)
     document.getElementById('tab-escalada').addEventListener('click', e => {
-      const btn = e.target.closest('[data-monitor-conta]');
-      if (btn) _toggleMonitorar(btn.dataset.monitorConta);
+      // "Parar de monitorar" nos cards de monitoradas
+      const monitorBtn = e.target.closest('[data-monitor-conta]');
+      if (monitorBtn) { _toggleMonitorar(monitorBtn.dataset.monitorConta); return; }
+
+      // Nome de produto clicável nos rankings
+      const nomeEl = e.target.closest('[data-analise-produto]');
+      if (nomeEl) abrirAnaliseProduto(nomeEl.dataset.analiseProduto);
     });
   }
 

@@ -1274,6 +1274,12 @@ tbody tr.row-repeated:hover td {
 }
 .rank-pos.top { color: var(--accent); }
 
+.rank-nome {
+  cursor:     pointer;
+  transition: color .15s;
+}
+.rank-nome:hover { color: #00d4ff; }
+
 .tag-status {
   display:     inline-flex;
   align-items: center;
