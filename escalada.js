@@ -279,11 +279,76 @@ const Escalada = (() => {
       </div>`;
   }
 
-  function secaoMonitoradas() {
+  function secaoMonitoradas(funis) {
+    const monitoradas = _getMonitoradas();
+
+    if (!monitoradas.length) {
+      return `
+        <div class="escalada-section">
+          <h3 class="escalada-section__title">👁 Contas monitoradas</h3>
+          <p class="analysis-no-results">Nenhuma conta monitorada. Clique em 👁 em qualquer funil para começar a acompanhar.</p>
+        </div>`;
+    }
+
+    const cardsHTML = monitoradas.map(conta => {
+      const funisC = funis.filter(f => f.conta === conta);
+      const views  = funisC.reduce((s, f) => s + (f.views || 0), 0);
+
+      // ROI consolidado da conta
+      let roiHtml = '';
+      const comPerf = funisC.filter(f => f.gasto != null && f.conversao != null);
+      if (comPerf.length) {
+        const g = comPerf.reduce((s, f) => s + (parseFloat(f.gasto)     || 0), 0);
+        const c = comPerf.reduce((s, f) => s + (parseFloat(f.conversao) || 0), 0);
+        if (g > 0) {
+          const roi = ((c - g) / g) * 100;
+          const cor = roi >= 0 ? '#00c47a' : '#ff4d4d';
+          roiHtml = `<span style="color:${cor};font-weight:700;font-size:13px;margin-left:10px">${fmtROI(roi)}</span>`;
+        }
+      }
+
+      // Produtos únicos
+      const produtos = [...new Set(funisC.map(f => f.produto).filter(Boolean))];
+      const prodTags = produtos
+        .map(p => `<span class="tag" style="font-size:10px">${esc(p)}</span>`)
+        .join('');
+
+      // Domínios únicos com link quando disponível
+      const domsMap = {};
+      funisC.forEach(f => {
+        if (f.domAnuncio && !domsMap[f.domAnuncio]) {
+          domsMap[f.domAnuncio] = f.domAnuncioFull || '';
+        }
+      });
+      const domTags = Object.entries(domsMap).map(([dom, url]) =>
+        url
+          ? `<a href="${esc(url)}" target="_blank" rel="noopener"
+               class="tag tag-split" style="font-size:10px;text-decoration:none">${esc(dom)}</a>`
+          : `<span class="tag tag-split" style="font-size:10px">${esc(dom)}</span>`
+      ).join('');
+
+      return `<div class="escalada-card" style="margin-bottom:12px">
+        <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;margin-bottom:8px">
+          <div>
+            <span style="font-weight:700;font-size:15px">${esc(conta)}</span>
+            ${roiHtml}
+          </div>
+          <button class="btn-monitor ativo" data-monitor-conta="${esc(conta)}" type="button">
+            Parar de monitorar
+          </button>
+        </div>
+        <div style="font-size:11px;color:var(--text-muted);margin-bottom:${prodTags || domTags ? '8px' : '0'}">
+          ${funisC.length} funil(s) · ${fmtViews(views)} views
+        </div>
+        ${prodTags ? `<div style="margin-bottom:6px;display:flex;flex-wrap:wrap;gap:4px">${prodTags}</div>` : ''}
+        ${domTags  ? `<div style="display:flex;flex-wrap:wrap;gap:4px">${domTags}</div>`  : ''}
+      </div>`;
+    }).join('');
+
     return `
       <div class="escalada-section">
         <h3 class="escalada-section__title">👁 Contas monitoradas</h3>
-        <p class="analysis-no-results">Em breve. Use o botão +👁 na tabela de funis para monitorar contas.</p>
+        ${cardsHTML}
       </div>`;
   }
 
@@ -299,7 +364,7 @@ const Escalada = (() => {
       secaoProdutos(funis) +
       secaoContasROI(funis) +
       secaoDominioPorProduto(funis) +
-      secaoMonitoradas();
+      secaoMonitoradas(funis);
   }
 
   // ── Inicialização ─────────────────────────────────────────────────────
@@ -308,6 +373,12 @@ const Escalada = (() => {
     _getFunnels      = getFunnels;
     _getMonitoradas  = getMonitoradas  || (() => []);
     _toggleMonitorar = toggleMonitorar || (() => {});
+
+    // Delegação para botões "Parar de monitorar" nos cards (renderizados dinamicamente)
+    document.getElementById('tab-escalada').addEventListener('click', e => {
+      const btn = e.target.closest('[data-monitor-conta]');
+      if (btn) _toggleMonitorar(btn.dataset.monitorConta);
+    });
   }
 
   return { init, refresh };

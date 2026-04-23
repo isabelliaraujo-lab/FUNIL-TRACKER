@@ -23,7 +23,8 @@ document.addEventListener('DOMContentLoaded', async () => {
       SupabaseStorage.saveMonitorada(conta).catch(console.error);
       showToast(`"${conta}" adicionada ao monitoramento!`);
     }
-    Tabela.renderTable();
+    // Tabela atualiza seus botões/células in-place (via onTableClick)
+    // Escalada atualiza a seção 4 se visível
     if (!document.getElementById('tab-escalada').hidden) Escalada.refresh();
   }
 
@@ -452,7 +453,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   // ── Inicializar módulos ───────────────────────────────────────────────
   Escalada.init(getFunnels, getMonitoradas, toggleMonitorar);
-  Tabela.init(getFunnels, saveFunnels, showToast);
+  Tabela.init(getFunnels, saveFunnels, showToast, getMonitoradas, toggleMonitorar);
   Analise.init(getFunnels);
 
   // Escalada é a aba padrão — renderizar conteúdo inicial

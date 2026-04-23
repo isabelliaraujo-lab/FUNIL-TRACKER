@@ -5,9 +5,11 @@
 const Tabela = (() => {
 
   // ── Referências injetadas pelo main.js ────────────────────────────────
-  let _getFunnels  = () => [];
-  let _saveFunnels = () => {};
-  let _showToast   = () => {};
+  let _getFunnels      = () => [];
+  let _saveFunnels     = () => {};
+  let _showToast       = () => {};
+  let _getMonitoradas  = () => [];
+  let _toggleMonitorar = () => {};
 
   // ── Ordenação ─────────────────────────────────────────────────────────
   let sortOrder = 'desc';   // 'desc' = mais recente primeiro
@@ -130,6 +132,39 @@ const Tabela = (() => {
     return `<div class="perf-tags">${g}${cv}</div>`;
   }
 
+  // ── Status column ─────────────────────────────────────────────────────
+
+  // Top N produtos por soma de views (para tag 🔥 escalando)
+  function computeTopViews(n = 3) {
+    const map = {};
+    _getFunnels().forEach(f => {
+      if (!f.produto) return;
+      map[f.produto] = (map[f.produto] || 0) + (f.views || 0);
+    });
+    return new Set(
+      Object.entries(map)
+        .sort((a, b) => b[1] - a[1])
+        .slice(0, n)
+        .map(([p]) => p)
+    );
+  }
+
+  function statusCellContent(f, topViews) {
+    const tags = [];
+    if (topViews.has(f.produto)) {
+      tags.push('<span class="tag-status" style="background:#2a1400;color:#f59e0b">🔥 escalando</span>');
+    }
+    if (f.gasto > 0 && f.conversao != null && f.conversao > f.gasto) {
+      tags.push('<span class="tag-status" style="background:#002a1a;color:#00c47a">💰 ROI+</span>');
+    }
+    if (_getMonitoradas().includes(f.conta)) {
+      tags.push('<span class="tag-status" style="background:#00143a;color:#00d4ff">👁</span>');
+    }
+    return tags.length
+      ? `<div style="display:flex;flex-direction:column;gap:3px">${tags.join('')}</div>`
+      : '';
+  }
+
   // ── Dashboard ─────────────────────────────────────────────────────────
   function renderDashboard(funnels) {
     const domCounts = Storage.getDomainCounts(funnels);
@@ -206,7 +241,7 @@ const Tabela = (() => {
            <p>Cole um texto ou adicione manualmente para começar.</p>`
         : `<h3>Nenhum resultado para os filtros ativos</h3>
            <p>Tente ampliar a busca ou clique em "Limpar filtros".</p>`;
-      tbody.innerHTML = `<tr><td colspan="12">
+      tbody.innerHTML = `<tr><td colspan="13">
         <div class="empty-state">
           <div class="empty-icon">📋</div>${msg}
         </div>
@@ -214,8 +249,11 @@ const Tabela = (() => {
       return;
     }
 
+    const topViews = computeTopViews(3);
+
     tbody.innerHTML = filtered.map(f => {
-      const repeated = Storage.isRepeated(f, domCounts);
+      const repeated   = Storage.isRepeated(f, domCounts);
+      const monitorada = _getMonitoradas().includes(f.conta);
 
       const urlAnuncioCell = f.urlAnuncio
         ? urlCell('Ver anúncio', f.urlAnuncioFull || f.urlAnuncio)
@@ -251,6 +289,9 @@ const Tabela = (() => {
                  value="${esc(f.obs || '')}"
                  placeholder="…" />
         </td>
+        <td class="status-cell" style="min-width:80px;white-space:nowrap;">
+          ${statusCellContent(f, topViews)}
+        </td>
         <td class="perf-cell" data-id="${esc(f.id)}" style="min-width:120px;position:relative;">
           ${perfCellContent(f)}
         </td>
@@ -259,6 +300,10 @@ const Tabela = (() => {
                   data-id="${esc(f.id)}"
                   title="Editar funil"
                   type="button">✏</button>
+          <button class="btn-monitor ${monitorada ? 'ativo' : ''}"
+                  data-monitor-conta="${esc(f.conta)}"
+                  title="${monitorada ? 'Parar de monitorar' : 'Monitorar esta conta'}"
+                  type="button">${monitorada ? '👁' : '+👁'}</button>
           <button class="btn btn-icon del-btn"
                   data-id="${esc(f.id)}"
                   title="Excluir funil"
@@ -378,6 +423,28 @@ const Tabela = (() => {
       return;
     }
 
+    // Toggle monitorar conta — atualiza botões e células de status in-place
+    const monitorBtn = e.target.closest('.btn-monitor[data-monitor-conta]');
+    if (monitorBtn) {
+      e.stopPropagation();
+      const conta = monitorBtn.dataset.monitorConta;
+      _toggleMonitorar(conta);   // atualiza monitoradas[] + Supabase + Escalada
+      const nowMonitored = _getMonitoradas().includes(conta);
+      // Atualizar todos os botões monitor desta conta
+      document.querySelectorAll(`.btn-monitor[data-monitor-conta="${CSS.escape(conta)}"]`).forEach(btn => {
+        btn.classList.toggle('ativo', nowMonitored);
+        btn.title       = nowMonitored ? 'Parar de monitorar' : 'Monitorar esta conta';
+        btn.textContent = nowMonitored ? '👁' : '+👁';
+      });
+      // Atualizar células de status das linhas desta conta
+      const topViews = computeTopViews(3);
+      _getFunnels().filter(f => f.conta === conta).forEach(f => {
+        const cell = document.querySelector(`tr[data-id="${f.id}"] .status-cell`);
+        if (cell) cell.innerHTML = statusCellContent(f, topViews);
+      });
+      return;
+    }
+
     // Abrir modal de performance (botão "+ adicionar" ou tags)
     const perfTrigger = e.target.closest('[data-perf-id]');
     if (perfTrigger) {
@@ -422,10 +489,12 @@ const Tabela = (() => {
   }
 
   // ── Inicialização ─────────────────────────────────────────────────────
-  function init(getFunnels, saveFunnels, showToast) {
-    _getFunnels  = getFunnels;
-    _saveFunnels = saveFunnels;
-    _showToast   = showToast;
+  function init(getFunnels, saveFunnels, showToast, getMonitoradas, toggleMonitorar) {
+    _getFunnels      = getFunnels;
+    _saveFunnels     = saveFunnels;
+    _showToast       = showToast;
+    _getMonitoradas  = getMonitoradas  || (() => []);
+    _toggleMonitorar = toggleMonitorar || (() => {});
 
     // Delegação no tbody
     const tbody = document.getElementById('table-body');
