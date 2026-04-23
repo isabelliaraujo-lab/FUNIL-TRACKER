@@ -196,11 +196,86 @@ const Escalada = (() => {
       </div>`;
   }
 
-  function secaoDominioPorProduto() {
+  function melhorDominioPorProduto(funis) {
+    const map = {};
+    funis.forEach(f => {
+      if (!f.produto || !f.domAnuncio || f.gasto == null || f.conversao == null) return;
+      if (!map[f.produto]) map[f.produto] = {};
+      if (!map[f.produto][f.domAnuncio]) map[f.produto][f.domAnuncio] = {
+        dom: f.domAnuncio, domFull: f.domAnuncioFull || '', gasto: 0, conversao: 0, views: 0, funis: 0, moeda: f.moeda || 'BRL',
+      };
+      map[f.produto][f.domAnuncio].gasto     += parseFloat(f.gasto)     || 0;
+      map[f.produto][f.domAnuncio].conversao += parseFloat(f.conversao) || 0;
+      map[f.produto][f.domAnuncio].views     += f.views || 0;
+      map[f.produto][f.domAnuncio].funis++;
+    });
+
+    return Object.entries(map)
+      .filter(([, doms]) => Object.keys(doms).length >= 2)
+      .map(([produto, doms]) => ({
+        produto,
+        dominios: Object.values(doms)
+          .map(d => ({ ...d, roi: d.gasto > 0 ? ((d.conversao - d.gasto) / d.gasto) * 100 : null }))
+          .sort((a, b) => (b.roi ?? -Infinity) - (a.roi ?? -Infinity)),
+      }))
+      .sort((a, b) => a.produto.localeCompare(b.produto));
+  }
+
+  // ── Render: Seção 3 — Melhor domínio por produto ──────────────────────
+
+  function melhorDominioHTML(funis) {
+    const items = melhorDominioPorProduto(funis);
+    if (!items.length) return '<p class="analysis-no-results">Nenhum produto com 2 ou mais domínios de anúncio e performance preenchida.</p>';
+
+    return items.map(({ produto, dominios }) => {
+      const temROI = dominios.some(d => d.roi != null);
+
+      const domsHTML = dominios.map((d, i) => {
+        const isFirst    = i === 0 && d.roi != null;
+        const semDados   = d.roi == null;
+        const cor        = semDados ? 'var(--text-muted)' : (d.roi >= 0 ? '#00c47a' : '#ff4d4d');
+        const roiTxt     = semDados ? '' : fmtROI(d.roi);
+        const badge      = isFirst
+          ? `<span class="tag-status" style="background:rgba(255,215,0,.12);color:#fbbf24">🏆 melhor ROI</span>`
+          : semDados
+            ? `<span class="tag-status" style="background:rgba(100,100,100,.12);color:var(--text-muted)">📊 sem dados</span>`
+            : '';
+
+        const domLink = d.domFull
+          ? `<a href="${esc(d.domFull)}" target="_blank" rel="noopener"
+               style="font-weight:600;font-size:13px;color:var(--accent);text-decoration:none"
+               title="${esc(d.domFull)}">${esc(d.dom)}</a>`
+          : `<span style="font-weight:600;font-size:13px">${esc(d.dom)}</span>`;
+
+        return `<div class="rank-item" style="align-items:flex-start;gap:12px">
+          <div style="flex:1;min-width:0;overflow:hidden">
+            <div style="display:flex;align-items:center;flex-wrap:wrap;gap:6px;margin-bottom:3px">
+              ${domLink}
+              ${badge}
+            </div>
+            <div style="font-size:11px;color:var(--text-muted)">
+              ${d.funis} funil(s)${d.views ? ' · ' + fmtViews(d.views) + ' views' : ''}
+              · ${fmtMoeda(d.gasto, d.moeda)} gasto · ${fmtMoeda(d.conversao, d.moeda)} conv.
+            </div>
+          </div>
+          <div style="font-weight:700;font-size:15px;color:${cor};white-space:nowrap;flex-shrink:0;padding-top:1px">
+            ${roiTxt || '—'}
+          </div>
+        </div>`;
+      }).join('');
+
+      return `<div class="escalada-card" style="margin-bottom:12px">
+        <div class="escalada-card__title" style="margin-bottom:${temROI ? '10px' : '6px'}">${esc(produto)}</div>
+        ${domsHTML}
+      </div>`;
+    }).join('');
+  }
+
+  function secaoDominioPorProduto(funis) {
     return `
       <div class="escalada-section">
         <h3 class="escalada-section__title">🏆 Melhor domínio por produto</h3>
-        <p class="analysis-no-results">Em breve.</p>
+        ${melhorDominioHTML(funis)}
       </div>`;
   }
 
@@ -223,7 +298,7 @@ const Escalada = (() => {
     el.innerHTML =
       secaoProdutos(funis) +
       secaoContasROI(funis) +
-      secaoDominioPorProduto() +
+      secaoDominioPorProduto(funis) +
       secaoMonitoradas();
   }
 
