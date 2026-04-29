@@ -1220,6 +1220,108 @@ tbody tr.row-repeated:hover td {
    ESCALADA TAB
    ============================================================ */
 
+/* ── Filtros de data ────────────────────────────────────────── */
+
+.escalada-filtros {
+  display:       flex;
+  align-items:   center;
+  flex-wrap:     wrap;
+  gap:           10px 16px;
+  margin-bottom: 20px;
+  padding:       10px 14px;
+  background:    var(--surface2);
+  border:        1px solid var(--border);
+  border-radius: var(--radius);
+}
+
+.escalada-filtros__rapidos {
+  display:     flex;
+  flex-wrap:   wrap;
+  gap:         5px;
+  align-items: center;
+}
+
+.escalada-filtros__custom {
+  display:     flex;
+  align-items: center;
+  flex-wrap:   wrap;
+  gap:         5px;
+  margin-left: auto;
+}
+
+.escalada-filtros__sep {
+  font-size: 12px;
+  color:     var(--text-muted);
+  padding:   0 2px;
+}
+
+.escalada-filtros__secao {
+  display:       flex;
+  gap:           4px;
+  margin-bottom: 10px;
+}
+
+.filtro-rapido {
+  background:    var(--surface);
+  border:        1px solid var(--border);
+  border-radius: var(--radius-sm);
+  color:         var(--text-muted);
+  font-size:     12px;
+  font-family:   var(--font);
+  padding:       4px 10px;
+  cursor:        pointer;
+  transition:    border-color .15s, color .15s, background .15s;
+  white-space:   nowrap;
+}
+.filtro-rapido:hover {
+  border-color: var(--accent);
+  color:        var(--text);
+}
+.filtro-rapido.ativo {
+  background:   rgba(0,212,255,.1);
+  border-color: var(--accent);
+  color:        var(--accent);
+  font-weight:  600;
+}
+
+.filtro-secao {
+  background:    transparent;
+  border:        1px solid var(--border);
+  border-radius: var(--radius-sm);
+  color:         var(--text-muted);
+  font-size:     10px;
+  font-family:   var(--font);
+  padding:       2px 7px;
+  cursor:        pointer;
+  transition:    border-color .15s, color .15s;
+}
+.filtro-secao:hover {
+  border-color: var(--accent);
+  color:        var(--text);
+}
+.filtro-secao.ativo {
+  border-color: var(--accent);
+  color:        var(--accent);
+  font-weight:  600;
+}
+
+.filtro-input-data {
+  background:    var(--surface);
+  border:        1px solid var(--border);
+  border-radius: var(--radius-sm);
+  color:         var(--text);
+  font-size:     12px;
+  font-family:   var(--font);
+  padding:       3px 8px;
+  width:         130px;
+  cursor:        pointer;
+  color-scheme:  dark;
+}
+.filtro-input-data:focus {
+  outline:      none;
+  border-color: var(--accent);
+}
+
 .escalada-section {
   margin-bottom: 28px;
 }
@@ -1308,7 +1410,10 @@ tbody tr.row-repeated:hover td {
 }
 
 @media (max-width: 768px) {
-  .escalada-grid { grid-template-columns: 1fr; }
+  .escalada-grid          { grid-template-columns: 1fr; }
+  .escalada-filtros       { flex-direction: column; align-items: stretch; }
+  .escalada-filtros__custom { margin-left: 0; }
+  .filtro-input-data      { width: 100%; }
 }
 
 /* ============================================================

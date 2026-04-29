@@ -4,13 +4,126 @@
 
 const Escalada = (() => {
 
-  let _getFunnels     = () => [];
-  let _getMonitoradas = () => [];
+  let _getFunnels      = () => [];
+  let _getMonitoradas  = () => [];
   let _toggleMonitorar = () => {};
 
-  const esc = Storage.escHtml;
+  // ── Filtro de data ────────────────────────────────────────────────────
+
+  let filtroGlobal = { tipo: 'tudo', de: null, ate: null };
+  let filtrosSecao = { secao1a: 'tudo', secao1b: 'tudo', secao2: 'tudo', secao3: 'tudo', secao4: 'tudo' };
+
+  function filtrarFunisPorPeriodo(funis, filtro) {
+    if (!filtro || filtro.tipo === 'tudo') return funis;
+
+    const hoje = new Date();
+    hoje.setHours(23, 59, 59, 999);
+    let de, ate;
+
+    if (filtro.tipo === 'custom') {
+      if (!filtro.de && !filtro.ate) return funis;
+      de  = filtro.de  ? new Date(filtro.de  + 'T00:00:00') : null;
+      ate = filtro.ate ? new Date(filtro.ate + 'T23:59:59') : null;
+    } else {
+      ate = hoje;
+      if (filtro.tipo === 'mes') {
+        de = new Date(hoje.getFullYear(), hoje.getMonth(), 1);
+      } else {
+        const dias = { '7d': 7, '15d': 15, '30d': 30 }[filtro.tipo] || 30;
+        de = new Date(hoje);
+        de.setDate(de.getDate() - dias + 1);
+        de.setHours(0, 0, 0, 0);
+      }
+    }
+
+    return funis.filter(f => {
+      if (!f.data) return false;
+      const d = new Date(f.data + (f.data.includes('T') ? '' : 'T00:00:00'));
+      if (de  && d < de)  return false;
+      if (ate && d > ate) return false;
+      return true;
+    });
+  }
+
+  function getFiltroEfetivo(nomeSecao) {
+    const s = filtrosSecao[nomeSecao];
+    if (s && s !== 'tudo') return { tipo: s, de: null, ate: null };
+    return filtroGlobal;
+  }
+
+  // ── HTML dos controles de filtro ──────────────────────────────────────
+
+  function filtrosBarHTML() {
+    const t = filtroGlobal.tipo;
+    const optsRapidos = [
+      { v: 'tudo', l: 'Tudo' },
+      { v: '7d',   l: '7 dias' },
+      { v: '15d',  l: '15 dias' },
+      { v: '30d',  l: '30 dias' },
+      { v: 'mes',  l: 'Este mês' },
+    ];
+    const btns = optsRapidos.map(o =>
+      `<button class="filtro-rapido${t === o.v ? ' ativo' : ''}" data-periodo="${o.v}" type="button">${o.l}</button>`
+    ).join('');
+    const deVal  = filtroGlobal.de  || '';
+    const ateVal = filtroGlobal.ate || '';
+    return `<div class="escalada-filtros">
+      <div class="escalada-filtros__rapidos">${btns}</div>
+      <div class="escalada-filtros__custom">
+        <input type="date" class="filtro-input-data" id="filtro-de"  value="${deVal}">
+        <span class="escalada-filtros__sep">até</span>
+        <input type="date" class="filtro-input-data" id="filtro-ate" value="${ateVal}">
+        <button class="filtro-rapido" data-action="aplicar-custom" type="button">Aplicar</button>
+        <button class="filtro-rapido" data-action="limpar-filtro"  type="button">Limpar</button>
+      </div>
+    </div>`;
+  }
+
+  function secaoFiltrosHTML(nomeSecao) {
+    const t = filtrosSecao[nomeSecao] || 'tudo';
+    const opts = [
+      { v: 'tudo', l: 'Tudo' },
+      { v: '7d',   l: '7d' },
+      { v: '15d',  l: '15d' },
+      { v: '30d',  l: '30d' },
+    ];
+    const btns = opts.map(o =>
+      `<button class="filtro-secao${t === o.v ? ' ativo' : ''}" data-secao="${nomeSecao}" data-periodo="${o.v}" type="button">${o.l}</button>`
+    ).join('');
+    return `<div class="escalada-filtros__secao">${btns}</div>`;
+  }
+
+  // ── Ações de filtro ───────────────────────────────────────────────────
+
+  function aplicarFiltroRapido(tipo) {
+    filtroGlobal = { tipo, de: null, ate: null };
+    Object.keys(filtrosSecao).forEach(k => { filtrosSecao[k] = 'tudo'; });
+    refresh();
+  }
+
+  function aplicarFiltroCustom() {
+    const de  = document.getElementById('filtro-de')?.value  || null;
+    const ate = document.getElementById('filtro-ate')?.value || null;
+    if (!de && !ate) return;
+    filtroGlobal = { tipo: 'custom', de, ate };
+    Object.keys(filtrosSecao).forEach(k => { filtrosSecao[k] = 'tudo'; });
+    refresh();
+  }
+
+  function limparFiltroData() {
+    filtroGlobal = { tipo: 'tudo', de: null, ate: null };
+    Object.keys(filtrosSecao).forEach(k => { filtrosSecao[k] = 'tudo'; });
+    refresh();
+  }
+
+  function aplicarFiltroSecao(secao, tipo) {
+    filtrosSecao[secao] = tipo;
+    renderSecaoPorNome(secao);
+  }
 
   // ── Formatação ────────────────────────────────────────────────────────
+
+  const esc = Storage.escHtml;
 
   function fmtViews(v) {
     if (!v) return '—';
@@ -62,11 +175,53 @@ const Escalada = (() => {
       .slice(0, 10);
   }
 
-  // ── Render: Seção 1 — Produtos em escalada ────────────────────────────
+  function rankContasPorROI(funis) {
+    const map = {};
+    funis.forEach(f => {
+      if (!f.conta || f.gasto == null || f.conversao == null) return;
+      if (!map[f.conta]) map[f.conta] = { conta: f.conta, gasto: 0, conversao: 0, funis: 0, produtos: new Set(), nichos: new Set(), moeda: f.moeda || 'BRL' };
+      map[f.conta].gasto     += parseFloat(f.gasto)     || 0;
+      map[f.conta].conversao += parseFloat(f.conversao) || 0;
+      map[f.conta].funis++;
+      if (f.produto) map[f.conta].produtos.add(f.produto);
+      if (f.nicho)   map[f.conta].nichos.add(f.nicho);
+    });
+    return Object.values(map)
+      .filter(c => c.gasto > 0)
+      .map(c => ({ ...c, roi: ((c.conversao - c.gasto) / c.gasto) * 100 }))
+      .sort((a, b) => b.roi - a.roi);
+  }
+
+  function melhorDominioPorProduto(funis) {
+    const map = {};
+    funis.forEach(f => {
+      if (!f.produto || !f.domAnuncio || f.gasto == null || f.conversao == null) return;
+      if (!map[f.produto]) map[f.produto] = {};
+      if (!map[f.produto][f.domAnuncio]) map[f.produto][f.domAnuncio] = {
+        dom: f.domAnuncio, domFull: f.domAnuncioFull || '', gasto: 0, conversao: 0, views: 0, funis: 0, moeda: f.moeda || 'BRL',
+      };
+      map[f.produto][f.domAnuncio].gasto     += parseFloat(f.gasto)     || 0;
+      map[f.produto][f.domAnuncio].conversao += parseFloat(f.conversao) || 0;
+      map[f.produto][f.domAnuncio].views     += f.views || 0;
+      map[f.produto][f.domAnuncio].funis++;
+    });
+
+    return Object.entries(map)
+      .filter(([, doms]) => Object.keys(doms).length >= 2)
+      .map(([produto, doms]) => ({
+        produto,
+        dominios: Object.values(doms)
+          .map(d => ({ ...d, roi: d.gasto > 0 ? ((d.conversao - d.gasto) / d.gasto) * 100 : null }))
+          .sort((a, b) => (b.roi ?? -Infinity) - (a.roi ?? -Infinity)),
+      }))
+      .sort((a, b) => a.produto.localeCompare(b.produto));
+  }
+
+  // ── HTML dos rankings ─────────────────────────────────────────────────
 
   function rankViewsHTML(funis) {
     const items = rankProdutosPorViews(funis);
-    if (!items.length) return '<p class="analysis-no-results">Nenhum produto cadastrado ainda.</p>';
+    if (!items.length) return '<p class="analysis-no-results">Nenhum produto no período selecionado.</p>';
 
     return items.map((p, i) => {
       const nichoTags = [...p.nichos].map(n =>
@@ -91,7 +246,7 @@ const Escalada = (() => {
 
   function rankROIProdutosHTML(funis) {
     const items = rankProdutosPorROI(funis);
-    if (!items.length) return '<p class="analysis-no-results">Nenhum produto com gasto e conversão preenchidos.</p>';
+    if (!items.length) return '<p class="analysis-no-results">Nenhum produto com performance no período.</p>';
 
     return items.map((p, i) => {
       const cor = p.roi >= 0 ? '#00c47a' : '#ff4d4d';
@@ -114,47 +269,9 @@ const Escalada = (() => {
     }).join('');
   }
 
-  // ── Seções ────────────────────────────────────────────────────────────
-
-  function secaoProdutos(funis) {
-    return `
-      <div class="escalada-section">
-        <h3 class="escalada-section__title">🔥 Produtos em escalada</h3>
-        <div class="escalada-grid">
-          <div class="escalada-card">
-            <div class="escalada-card__title">Ranking por views</div>
-            ${rankViewsHTML(funis)}
-          </div>
-          <div class="escalada-card">
-            <div class="escalada-card__title">Ranking por ROI</div>
-            ${rankROIProdutosHTML(funis)}
-          </div>
-        </div>
-      </div>`;
-  }
-
-  function rankContasPorROI(funis) {
-    const map = {};
-    funis.forEach(f => {
-      if (!f.conta || f.gasto == null || f.conversao == null) return;
-      if (!map[f.conta]) map[f.conta] = { conta: f.conta, gasto: 0, conversao: 0, funis: 0, produtos: new Set(), nichos: new Set(), moeda: f.moeda || 'BRL' };
-      map[f.conta].gasto     += parseFloat(f.gasto)     || 0;
-      map[f.conta].conversao += parseFloat(f.conversao) || 0;
-      map[f.conta].funis++;
-      if (f.produto) map[f.conta].produtos.add(f.produto);
-      if (f.nicho)   map[f.conta].nichos.add(f.nicho);
-    });
-    return Object.values(map)
-      .filter(c => c.gasto > 0)
-      .map(c => ({ ...c, roi: ((c.conversao - c.gasto) / c.gasto) * 100 }))
-      .sort((a, b) => b.roi - a.roi);
-  }
-
-  // ── Render: Seção 2 — Contas com melhor ROI ───────────────────────────
-
   function rankROIContasHTML(funis) {
     const items = rankContasPorROI(funis);
-    if (!items.length) return '<p class="analysis-no-results">Nenhuma conta com dados de performance ainda.</p>';
+    if (!items.length) return '<p class="analysis-no-results">Nenhuma conta com dados de performance no período.</p>';
 
     return items.map(c => {
       const cor   = c.roi >= 0 ? '#00c47a' : '#ff4d4d';
@@ -188,46 +305,9 @@ const Escalada = (() => {
     }).join('');
   }
 
-  function secaoContasROI(funis) {
-    return `
-      <div class="escalada-section">
-        <h3 class="escalada-section__title">💰 Contas com melhor ROI</h3>
-        <div class="escalada-card">
-          ${rankROIContasHTML(funis)}
-        </div>
-      </div>`;
-  }
-
-  function melhorDominioPorProduto(funis) {
-    const map = {};
-    funis.forEach(f => {
-      if (!f.produto || !f.domAnuncio || f.gasto == null || f.conversao == null) return;
-      if (!map[f.produto]) map[f.produto] = {};
-      if (!map[f.produto][f.domAnuncio]) map[f.produto][f.domAnuncio] = {
-        dom: f.domAnuncio, domFull: f.domAnuncioFull || '', gasto: 0, conversao: 0, views: 0, funis: 0, moeda: f.moeda || 'BRL',
-      };
-      map[f.produto][f.domAnuncio].gasto     += parseFloat(f.gasto)     || 0;
-      map[f.produto][f.domAnuncio].conversao += parseFloat(f.conversao) || 0;
-      map[f.produto][f.domAnuncio].views     += f.views || 0;
-      map[f.produto][f.domAnuncio].funis++;
-    });
-
-    return Object.entries(map)
-      .filter(([, doms]) => Object.keys(doms).length >= 2)
-      .map(([produto, doms]) => ({
-        produto,
-        dominios: Object.values(doms)
-          .map(d => ({ ...d, roi: d.gasto > 0 ? ((d.conversao - d.gasto) / d.gasto) * 100 : null }))
-          .sort((a, b) => (b.roi ?? -Infinity) - (a.roi ?? -Infinity)),
-      }))
-      .sort((a, b) => a.produto.localeCompare(b.produto));
-  }
-
-  // ── Render: Seção 3 — Melhor domínio por produto ──────────────────────
-
   function melhorDominioHTML(funis) {
     const items = melhorDominioPorProduto(funis);
-    if (!items.length) return '<p class="analysis-no-results">Nenhum produto com 2 ou mais domínios de anúncio e performance preenchida.</p>';
+    if (!items.length) return '<p class="analysis-no-results">Nenhum produto com 2 ou mais domínios de anúncio e performance no período.</p>';
 
     return items.map(({ produto, dominios }) => {
       const temROI = dominios.some(d => d.roi != null);
@@ -273,30 +353,63 @@ const Escalada = (() => {
     }).join('');
   }
 
-  function secaoDominioPorProduto(funis) {
+  // ── Seções ────────────────────────────────────────────────────────────
+
+  function secaoProdutos(funis) {
+    const funis1a = filtrarFunisPorPeriodo(funis, getFiltroEfetivo('secao1a'));
+    const funis1b = filtrarFunisPorPeriodo(funis, getFiltroEfetivo('secao1b'));
     return `
       <div class="escalada-section">
-        <h3 class="escalada-section__title">🏆 Melhor domínio por produto</h3>
-        ${melhorDominioHTML(funis)}
+        <h3 class="escalada-section__title">🔥 Produtos em escalada</h3>
+        <div class="escalada-grid">
+          <div class="escalada-card" data-secao-content="secao1a">
+            <div class="escalada-card__title">Ranking por views</div>
+            ${secaoFiltrosHTML('secao1a')}
+            ${rankViewsHTML(funis1a)}
+          </div>
+          <div class="escalada-card" data-secao-content="secao1b">
+            <div class="escalada-card__title">Ranking por ROI</div>
+            ${secaoFiltrosHTML('secao1b')}
+            ${rankROIProdutosHTML(funis1b)}
+          </div>
+        </div>
       </div>`;
   }
 
-  function secaoMonitoradas(funis) {
-    const monitoradas = _getMonitoradas();
+  function secaoContasROI(funis) {
+    const funisF = filtrarFunisPorPeriodo(funis, getFiltroEfetivo('secao2'));
+    return `
+      <div class="escalada-section">
+        <h3 class="escalada-section__title">💰 Contas com melhor ROI</h3>
+        <div data-secao-content="secao2">
+          ${secaoFiltrosHTML('secao2')}
+          <div class="escalada-card">${rankROIContasHTML(funisF)}</div>
+        </div>
+      </div>`;
+  }
 
+  function secaoDominioPorProduto(funis) {
+    const funisF = filtrarFunisPorPeriodo(funis, getFiltroEfetivo('secao3'));
+    return `
+      <div class="escalada-section">
+        <h3 class="escalada-section__title">🏆 Melhor domínio por produto</h3>
+        <div data-secao-content="secao3">
+          ${secaoFiltrosHTML('secao3')}
+          ${melhorDominioHTML(funisF)}
+        </div>
+      </div>`;
+  }
+
+  function secaoMonitoradasContent(funisF) {
+    const monitoradas = _getMonitoradas();
     if (!monitoradas.length) {
-      return `
-        <div class="escalada-section">
-          <h3 class="escalada-section__title">👁 Contas monitoradas</h3>
-          <p class="analysis-no-results">Nenhuma conta monitorada. Clique em 👁 em qualquer funil para começar a acompanhar.</p>
-        </div>`;
+      return '<p class="analysis-no-results">Nenhuma conta monitorada. Clique em 👁 em qualquer funil para começar a acompanhar.</p>';
     }
 
-    const cardsHTML = monitoradas.map(conta => {
-      const funisC = funis.filter(f => f.conta === conta);
+    return monitoradas.map(conta => {
+      const funisC = funisF.filter(f => f.conta === conta);
       const views  = funisC.reduce((s, f) => s + (f.views || 0), 0);
 
-      // ROI consolidado da conta
       let roiHtml = '';
       const comPerf = funisC.filter(f => f.gasto != null && f.conversao != null);
       if (comPerf.length) {
@@ -309,13 +422,11 @@ const Escalada = (() => {
         }
       }
 
-      // Produtos únicos
       const produtos = [...new Set(funisC.map(f => f.produto).filter(Boolean))];
       const prodTags = produtos
         .map(p => `<span class="tag" style="font-size:10px">${esc(p)}</span>`)
         .join('');
 
-      // Domínios únicos com link quando disponível
       const domsMap = {};
       funisC.forEach(f => {
         if (f.domAnuncio && !domsMap[f.domAnuncio]) {
@@ -346,12 +457,57 @@ const Escalada = (() => {
         ${domTags  ? `<div style="display:flex;flex-wrap:wrap;gap:4px">${domTags}</div>`  : ''}
       </div>`;
     }).join('');
+  }
 
+  function secaoMonitoradas(funis) {
+    const funisF = filtrarFunisPorPeriodo(funis, getFiltroEfetivo('secao4'));
     return `
       <div class="escalada-section">
         <h3 class="escalada-section__title">👁 Contas monitoradas</h3>
-        ${cardsHTML}
+        <div data-secao-content="secao4">
+          ${secaoFiltrosHTML('secao4')}
+          ${secaoMonitoradasContent(funisF)}
+        </div>
       </div>`;
+  }
+
+  // ── Render parcial por seção ──────────────────────────────────────────
+
+  function renderSecaoPorNome(nomeSecao) {
+    const el = document.querySelector(`[data-secao-content="${nomeSecao}"]`);
+    if (!el) return;
+    const funis  = _getFunnels();
+    const funisF = filtrarFunisPorPeriodo(funis, getFiltroEfetivo(nomeSecao));
+
+    switch (nomeSecao) {
+      case 'secao1a':
+        el.innerHTML = `
+          <div class="escalada-card__title">Ranking por views</div>
+          ${secaoFiltrosHTML('secao1a')}
+          ${rankViewsHTML(funisF)}`;
+        break;
+      case 'secao1b':
+        el.innerHTML = `
+          <div class="escalada-card__title">Ranking por ROI</div>
+          ${secaoFiltrosHTML('secao1b')}
+          ${rankROIProdutosHTML(funisF)}`;
+        break;
+      case 'secao2':
+        el.innerHTML = `
+          ${secaoFiltrosHTML('secao2')}
+          <div class="escalada-card">${rankROIContasHTML(funisF)}</div>`;
+        break;
+      case 'secao3':
+        el.innerHTML = `
+          ${secaoFiltrosHTML('secao3')}
+          ${melhorDominioHTML(funisF)}`;
+        break;
+      case 'secao4':
+        el.innerHTML = `
+          ${secaoFiltrosHTML('secao4')}
+          ${secaoMonitoradasContent(funisF)}`;
+        break;
+    }
   }
 
   // ── Render principal ──────────────────────────────────────────────────
@@ -359,10 +515,9 @@ const Escalada = (() => {
   function refresh() {
     const el = document.getElementById('tab-escalada');
     if (!el) return;
-
     const funis = _getFunnels();
-
     el.innerHTML =
+      filtrosBarHTML() +
       secaoProdutos(funis) +
       secaoContasROI(funis) +
       secaoDominioPorProduto(funis) +
@@ -388,13 +543,23 @@ const Escalada = (() => {
     _toggleMonitorar = toggleMonitorar || (() => {});
 
     document.getElementById('tab-escalada').addEventListener('click', e => {
-      // "Parar de monitorar" nos cards de monitoradas
       const monitorBtn = e.target.closest('[data-monitor-conta]');
       if (monitorBtn) { _toggleMonitorar(monitorBtn.dataset.monitorConta); return; }
 
-      // Nome de produto clicável nos rankings
       const nomeEl = e.target.closest('[data-analise-produto]');
-      if (nomeEl) abrirAnaliseProduto(nomeEl.dataset.analiseProduto);
+      if (nomeEl) { abrirAnaliseProduto(nomeEl.dataset.analiseProduto); return; }
+
+      const filtroRapidoBtn = e.target.closest('.filtro-rapido[data-periodo]');
+      if (filtroRapidoBtn) { aplicarFiltroRapido(filtroRapidoBtn.dataset.periodo); return; }
+
+      const aplicarBtn = e.target.closest('[data-action="aplicar-custom"]');
+      if (aplicarBtn) { aplicarFiltroCustom(); return; }
+
+      const limparBtn = e.target.closest('[data-action="limpar-filtro"]');
+      if (limparBtn) { limparFiltroData(); return; }
+
+      const filtroSecaoBtn = e.target.closest('.filtro-secao[data-periodo]');
+      if (filtroSecaoBtn) { aplicarFiltroSecao(filtroSecaoBtn.dataset.secao, filtroSecaoBtn.dataset.periodo); return; }
     });
   }
 
