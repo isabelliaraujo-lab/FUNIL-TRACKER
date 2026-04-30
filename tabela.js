@@ -255,8 +255,12 @@ const Tabela = (() => {
       const repeated   = Storage.isRepeated(f, domCounts);
       const monitorada = _getMonitoradas().includes(f.conta);
 
+      const totalAnuncios  = f.anuncios?.length || (f.urlAnuncio ? 1 : 0);
       const urlAnuncioCell = f.urlAnuncio
-        ? urlCell('Ver anúncio', f.urlAnuncioFull || f.urlAnuncio)
+        ? urlCell('Ver anúncio', f.urlAnuncioFull || f.urlAnuncio) +
+          (totalAnuncios > 1
+            ? `<span style="display:block;font-size:10px;background:#1a1040;color:#a78bfa;padding:1px 6px;border-radius:10px;margin-top:3px;width:fit-content">+${totalAnuncios - 1}</span>`
+            : '')
         : dash();
 
       const domAnuncioCell = f.domAnuncio
@@ -333,10 +337,20 @@ const Tabela = (() => {
     set('e-conta',        f.conta        || '');
     set('e-nicho',        f.nicho        || '');
     set('e-produto',      f.produto      || '');
-    set('e-urlAnuncio',   f.urlAnuncio || f.urlAnuncioFull || '');
-    set('e-views',        f.views != null ? Parser.formatViews(f.views) : '');
-    // Normaliza "nao" (sem acento, vindo do parser) para o valor do <select>
-    set('e-famoso',       f.famoso === 'nao' ? 'não' : (f.famoso || ''));
+    // Reconstrói anuncios para compatibilidade com dados antigos
+    const anunciosEdit = (f.anuncios && f.anuncios.length > 0)
+      ? f.anuncios
+      : (f.urlAnuncio ? [{ url: f.urlAnuncio, views: f.views, famoso: f.famoso }] : []);
+
+    [1, 2, 3].forEach(i => {
+      const a = anunciosEdit[i - 1] || { url: '', views: null, famoso: null };
+      const urlEl    = document.getElementById(`e-url-${i}`);
+      const viewsEl  = document.getElementById(`e-views-${i}`);
+      const famosoEl = document.getElementById(`e-famoso-${i}`);
+      if (urlEl)    urlEl.value    = a.url || '';
+      if (viewsEl)  viewsEl.value  = a.views != null ? a.views : '';
+      if (famosoEl) famosoEl.value = a.famoso === 'nao' ? 'não' : (a.famoso || '');
+    });
     set('e-domAnuncio',   f.domAnuncio   || '');
     set('e-domAnuncioFull', f.domAnuncioFull || '');
     set('e-domFinal',     f.domFinal     || '');
@@ -547,8 +561,14 @@ const Tabela = (() => {
       const domAnuncio   = val('e-domAnuncio').toUpperCase();
       const domFinalFull = val('e-domFinalFull');
       const splitVal     = document.getElementById('e-split').value === 'true';
-      const viewsRaw     = val('e-views');
-      const urlAn        = val('e-urlAnuncio');
+
+      const anuncios = [1, 2, 3].map(i => ({
+        url:    (document.getElementById(`e-url-${i}`)?.value || '').trim(),
+        views:  document.getElementById(`e-views-${i}`)?.value ? parseInt(document.getElementById(`e-views-${i}`).value, 10) : null,
+        famoso: document.getElementById(`e-famoso-${i}`)?.value || null,
+      })).filter(a => a.url);
+
+      const urlAn = anuncios.length > 0 ? anuncios[0].url : '';
 
       let domFinal = val('e-domFinal').toUpperCase();
       if (!domFinal && domFinalFull) {
@@ -565,10 +585,11 @@ const Tabela = (() => {
         conta:          val('e-conta'),
         nicho:          val('e-nicho'),
         produto:        val('e-produto').toUpperCase(),
+        anuncios,
         urlAnuncio:     urlAn,
         urlAnuncioFull: urlAn,
-        views:          viewsRaw ? Parser.parseViews(viewsRaw) : null,
-        famoso:         val('e-famoso') || null,
+        views:          anuncios.length > 0 ? anuncios[0].views : null,
+        famoso:         anuncios.length > 0 ? anuncios[0].famoso : null,
         domAnuncio,
         domAnuncioFull: val('e-domAnuncioFull') || (domAnuncio ? 'https://' + domAnuncio.toLowerCase() : ''),
         domFinal,
