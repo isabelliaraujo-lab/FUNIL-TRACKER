@@ -449,6 +449,168 @@ const Analise = (() => {
     searchProduto();
   }
 
+  // ── Análise com IA ────────────────────────────────────────────────────
+
+  function usarExemplo(btn) {
+    document.getElementById('ia-pergunta').value = btn.textContent.trim();
+  }
+
+  function limparAnalise() {
+    document.getElementById('ia-pergunta').value = '';
+    document.getElementById('ia-resultado').style.display = 'none';
+    document.getElementById('ia-status').textContent = '';
+  }
+
+  function copiarResultado(e) {
+    const texto = document.getElementById('ia-resultado-texto').innerText;
+    const btn   = e.target;
+    navigator.clipboard.writeText(texto)
+      .then(() => {
+        btn.textContent = 'Copiado!';
+        setTimeout(() => { btn.textContent = 'Copiar'; }, 1500);
+      })
+      .catch(() => {});
+  }
+
+  function prepararContexto(funis) {
+    const nichos   = {};
+    const produtos = {};
+    const dominios = {};
+    const contas   = {};
+
+    funis.forEach(f => {
+      if (f.nicho)    nichos[f.nicho]    = (nichos[f.nicho]    || 0) + 1;
+      if (f.domAnuncio) dominios[f.domAnuncio] = (dominios[f.domAnuncio] || 0) + 1;
+
+      if (f.produto) {
+        if (!produtos[f.produto]) produtos[f.produto] = { funis: 0, views: 0, gasto: 0, conversao: 0, nichos: new Set() };
+        produtos[f.produto].funis++;
+        produtos[f.produto].views     += f.views || 0;
+        produtos[f.produto].gasto     += parseFloat(f.gasto)     || 0;
+        produtos[f.produto].conversao += parseFloat(f.conversao) || 0;
+        if (f.nicho) produtos[f.produto].nichos.add(f.nicho);
+      }
+
+      if (f.conta) {
+        if (!contas[f.conta]) contas[f.conta] = { funis: 0, gasto: 0, conversao: 0 };
+        contas[f.conta].funis++;
+        contas[f.conta].gasto     += parseFloat(f.gasto)     || 0;
+        contas[f.conta].conversao += parseFloat(f.conversao) || 0;
+      }
+    });
+
+    const produtosArr = Object.entries(produtos).map(([nome, d]) => ({
+      nome,
+      funis:     d.funis,
+      views:     d.views,
+      gasto:     d.gasto.toFixed(2),
+      conversao: d.conversao.toFixed(2),
+      roi:       d.gasto > 0 ? (((d.conversao - d.gasto) / d.gasto) * 100).toFixed(1) + '%' : 'sem dados',
+      nichos:    [...d.nichos].join(', '),
+    }));
+
+    return JSON.stringify({
+      totalFunis: funis.length,
+      nichos,
+      produtos: produtosArr,
+      dominiosMaisUsados: Object.entries(dominios)
+        .sort((a, b) => b[1] - a[1]).slice(0, 20),
+      contasComPerformance: Object.entries(contas)
+        .filter(([, d]) => d.gasto > 0)
+        .map(([conta, d]) => ({
+          conta,
+          funis:     d.funis,
+          gasto:     d.gasto.toFixed(2),
+          conversao: d.conversao.toFixed(2),
+          roi:       (((d.conversao - d.gasto) / d.gasto) * 100).toFixed(1) + '%',
+        }))
+        .sort((a, b) => parseFloat(b.roi) - parseFloat(a.roi))
+        .slice(0, 20),
+    }, null, 2);
+  }
+
+  function formatarResposta(texto) {
+    let html = texto
+      .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+      .replace(/\*(.*?)\*/g, '<em>$1</em>')
+      .replace(/^#{1,3} (.+)$/gm, '<strong>$1</strong>')
+      .replace(/^[•\-] (.+)$/gm, '<li>$1</li>');
+
+    // wrap consecutive <li> blocks in <ul>
+    html = html.replace(/((?:<li>[^\n]*\n?)+)/g, '<ul>$1</ul>');
+
+    // remaining lines → <p>
+    html = html.split('\n').map(line => {
+      line = line.trim();
+      if (!line || line.startsWith('<')) return line;
+      return `<p>${line}</p>`;
+    }).join('');
+
+    return html;
+  }
+
+  async function gerarAnalise() {
+    const pergunta = document.getElementById('ia-pergunta').value.trim();
+    if (!pergunta) return;
+
+    const apiKey = document.getElementById('ia-api-key')?.value.trim()
+      || localStorage.getItem('anthropic-api-key') || '';
+
+    const btn    = document.getElementById('btn-gerar-analise');
+    const status = document.getElementById('ia-status');
+
+    if (!apiKey) {
+      status.textContent = '⚠ Insira a chave de API Anthropic no campo acima.';
+      return;
+    }
+
+    btn.disabled = true;
+    status.textContent = 'Analisando seus dados…';
+    document.getElementById('ia-resultado').style.display = 'none';
+
+    const resumo = prepararContexto(_getFunnels());
+
+    try {
+      const response = await fetch('https://api.anthropic.com/v1/messages', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-api-key': apiKey,
+          'anthropic-version': '2023-06-01',
+          'anthropic-dangerous-direct-browser-access': 'true',
+        },
+        body: JSON.stringify({
+          model: 'claude-sonnet-4-6',
+          max_tokens: 1500,
+          system: `Você é um analista especializado em funis de anúncios do Meta Ads.
+Analise os dados fornecidos e responda em português brasileiro de forma clara e objetiva.
+Quando relevante, use bullet points (•) para listas e markdown simples para organizar.
+Seja direto e foque nos insights mais importantes para o usuário.
+Dados dos funis coletados: ${resumo}`,
+          messages: [{ role: 'user', content: pergunta }],
+        }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        status.textContent = `Erro: ${data.error?.message || 'Falha na API.'}`;
+        btn.disabled = false;
+        return;
+      }
+
+      const texto = data.content?.[0]?.text || 'Não foi possível gerar a análise.';
+      document.getElementById('ia-resultado-texto').innerHTML = formatarResposta(texto);
+      document.getElementById('ia-resultado').style.display = 'block';
+      status.textContent = '';
+    } catch (e) {
+      status.textContent = 'Erro ao gerar análise. Verifique a chave e tente novamente.';
+      console.error(e);
+    }
+
+    btn.disabled = false;
+  }
+
   // ── Inicialização ─────────────────────────────────────────────────────
   function init(getFunnels) {
     _getFunnels = getFunnels;
@@ -468,7 +630,18 @@ const Analise = (() => {
     document.getElementById('modal-funil-detalhe').addEventListener('click', e => {
       if (e.target === document.getElementById('modal-funil-detalhe')) fecharModalFunil();
     });
+
+    // Restaurar chave de API salva
+    const savedKey = localStorage.getItem('anthropic-api-key') || '';
+    const keyEl    = document.getElementById('ia-api-key');
+    if (keyEl) {
+      if (savedKey) keyEl.value = savedKey;
+      keyEl.addEventListener('input', () => {
+        localStorage.setItem('anthropic-api-key', keyEl.value.trim());
+      });
+    }
   }
 
-  return { init, refresh, searchDomAnuncio, searchDomFinal, searchProduto };
+  return { init, refresh, searchDomAnuncio, searchDomFinal, searchProduto,
+           usarExemplo, limparAnalise, copiarResultado, gerarAnalise };
 })();
