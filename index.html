@@ -372,44 +372,6 @@
         <div id="result-produto" class="analysis-result"></div>
       </div>
 
-      <!-- Block 4: Análise com IA -->
-      <div class="analise-ia-section">
-        <div class="analise-ia-header">
-          <div class="analise-ia-title">✨ Análise com IA</div>
-          <div class="analise-ia-sub">Descreva o que quer analisar e a IA vai cruzar com os seus dados</div>
-        </div>
-
-        <div class="analise-ia-exemplos">
-          <span style="font-size:11px;color:#555">Exemplos:</span>
-          <button class="exemplo-btn" onclick="Analise.usarExemplo(this)">Quais produtos estão escalando no nicho WL?</button>
-          <button class="exemplo-btn" onclick="Analise.usarExemplo(this)">Compare o ROI dos domínios rodando LEAN PEAK</button>
-          <button class="exemplo-btn" onclick="Analise.usarExemplo(this)">Quais contas têm ROI negativo e quanto estão perdendo?</button>
-          <button class="exemplo-btn" onclick="Analise.usarExemplo(this)">Resumo geral dos funis da última semana</button>
-        </div>
-
-        <textarea id="ia-pergunta" rows="3"
-          placeholder="Ex: Quais produtos têm mais funis rodando com famoso no nicho WL nos últimos 30 dias?"></textarea>
-
-        <div style="margin-top:6px">
-          <input type="password" id="ia-api-key" class="ia-api-key-input"
-                 placeholder="Chave de API Anthropic (sk-ant-…)" autocomplete="off">
-        </div>
-
-        <div style="display:flex;gap:8px;margin-top:10px;align-items:center;flex-wrap:wrap">
-          <button class="btn btn-primary" onclick="Analise.gerarAnalise()" id="btn-gerar-analise">✨ Gerar análise</button>
-          <button class="btn btn-secondary" onclick="Analise.limparAnalise()">Limpar</button>
-          <span id="ia-status" style="font-size:12px;color:#555"></span>
-        </div>
-
-        <div id="ia-resultado" style="display:none;margin-top:16px">
-          <div class="ia-resultado-header">
-            <span style="font-size:12px;color:#555">Resultado</span>
-            <button class="btn btn-sm" onclick="Analise.copiarResultado(event)">Copiar</button>
-          </div>
-          <div id="ia-resultado-texto" class="ia-resultado-corpo"></div>
-        </div>
-      </div>
-
     </div><!-- /tab-analise -->
 
   </main><!-- /main -->
