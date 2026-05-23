@@ -192,8 +192,8 @@ document.addEventListener('DOMContentLoaded', async () => {
     const nicho   = v('m-nicho');
     const produto = v('m-produto');
 
-    if (!conta || !nicho || !produto) {
-      showToast('Preencha os campos obrigatórios: Conta, Nicho e Produto.');
+    if (!conta && !v('m-urlAnuncio')) {
+      showToast('Preencha pelo menos a Conta ou a URL do anúncio.');
       return;
     }
 
@@ -426,7 +426,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     const parsed = blocos
       .map(b => Parser.parse(b, linkMap))
-      .filter(f => f.conta || f.produto);
+      .filter(f => f.conta || f.urlAnuncio);
 
     if (!parsed.length) {
       showToast('Não foi possível extrair nenhum funil válido.');
