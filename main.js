@@ -433,9 +433,8 @@ document.addEventListener('DOMContentLoaded', async () => {
       return;
     }
 
-    const idsNoBanco = new Set(funnels.map(f => f.adId).filter(Boolean));
-    const novos      = parsed.filter(f => !f.adId || !idsNoBanco.has(f.adId));
-    const duplicados = parsed.filter(f =>  f.adId &&  idsNoBanco.has(f.adId));
+    const novos      = parsed;
+    const duplicados = [];
 
     const dataEscolhida = await pedirDataImport(novos, duplicados);
     if (dataEscolhida === null) return;   // usuário cancelou
