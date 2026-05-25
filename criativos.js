@@ -161,17 +161,6 @@ const Criativos = (() => {
     ).join('');
   }
 
-  // ── Visibilidade de colunas ───────────────────────────────────────────
-
-  function applyColVisibility() {
-    COLUMNS.forEach(c => {
-      const visible = _cols[c.key] !== false;
-      document.querySelectorAll(`#cr-table [data-col="${c.key}"]`).forEach(el => {
-        el.style.display = visible ? '' : 'none';
-      });
-    });
-  }
-
   // ── Inline editing ────────────────────────────────────────────────────
 
   function rerenderRow(id) {
@@ -182,7 +171,6 @@ const Criativos = (() => {
     const tmp = document.createElement('tbody');
     tmp.innerHTML = renderRow(ad, _currentDups);
     tr.replaceWith(tmp.firstElementChild);
-    applyColVisibility();
   }
 
   function makeEditable(td) {
@@ -401,23 +389,23 @@ const Criativos = (() => {
         <table id="cr-table">
           <thead>
             <tr>
-              <th data-col="data">Data</th>
-              <th data-col="nicho">Nicho</th>
-              <th data-col="produto" style="min-width:100px">Produto</th>
-              <th data-col="conta">Conta</th>
-              <th data-col="hook">Hook</th>
-              <th data-col="angulo">Ângulo</th>
-              <th data-col="formato">Formato</th>
-              <th data-col="views" style="text-align:right">Views</th>
-              <th data-col="contas" style="text-align:center">Lateral.</th>
-              <th data-col="destaque" style="text-align:center">⭐</th>
-              <th data-col="urlAnuncio" style="text-align:center">Link</th>
+              ${_cols['data']       !== false ? '<th>Data</th>'                                  : ''}
+              ${_cols['nicho']      !== false ? '<th>Nicho</th>'                                 : ''}
+              ${_cols['produto']    !== false ? '<th style="min-width:100px">Produto</th>'       : ''}
+              ${_cols['conta']      !== false ? '<th>Conta</th>'                                 : ''}
+              ${_cols['hook']       !== false ? '<th>Hook</th>'                                  : ''}
+              ${_cols['angulo']     !== false ? '<th>Ângulo</th>'                                : ''}
+              ${_cols['formato']    !== false ? '<th>Formato</th>'                               : ''}
+              ${_cols['views']      !== false ? '<th style="text-align:right">Views</th>'        : ''}
+              ${_cols['contas']     !== false ? '<th style="text-align:center">Lateral.</th>'    : ''}
+              ${_cols['destaque']   !== false ? '<th style="text-align:center">⭐</th>'          : ''}
+              ${_cols['urlAnuncio'] !== false ? '<th style="text-align:center">Link</th>'        : ''}
               <th style="width:52px"></th>
             </tr>
           </thead>
           <tbody>
             ${ads.length === 0 ? `
-              <tr><td colspan="12">
+              <tr><td colspan="${COLUMNS.filter(c => _cols[c.key] !== false).length + 1}">
                 <div class="empty-state">
                   <div class="empty-icon">🎬</div>
                   <h3>Nenhum criativo cadastrado</h3>
@@ -458,7 +446,9 @@ const Criativos = (() => {
       if (!cb) return;
       _cols[cb.dataset.colToggle] = cb.checked;
       saveCols(_cols);
-      applyColVisibility();
+      render();
+      const dd = document.getElementById('cr-cols-dropdown');
+      if (dd) dd.style.display = 'block';
     });
     _closeColsDd = () => {
       const dd = document.getElementById('cr-cols-dropdown');
@@ -486,8 +476,6 @@ const Criativos = (() => {
       const td = e.target.closest('td[data-field]');
       if (td) makeEditable(td);
     });
-
-    applyColVisibility();
   }
 
   // ── Gráfico de ângulos ────────────────────────────────────────────────
@@ -536,59 +524,60 @@ const Criativos = (() => {
     const hookText     = (ad.hook || '').slice(0, 50);
     const hookTrunc    = (ad.hook || '').length > 50;
 
+    const show = k => _cols[k] !== false;
     return `
       <tr data-id="${esc(ad.id)}"${needsHook ? ' class="cr-needs-hook"' : ''}${rowStyle ? ` style="${rowStyle}"` : ''}>
-        <td data-col="data" data-field="data">${formatDateShort(ad.data)}</td>
-        <td data-col="nicho" data-field="nicho">
+        ${show('data') ? `<td data-field="data">${formatDateShort(ad.data)}</td>` : ''}
+        ${show('nicho') ? `<td data-field="nicho">
           ${ad.nicho ? nichoBadge(ad.nicho) : '<span style="color:var(--text-muted)">—</span>'}
-        </td>
-        <td data-col="produto" data-field="produto" style="min-width:100px">
+        </td>` : ''}
+        ${show('produto') ? `<td data-field="produto" style="min-width:100px">
           ${(ad.produtoDesconhecido || Storage.isProdutoDesconhecido(ad.produto))
             ? '<em style="color:var(--text-muted);font-style:italic">—</em>'
             : `<span style="font-weight:500">${esc(ad.produto)}</span>`}
-        </td>
-        <td data-col="conta" data-field="conta" style="font-size:12px">
+        </td>` : ''}
+        ${show('conta') ? `<td data-field="conta" style="font-size:12px">
           ${cleanedConta ? esc(cleanedConta) : '<span style="color:var(--text-muted)">—</span>'}
-        </td>
-        <td data-col="hook" data-field="hook" class="cr-hook-cell">
+        </td>` : ''}
+        ${show('hook') ? `<td data-field="hook" class="cr-hook-cell">
           ${needsHook
             ? `<span style="color:#BA7517;font-size:11px;font-weight:600">⚠ preencher</span>`
             : ad.hook
               ? `<span title="${esc(ad.hook)}">${esc(hookText)}${hookTrunc ? '…' : ''}</span>`
               : '<span style="color:var(--text-muted)">—</span>'}
-        </td>
-        <td data-col="angulo" data-field="angulo">
+        </td>` : ''}
+        ${show('angulo') ? `<td data-field="angulo">
           ${ad.angulo
             ? `<span style="background:var(--bg-card);border:0.5px solid var(--border);
                 border-radius:20px;padding:2px 7px;font-size:11px">${esc(ad.angulo)}</span>`
             : '<span style="color:var(--text-muted)">—</span>'}
-        </td>
-        <td data-col="formato" data-field="formato">
+        </td>` : ''}
+        ${show('formato') ? `<td data-field="formato">
           ${ad.formato
             ? `<span style="background:var(--bg-card);border:0.5px solid var(--border);
                 border-radius:20px;padding:2px 7px;font-size:11px">${esc(ad.formato)}</span>`
             : '<span style="color:var(--text-muted)">—</span>'}
-        </td>
-        <td data-col="views" data-field="views" style="text-align:right;font-weight:500">${formatViews(ad.views)}</td>
-        <td data-col="contas" style="text-align:center">
+        </td>` : ''}
+        ${show('views') ? `<td data-field="views" style="text-align:right;font-weight:500">${formatViews(ad.views)}</td>` : ''}
+        ${show('contas') ? `<td style="text-align:center">
           ${isLateral
             ? `<span style="color:#D85A30;font-size:12px;font-weight:600">🔄</span>`
             : '<span style="color:var(--text-muted);font-size:12px">—</span>'}
-        </td>
-        <td data-col="destaque" style="text-align:center">
+        </td>` : ''}
+        ${show('destaque') ? `<td style="text-align:center">
           <button class="btn btn-sm" data-action="star" data-id="${esc(ad.id)}"
             title="${ad.destaque ? 'Remover destaque' : 'Marcar como destaque'}"
             style="font-size:15px;border:none;background:none;cursor:pointer;padding:2px 4px;line-height:1">
             ${ad.destaque ? '⭐' : '☆'}
           </button>
-        </td>
-        <td data-col="urlAnuncio" data-field="urlAnuncio" style="text-align:center">
+        </td>` : ''}
+        ${show('urlAnuncio') ? `<td data-field="urlAnuncio" style="text-align:center">
           ${ad.urlAnuncio
             ? `<a href="${esc(ad.urlAnuncio)}" target="_blank" rel="noopener"
                 style="font-size:15px;color:var(--accent);text-decoration:none;line-height:1"
                 title="${esc(ad.urlAnuncio)}">↗</a>`
             : '<span style="color:var(--text-muted)">—</span>'}
-        </td>
+        </td>` : ''}
         <td>
           <div class="cr-actions" style="display:flex;gap:2px;justify-content:flex-end">
             <button data-action="edit" data-id="${esc(ad.id)}" title="Editar"
