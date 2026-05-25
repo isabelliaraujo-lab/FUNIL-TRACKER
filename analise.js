@@ -4,7 +4,8 @@
 
 const Analise = (() => {
 
-  let _getFunnels = () => [];
+  let _getFunnels   = () => [];
+  let _intelPeriodo = 'tudo';
 
   const esc = Storage.escHtml;
 
@@ -442,8 +443,211 @@ const Analise = (() => {
       );
   }
 
+  // ── Painel de inteligência do período ────────────────────────────────
+
+  function filtrarPorPeriodo(funis, tipo) {
+    if (!tipo || tipo === 'tudo') return funis;
+    const hoje = new Date();
+    hoje.setHours(23, 59, 59, 999);
+    let de;
+    if (tipo === 'mes') {
+      de = new Date(hoje.getFullYear(), hoje.getMonth(), 1);
+    } else {
+      const dias = { '7d': 7, '15d': 15, '30d': 30 }[tipo] || 7;
+      de = new Date(hoje);
+      de.setDate(de.getDate() - dias + 1);
+      de.setHours(0, 0, 0, 0);
+    }
+    return funis.filter(f => {
+      if (!f.data) return false;
+      const d = new Date(f.data + (f.data.includes('T') ? '' : 'T00:00:00'));
+      return d >= de && d <= hoje;
+    });
+  }
+
+  function intelPeriodoBtnsHTML() {
+    const opts = [
+      { v: '7d',   l: '7 dias'   },
+      { v: '15d',  l: '15 dias'  },
+      { v: '30d',  l: '30 dias'  },
+      { v: 'mes',  l: 'Este mês' },
+      { v: 'tudo', l: 'Tudo'     },
+    ];
+    return `<div class="escalada-filtros__rapidos" style="margin-bottom:20px">
+      ${opts.map(o =>
+        `<button class="filtro-rapido${_intelPeriodo === o.v ? ' ativo' : ''}"
+                 data-intel-periodo="${esc(o.v)}" type="button">${esc(o.l)}</button>`
+      ).join('')}
+    </div>`;
+  }
+
+  function intelNichosHTML(funis) {
+    const counts = {};
+    funis.forEach(f => { if (f.nicho) counts[f.nicho] = (counts[f.nicho] || 0) + 1; });
+    const items = Object.entries(counts).sort((a, b) => b[1] - a[1]);
+    if (!items.length) return '<p class="analysis-no-results">Nenhum funil no período.</p>';
+    const max = items[0][1];
+    return items.map(([nicho, count]) => {
+      const pct = Math.round((count / max) * 100);
+      return `<div style="margin-bottom:9px">
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:3px">
+          <span class="tag tag-nicho nicho-${esc(nicho)}" style="font-size:10px;padding:1px 7px;min-width:34px;text-align:center">${esc(nicho)}</span>
+          <span style="font-size:12px;color:var(--text);font-weight:600">${count}</span>
+        </div>
+        <div style="background:var(--border);border-radius:4px;height:5px;overflow:hidden">
+          <div style="width:${pct}%;height:100%;background:var(--accent);border-radius:4px"></div>
+        </div>
+      </div>`;
+    }).join('');
+  }
+
+  function intelDomFinalHTML(funis) {
+    const domMap = {};
+    funis.forEach(f => {
+      if (!f.domFinal) return;
+      const doms = (f.split === true || f.split === 'true')
+        ? f.domFinal.split(' / ').map(d => d.trim()).filter(Boolean)
+        : [f.domFinal.trim()];
+      doms.forEach(d => {
+        if (!domMap[d]) domMap[d] = { count: 0, produtos: new Set() };
+        domMap[d].count++;
+        if (!Storage.isProdutoDesconhecido(f.produto)) domMap[d].produtos.add(f.produto);
+      });
+    });
+    const items = Object.entries(domMap).sort((a, b) => b[1].count - a[1].count).slice(0, 10);
+    if (!items.length) return '<p class="analysis-no-results">Nenhum domínio final no período.</p>';
+    return items.map(([dom, d], i) => {
+      const prodTags = [...d.produtos].map(p =>
+        `<span class="tag" style="font-size:10px;padding:1px 5px">${esc(p)}</span>`
+      ).join('');
+      return `<div class="rank-item">
+        <span class="rank-pos ${i < 3 ? 'top' : ''}">#${i + 1}</span>
+        <div style="flex:1;min-width:0;overflow:hidden">
+          <div style="font-weight:600;font-size:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${esc(dom)}">${esc(dom)}</div>
+          ${prodTags ? `<div style="margin-top:3px;display:flex;flex-wrap:wrap;gap:3px">${prodTags}</div>` : ''}
+        </div>
+        <span style="font-size:13px;font-weight:700;color:var(--accent);flex-shrink:0;margin-left:6px">${d.count}</span>
+      </div>`;
+    }).join('');
+  }
+
+  function intelTopViewsHTML(funis) {
+    const items = [...funis].filter(f => f.views > 0).sort((a, b) => (b.views || 0) - (a.views || 0)).slice(0, 10);
+    if (!items.length) return '<p class="analysis-no-results">Nenhum funil com views no período.</p>';
+    return items.map((f, i) => {
+      const url      = f.urlAnuncioFull || f.urlAnuncio || '';
+      const prodLabel = Storage.isProdutoDesconhecido(f.produto) ? '—' : esc(f.produto || '—');
+      const nichoTag  = f.nicho
+        ? `<span class="tag tag-nicho nicho-${esc(f.nicho)}" style="font-size:10px;padding:1px 5px">${esc(f.nicho)}</span>`
+        : '';
+      const row = `<div class="rank-item"${url ? ' style="cursor:pointer"' : ''}>
+        <span class="rank-pos ${i < 3 ? 'top' : ''}">#${i + 1}</span>
+        <div style="flex:1;min-width:0;overflow:hidden">
+          <div style="font-size:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${esc(f.conta || '—')}">${esc(f.conta || '—')}</div>
+          <div style="display:flex;flex-wrap:wrap;align-items:center;gap:3px;margin-top:2px">
+            ${nichoTag}
+            <span style="font-size:10px;color:var(--text-muted)">${prodLabel}</span>
+          </div>
+        </div>
+        <div style="font-size:13px;font-weight:700;color:#a78bfa;flex-shrink:0;margin-left:6px">${Parser.formatViews(f.views)}</div>
+      </div>`;
+      return url
+        ? `<a href="${esc(url)}" target="_blank" rel="noopener" style="text-decoration:none;color:inherit;display:block">${row}</a>`
+        : row;
+    }).join('');
+  }
+
+  function intelProdutosNovosHTML(allFunis) {
+    const hoje = new Date();
+    hoje.setHours(23, 59, 59, 999);
+    const limite = new Date(hoje);
+    limite.setDate(limite.getDate() - 6);
+    limite.setHours(0, 0, 0, 0);
+
+    const recentes   = new Set();
+    const anteriores = new Set();
+    allFunis.forEach(f => {
+      if (Storage.isProdutoDesconhecido(f.produto) || !f.data) return;
+      const d = new Date(f.data + (f.data.includes('T') ? '' : 'T00:00:00'));
+      if (d >= limite) recentes.add(f.produto);
+      else             anteriores.add(f.produto);
+    });
+    const novos = [...recentes].filter(p => !anteriores.has(p)).sort();
+    if (!novos.length) return '<p class="analysis-no-results">Nenhum produto novo identificado no período.</p>';
+    return novos.map(p =>
+      `<div class="rank-item">
+        <span style="font-size:11px;color:#00c47a;flex-shrink:0">★</span>
+        <span style="font-size:13px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${esc(p)}">${esc(p)}</span>
+      </div>`
+    ).join('');
+  }
+
+  function intelContasAtivasHTML(funis) {
+    const map = {};
+    funis.forEach(f => {
+      if (!f.conta) return;
+      if (!map[f.conta]) map[f.conta] = { count: 0, nichos: new Set(), produtos: new Set() };
+      map[f.conta].count++;
+      if (f.nicho) map[f.conta].nichos.add(f.nicho);
+      if (!Storage.isProdutoDesconhecido(f.produto)) map[f.conta].produtos.add(f.produto);
+    });
+    const items = Object.entries(map).sort((a, b) => b[1].count - a[1].count).slice(0, 10);
+    if (!items.length) return '<p class="analysis-no-results">Nenhuma conta no período.</p>';
+    return items.map(([conta, d], i) => {
+      const nichoTags = [...d.nichos].map(n =>
+        `<span class="tag tag-nicho nicho-${esc(n)}" style="font-size:10px;padding:1px 5px">${esc(n)}</span>`
+      ).join('');
+      const prodTags = [...d.produtos].map(p =>
+        `<span class="tag" style="font-size:10px;padding:1px 5px">${esc(p)}</span>`
+      ).join('');
+      return `<div class="rank-item" style="align-items:flex-start">
+        <span class="rank-pos ${i < 3 ? 'top' : ''}" style="padding-top:1px">#${i + 1}</span>
+        <div style="flex:1;min-width:0;overflow:hidden">
+          <div style="font-weight:600;font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${esc(conta)}">${esc(conta)}</div>
+          ${nichoTags || prodTags ? `<div style="margin-top:4px;display:flex;flex-wrap:wrap;gap:3px">${nichoTags}${prodTags}</div>` : ''}
+        </div>
+        <span style="font-size:12px;font-weight:700;color:var(--accent);flex-shrink:0;white-space:nowrap;margin-left:8px;padding-top:1px">${d.count} funil(s)</span>
+      </div>`;
+    }).join('');
+  }
+
+  function renderIntel() {
+    const el = document.getElementById('analise-intel');
+    if (!el) return;
+    const allFunis = _getFunnels();
+    const funis    = filtrarPorPeriodo(allFunis, _intelPeriodo);
+    el.innerHTML = `
+      <div class="escalada-section">
+        <h3 class="escalada-section__title">🧠 Inteligência do período</h3>
+        ${intelPeriodoBtnsHTML()}
+        <div class="escalada-grid">
+          <div class="escalada-card">
+            <div class="escalada-card__title">Nichos em volume</div>
+            ${intelNichosHTML(funis)}
+          </div>
+          <div class="escalada-card">
+            <div class="escalada-card__title">Domínios finais mais repetidos</div>
+            ${intelDomFinalHTML(funis)}
+          </div>
+          <div class="escalada-card">
+            <div class="escalada-card__title">Ads com mais views</div>
+            ${intelTopViewsHTML(funis)}
+          </div>
+          <div class="escalada-card">
+            <div class="escalada-card__title">Produtos novos na semana</div>
+            ${intelProdutosNovosHTML(allFunis)}
+          </div>
+          <div class="escalada-card" style="grid-column:span 2">
+            <div class="escalada-card__title">Contas mais ativas</div>
+            ${intelContasAtivasHTML(funis)}
+          </div>
+        </div>
+      </div>`;
+  }
+
   // ── Re-executa todas as buscas ativas ─────────────────────────────────
   function refresh() {
+    renderIntel();
     searchDomAnuncio();
     searchDomFinal();
     searchProduto();
@@ -452,6 +656,13 @@ const Analise = (() => {
   // ── Inicialização ─────────────────────────────────────────────────────
   function init(getFunnels) {
     _getFunnels = getFunnels;
+
+    document.getElementById('tab-analise').addEventListener('click', e => {
+      const btn = e.target.closest('[data-intel-periodo]');
+      if (!btn) return;
+      _intelPeriodo = btn.dataset.intelPeriodo;
+      renderIntel();
+    });
 
     document.getElementById('search-dom-anuncio')
       .addEventListener('input', searchDomAnuncio);
