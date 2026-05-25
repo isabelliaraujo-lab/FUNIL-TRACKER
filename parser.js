@@ -108,7 +108,7 @@ const Parser = (() => {
         adId    = m[1];
         conta   = m[1].trim() + ' - ' + m[2].trim();
         nicho   = m[3].trim().toUpperCase();
-        produto = m[4].trim().toUpperCase();
+        produto = Storage.normalizeProduto(m[4]);
       }
     }
 

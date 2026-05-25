@@ -210,7 +210,7 @@ const Storage = (() => {
           data:          get(row, iData),
           conta:         get(row, iConta),
           nicho:         get(row, iNicho),
-          produto:       get(row, iProduto),
+          produto:       normalizeProduto(get(row, iProduto)),
           urlAnuncio:    get(row, iUrlAn),
           urlAnuncioFull: get(row, iUrlAnFull) || get(row, iUrlAn),
           views:         viewsStr ? (parseInt(viewsStr, 10) || null) : null,
@@ -231,6 +231,16 @@ const Storage = (() => {
     }
 
     return { funnels, errors };
+  }
+
+  // ── Produto desconhecido ──────────────────────────────────────────────
+
+  function isProdutoDesconhecido(produto) {
+    return !produto || produto.trim().toUpperCase() === 'S';
+  }
+
+  function normalizeProduto(produto) {
+    return isProdutoDesconhecido(produto) ? null : produto.trim().toUpperCase();
   }
 
   // ── Utilitário HTML ───────────────────────────────────────────────────
@@ -254,5 +264,7 @@ const Storage = (() => {
     exportCSV,
     importCSV,
     escHtml,
+    isProdutoDesconhecido,
+    normalizeProduto,
   };
 })();

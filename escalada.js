@@ -146,7 +146,7 @@ const Escalada = (() => {
   function rankProdutosPorViews(funis) {
     const map = {};
     funis.forEach(f => {
-      if (!f.produto) return;
+      if (Storage.isProdutoDesconhecido(f.produto)) return;
       if (!map[f.produto]) map[f.produto] = { produto: f.produto, views: 0, funis: 0, nichos: new Set() };
       map[f.produto].views += f.views || 0;
       map[f.produto].funis++;
@@ -160,7 +160,7 @@ const Escalada = (() => {
   function rankProdutosPorROI(funis) {
     const map = {};
     funis.forEach(f => {
-      if (!f.produto || f.gasto == null || f.conversao == null) return;
+      if (Storage.isProdutoDesconhecido(f.produto) || f.gasto == null || f.conversao == null) return;
       const g = parseFloat(f.gasto)     || 0;
       const c = parseFloat(f.conversao) || 0;
       if (!map[f.produto]) map[f.produto] = { produto: f.produto, gasto: 0, conversao: 0, funis: 0, moeda: f.moeda || 'BRL' };
@@ -183,7 +183,7 @@ const Escalada = (() => {
       map[f.conta].gasto     += parseFloat(f.gasto)     || 0;
       map[f.conta].conversao += parseFloat(f.conversao) || 0;
       map[f.conta].funis++;
-      if (f.produto) map[f.conta].produtos.add(f.produto);
+      if (!Storage.isProdutoDesconhecido(f.produto)) map[f.conta].produtos.add(f.produto);
       if (f.nicho)   map[f.conta].nichos.add(f.nicho);
     });
     return Object.values(map)
@@ -195,7 +195,7 @@ const Escalada = (() => {
   function melhorDominioPorProduto(funis) {
     const map = {};
     funis.forEach(f => {
-      if (!f.produto || !f.domAnuncio || f.gasto == null || f.conversao == null) return;
+      if (Storage.isProdutoDesconhecido(f.produto) || !f.domAnuncio || f.gasto == null || f.conversao == null) return;
       if (!map[f.produto]) map[f.produto] = {};
       if (!map[f.produto][f.domAnuncio]) map[f.produto][f.domAnuncio] = {
         dom: f.domAnuncio, domFull: f.domAnuncioFull || '', gasto: 0, conversao: 0, views: 0, funis: 0, moeda: f.moeda || 'BRL',
@@ -422,7 +422,7 @@ const Escalada = (() => {
         }
       }
 
-      const produtos = [...new Set(funisC.map(f => f.produto).filter(Boolean))];
+      const produtos = [...new Set(funisC.map(f => f.produto).filter(p => !Storage.isProdutoDesconhecido(p)))];
       const prodTags = produtos
         .map(p => `<span class="tag" style="font-size:10px">${esc(p)}</span>`)
         .join('');

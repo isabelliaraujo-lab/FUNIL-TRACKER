@@ -74,6 +74,18 @@ document.addEventListener('DOMContentLoaded', async () => {
     const cloud = await SupabaseStorage.loadFunnels();
     funnels = cloud !== null ? cloud : Storage.load();
   } catch { funnels = Storage.load(); }
+
+  // Migração silenciosa: produto "S" → null
+  let _migrou = false;
+  funnels = funnels.map(f => {
+    if (f.produto?.trim().toUpperCase() === 'S') {
+      _migrou = true;
+      return { ...f, produto: null };
+    }
+    return f;
+  });
+  if (_migrou) saveFunnels(funnels);
+
   prevFunnels = [...funnels];
 
   try {

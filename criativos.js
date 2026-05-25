@@ -224,7 +224,7 @@ const Criativos = (() => {
         val = null;
       }
 
-      if (field === 'produto' && val) val = val.toUpperCase();
+      if (field === 'produto') val = Storage.normalizeProduto(val);
       if (field === 'hook' && val && !ad.hookFingerprint) {
         ad.hookFingerprint = val.toLowerCase().slice(0, 60);
       }
@@ -543,7 +543,7 @@ const Criativos = (() => {
           ${ad.nicho ? nichoBadge(ad.nicho) : '<span style="color:var(--text-muted)">—</span>'}
         </td>
         <td data-col="produto" data-field="produto" style="min-width:100px">
-          ${(ad.produtoDesconhecido || !ad.produto)
+          ${(ad.produtoDesconhecido || Storage.isProdutoDesconhecido(ad.produto))
             ? '<em style="color:var(--text-muted);font-style:italic">—</em>'
             : `<span style="font-weight:500">${esc(ad.produto)}</span>`}
         </td>
@@ -740,7 +740,7 @@ const Criativos = (() => {
         id:              id || Storage.genId(),
         data:            document.getElementById('cr-data').value,
         nicho:           document.getElementById('cr-nicho').value,
-        produto:         document.getElementById('cr-produto').value.trim().toUpperCase(),
+        produto:         Storage.normalizeProduto(document.getElementById('cr-produto').value),
         conta:           document.getElementById('cr-conta').value.trim(),
         hook,
         copy:            document.getElementById('cr-copy').value.trim(),

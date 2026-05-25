@@ -299,7 +299,7 @@ const Analise = (() => {
     }
 
     const contas   = new Set(matched.map(f => f.conta).filter(Boolean));
-    const produtos = new Set(matched.map(f => f.produto).filter(Boolean));
+    const produtos = new Set(matched.map(f => f.produto).filter(p => !Storage.isProdutoDesconhecido(p)));
     const destinos = new Set();
     matched.forEach(f => finalDomains(f).forEach(d => destinos.add(d)));
 
@@ -308,7 +308,7 @@ const Analise = (() => {
       const k = f.conta || '(sem conta)';
       if (!byContas[k]) byContas[k] = { produtos: new Set(), funnels: [] };
       byContas[k].funnels.push(f);
-      if (f.produto) byContas[k].produtos.add(f.produto);
+      if (!Storage.isProdutoDesconhecido(f.produto)) byContas[k].produtos.add(f.produto);
     });
 
     const items = Object.entries(byContas)
@@ -346,7 +346,7 @@ const Analise = (() => {
     }
 
     const contas   = new Set(matched.map(f => f.conta).filter(Boolean));
-    const produtos = new Set(matched.map(f => f.produto).filter(Boolean));
+    const produtos = new Set(matched.map(f => f.produto).filter(p => !Storage.isProdutoDesconhecido(p)));
     const domsAn   = new Set(matched.map(f => f.domAnuncio).filter(Boolean));
 
     const byContas = {};
@@ -355,7 +355,7 @@ const Analise = (() => {
       if (!byContas[k]) byContas[k] = { domsAn: new Set(), produtos: new Set(), funnels: [] };
       byContas[k].funnels.push(f);
       if (f.domAnuncio) byContas[k].domsAn.add(f.domAnuncio);
-      if (f.produto)    byContas[k].produtos.add(f.produto);
+      if (!Storage.isProdutoDesconhecido(f.produto)) byContas[k].produtos.add(f.produto);
     });
 
     const items = Object.entries(byContas)

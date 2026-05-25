@@ -138,7 +138,7 @@ const Tabela = (() => {
   function computeTopViews(n = 3) {
     const map = {};
     _getFunnels().forEach(f => {
-      if (!f.produto) return;
+      if (Storage.isProdutoDesconhecido(f.produto)) return;
       map[f.produto] = (map[f.produto] || 0) + (f.views || 0);
     });
     return new Set(
@@ -280,7 +280,9 @@ const Tabela = (() => {
         <td>${nichoTag(f.nicho)}</td>
         <td title="${esc(f.produto || '')}"
             style="font-size:12px;max-width:130px;">
-          ${esc(truncate(f.produto || '—', 18))}
+          ${Storage.isProdutoDesconhecido(f.produto)
+            ? '<span style="color:var(--text-muted);font-style:italic">—</span>'
+            : esc(truncate(f.produto, 18))}
         </td>
         <td>${urlAnuncioCell}</td>
         <td>${viewsTag(f.views)}</td>
@@ -584,7 +586,7 @@ const Tabela = (() => {
         data:           val('e-data'),
         conta:          val('e-conta'),
         nicho:          val('e-nicho'),
-        produto:        val('e-produto').toUpperCase(),
+        produto:        Storage.normalizeProduto(val('e-produto')),
         anuncios,
         urlAnuncio:     urlAn,
         urlAnuncioFull: urlAn,
