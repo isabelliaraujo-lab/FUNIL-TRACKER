@@ -4,7 +4,8 @@
 
 const Criativos = (() => {
 
-  const KEY = 'funil-tracker-criativos-v1';
+  const KEY     = 'funil-tracker-criativos-v1';
+  const COL_KEY = 'funil-tracker-criativos-colunas';
 
   // ── Storage próprio ───────────────────────────────────────────────────
 
@@ -17,9 +18,42 @@ const Criativos = (() => {
     localStorage.setItem(KEY, JSON.stringify(ads));
   }
 
+  // ── Colunas visíveis ──────────────────────────────────────────────────
+
+  const COLUMNS = [
+    { key: 'data',       label: 'Data',                     default: true  },
+    { key: 'nicho',      label: 'Nicho',                    default: true  },
+    { key: 'produto',    label: 'Produto',                  default: true  },
+    { key: 'conta',      label: 'Conta',                    default: true  },
+    { key: 'hook',       label: 'Hook',                     default: true  },
+    { key: 'angulo',     label: 'Ângulo',                   default: true  },
+    { key: 'formato',    label: 'Formato',                  default: false },
+    { key: 'views',      label: 'Views',                    default: true  },
+    { key: 'contas',     label: 'Contas c/ mesmo criativo', default: false },
+    { key: 'destaque',   label: 'Destaque',                 default: false },
+    { key: 'urlAnuncio', label: 'Link do anúncio',          default: true  },
+  ];
+
+  function loadCols() {
+    try {
+      const saved = JSON.parse(localStorage.getItem(COL_KEY));
+      if (saved && typeof saved === 'object') {
+        const defaults = Object.fromEntries(COLUMNS.map(c => [c.key, c.default]));
+        return Object.assign(defaults, saved);
+      }
+    } catch {}
+    return Object.fromEntries(COLUMNS.map(c => [c.key, c.default]));
+  }
+
+  function saveCols(cols) {
+    localStorage.setItem(COL_KEY, JSON.stringify(cols));
+  }
+
   let _ads         = loadAds();
   let _showToast   = null;
   let _currentDups = [];
+  let _cols        = loadCols();
+  let _closeColsDd = null;
 
   // ── Constantes ────────────────────────────────────────────────────────
 
@@ -97,7 +131,7 @@ const Criativos = (() => {
   function nichoBadge(nicho) {
     const c = NICHO_COLORS[nicho] || '#888';
     return `<span style="background:${c}22;color:${c};border:1px solid ${c}44;
-      border-radius:20px;padding:2px 8px;font-size:11px;font-weight:500">${esc(nicho)}</span>`;
+      border-radius:20px;padding:2px 7px;font-size:11px;font-weight:500">${esc(nicho)}</span>`;
   }
 
   function formatViews(v) {
@@ -108,10 +142,34 @@ const Criativos = (() => {
     return String(n);
   }
 
+  function formatDateShort(dateStr) {
+    if (!dateStr) return '—';
+    const p = dateStr.split('-');
+    return p.length === 3 ? `${p[2]}/${p[1]}` : dateStr;
+  }
+
+  function cleanConta(conta) {
+    if (!conta) return null;
+    const m = conta.match(/^[\d]+\s*-\s*(.+)$/);
+    if (m && m[1].trim()) return m[1].trim();
+    return conta.trim();
+  }
+
   function optionsHtml(arr, selected = '') {
     return arr.map(v =>
       `<option value="${esc(v)}" ${selected === v ? 'selected' : ''}>${esc(v)}</option>`
     ).join('');
+  }
+
+  // ── Visibilidade de colunas ───────────────────────────────────────────
+
+  function applyColVisibility() {
+    COLUMNS.forEach(c => {
+      const visible = _cols[c.key] !== false;
+      document.querySelectorAll(`#cr-table [data-col="${c.key}"]`).forEach(el => {
+        el.style.display = visible ? '' : 'none';
+      });
+    });
   }
 
   // ── Inline editing ────────────────────────────────────────────────────
@@ -124,6 +182,7 @@ const Criativos = (() => {
     const tmp = document.createElement('tbody');
     tmp.innerHTML = renderRow(ad, _currentDups);
     tr.replaceWith(tmp.firstElementChild);
+    applyColVisibility();
   }
 
   function makeEditable(td) {
@@ -245,7 +304,6 @@ const Criativos = (() => {
     const dups = getDuplicates(filteredAds(semAtual, '', ''));
     _currentDups = dups;
 
-    // Métricas
     const totalAds    = ads.length;
     const totalContas = new Set(ads.map(a => a.conta).filter(Boolean)).size;
     const topViews    = ads.reduce((max, a) => Math.max(max, Number(a.views)||0), 0);
@@ -253,8 +311,8 @@ const Criativos = (() => {
 
     container.innerHTML = `
 
-      <!-- Filtros de semana + nicho + ângulo -->
-      <div class="filters-bar" style="margin-bottom:16px;flex-wrap:wrap;gap:8px">
+      <!-- Filtros -->
+      <div class="filters-bar" style="margin-bottom:16px;flex-wrap:wrap;gap:8px;align-items:center">
         <select id="cr-filter-semana" class="filter-input" style="min-width:180px">
           ${semanas.map(s =>
             `<option value="${esc(s)}" ${s===semAtual?'selected':''}>${esc(s)}</option>`
@@ -268,14 +326,30 @@ const Criativos = (() => {
           <option value="">Todos os ângulos</option>
           ${ANGULOS.map(a => `<option value="${esc(a)}" ${a===anguloAtual?'selected':''}>${esc(a)}</option>`).join('')}
         </select>
-        <button class="btn btn-primary btn-sm" id="cr-btn-novo">+ Novo criativo</button>
-        <button class="btn btn-secondary btn-sm" id="cr-btn-export">↓ Exportar CSV</button>
+        <div style="position:relative" id="cr-cols-wrapper">
+          <button class="btn btn-secondary btn-sm" id="cr-cols-btn" style="white-space:nowrap">⊞ Colunas</button>
+          <div id="cr-cols-dropdown" style="display:none;position:absolute;top:calc(100% + 4px);right:0;
+            z-index:200;background:var(--surface2);border:1px solid var(--border);border-radius:8px;
+            padding:10px 14px;min-width:220px;box-shadow:0 6px 24px rgba(0,0,0,.5)">
+            ${COLUMNS.map(c => `
+              <label style="display:flex;align-items:center;gap:8px;padding:5px 0;cursor:pointer;
+                font-size:13px;color:var(--text);user-select:none">
+                <input type="checkbox" data-col-toggle="${esc(c.key)}"
+                  ${_cols[c.key] !== false ? 'checked' : ''}
+                  style="accent-color:var(--accent);width:14px;height:14px;cursor:pointer">
+                ${esc(c.label)}
+              </label>
+            `).join('')}
+          </div>
+        </div>
+        <button class="btn btn-primary btn-sm" id="cr-btn-novo" style="margin-left:auto">+ Novo</button>
+        <button class="btn btn-secondary btn-sm" id="cr-btn-export">↓ CSV</button>
       </div>
 
       <!-- Métricas rápidas -->
       <div class="dashboard-grid" style="margin-bottom:20px">
         <div class="stat-card">
-          <div class="stat-label">Criativos na semana</div>
+          <div class="stat-label">Criativos</div>
           <div class="stat-value">${totalAds}</div>
         </div>
         <div class="stat-card">
@@ -287,7 +361,7 @@ const Criativos = (() => {
           <div class="stat-value">${formatViews(topViews)}</div>
         </div>
         <div class="stat-card">
-          <div class="stat-label">Criativos lateralizados</div>
+          <div class="stat-label">Lateralizados</div>
           <div class="stat-value" style="color:${laterais>0?'#D85A30':'inherit'}">${laterais}</div>
         </div>
       </div>
@@ -309,7 +383,7 @@ const Criativos = (() => {
                 ${group.map(a => `
                   <span style="background:var(--bg-card);border:0.5px solid var(--border);
                     border-radius:6px;padding:4px 10px;font-size:12px">
-                    ${esc(a.conta||'—')} ${nichoBadge(a.nicho)}
+                    ${esc(cleanConta(a.conta)||'—')} ${a.nicho ? nichoBadge(a.nicho) : ''}
                     ${a.views ? `<span style="color:var(--text-muted);margin-left:4px">${formatViews(a.views)}</span>` : ''}
                   </span>
                 `).join('')}
@@ -327,35 +401,30 @@ const Criativos = (() => {
         <table id="cr-table">
           <thead>
             <tr>
-              <th>Data</th>
-              <th>Nicho</th>
-              <th>Produto</th>
-              <th>Conta</th>
-              <th>Hook (primeiros 3s)</th>
-              <th>Ângulo</th>
-              <th>Formato</th>
-              <th>Views</th>
-              <th>Contas c/ mesmo criativo</th>
-              <th>Destaque</th>
-              <th>Link do anúncio</th>
-              <th aria-label="Ações"></th>
+              <th data-col="data">Data</th>
+              <th data-col="nicho">Nicho</th>
+              <th data-col="produto" style="min-width:100px">Produto</th>
+              <th data-col="conta">Conta</th>
+              <th data-col="hook">Hook</th>
+              <th data-col="angulo">Ângulo</th>
+              <th data-col="formato">Formato</th>
+              <th data-col="views" style="text-align:right">Views</th>
+              <th data-col="contas" style="text-align:center">Lateral.</th>
+              <th data-col="destaque" style="text-align:center">⭐</th>
+              <th data-col="urlAnuncio" style="text-align:center">Link</th>
+              <th style="width:52px"></th>
             </tr>
           </thead>
           <tbody>
             ${ads.length === 0 ? `
-              <tr>
-                <td colspan="12">
-                  <div class="empty-state">
-                    <div class="empty-icon">🎬</div>
-                    <h3>Nenhum criativo cadastrado</h3>
-                    <p>Clique em "+ Novo criativo" para começar a registrar os ads da semana.</p>
-                  </div>
-                </td>
-              </tr>
-            ` : ads
-                .sort((a,b) => calcScore(b) - calcScore(a))
-                .map(ad => renderRow(ad, dups))
-                .join('')}
+              <tr><td colspan="12">
+                <div class="empty-state">
+                  <div class="empty-icon">🎬</div>
+                  <h3>Nenhum criativo cadastrado</h3>
+                  <p>Clique em "+ Novo" para começar a registrar os ads da semana.</p>
+                </div>
+              </td></tr>
+            ` : ads.sort((a,b) => calcScore(b) - calcScore(a)).map(ad => renderRow(ad, dups)).join('')}
           </tbody>
         </table>
       </div>
@@ -363,24 +432,42 @@ const Criativos = (() => {
 
     // Bind filtros
     document.getElementById('cr-filter-semana').addEventListener('change', e => {
-      container.dataset.semana = e.target.value;
-      render();
+      container.dataset.semana = e.target.value; render();
     });
     document.getElementById('cr-filter-nicho').addEventListener('change', e => {
-      container.dataset.nicho = e.target.value;
-      render();
+      container.dataset.nicho = e.target.value; render();
     });
     document.getElementById('cr-filter-angulo').addEventListener('change', e => {
-      container.dataset.angulo = e.target.value;
-      render();
+      container.dataset.angulo = e.target.value; render();
     });
 
     document.getElementById('cr-btn-novo').addEventListener('click', () => openModal(null));
     document.getElementById('cr-btn-export').addEventListener('click', exportCSV);
 
+    // Seletor de colunas
+    if (_closeColsDd) { document.removeEventListener('click', _closeColsDd); _closeColsDd = null; }
+    const colsBtn = document.getElementById('cr-cols-btn');
+    const colsDd  = document.getElementById('cr-cols-dropdown');
+    colsBtn.addEventListener('click', e => {
+      e.stopPropagation();
+      colsDd.style.display = colsDd.style.display === 'none' ? 'block' : 'none';
+    });
+    colsDd.addEventListener('click', e => {
+      e.stopPropagation();
+      const cb = e.target.closest('input[data-col-toggle]');
+      if (!cb) return;
+      _cols[cb.dataset.colToggle] = cb.checked;
+      saveCols(_cols);
+      applyColVisibility();
+    });
+    _closeColsDd = () => {
+      const dd = document.getElementById('cr-cols-dropdown');
+      if (dd) dd.style.display = 'none';
+    };
+    document.addEventListener('click', _closeColsDd);
+
     // Delegação de eventos na tabela
     document.getElementById('cr-table')?.addEventListener('click', e => {
-      // Ignore clicks on active inputs / links
       if (e.target.matches('input, select, textarea')) return;
       if (e.target.closest('a[href]')) return;
 
@@ -399,6 +486,8 @@ const Criativos = (() => {
       const td = e.target.closest('td[data-field]');
       if (td) makeEditable(td);
     });
+
+    applyColVisibility();
   }
 
   // ── Gráfico de ângulos ────────────────────────────────────────────────
@@ -438,54 +527,76 @@ const Criativos = (() => {
   // ── Linha da tabela ───────────────────────────────────────────────────
 
   function renderRow(ad, dups) {
-    const isLateral  = dups.some(g => g.length > 1 && g.some(a => a.id === ad.id));
-    const needsHook  = ad._importado && !ad.hook;
-    const rowBg      = ad.destaque   ? 'background:rgba(255,200,0,0.07)'
-                     : needsHook     ? 'background:rgba(255,180,0,0.05)'
-                     : '';
+    const isLateral    = dups.some(g => g.length > 1 && g.some(a => a.id === ad.id));
+    const needsHook    = ad._importado && !ad.hook;
+    const rowStyle     = ad.destaque ? 'background:rgba(255,200,0,0.07)'
+                       : needsHook   ? 'background:rgba(255,160,0,0.05)'
+                       : '';
+    const cleanedConta = cleanConta(ad.conta);
+    const hookText     = (ad.hook || '').slice(0, 50);
+    const hookTrunc    = (ad.hook || '').length > 50;
 
     return `
-      <tr data-id="${esc(ad.id)}" style="${rowBg}">
-        <td data-field="data">${esc(ad.data || '—')}</td>
-        <td data-field="nicho">${ad.nicho ? nichoBadge(ad.nicho) : '<span style="color:var(--text-muted)">—</span>'}</td>
-        <td data-field="produto" style="font-weight:500">${esc(ad.produto || '—')}</td>
-        <td data-field="conta" style="font-size:12px">${esc(ad.conta || '—')}</td>
-        <td data-field="hook" style="font-size:12px;max-width:200px">
-          ${needsHook
-            ? `<span style="color:#F59E0B;font-size:11px;font-weight:600">⚠ preencher hook</span>`
-            : `<span title="${esc(ad.hook||'')}">${esc((ad.hook||'').slice(0,60))}${(ad.hook||'').length>60?'…':''}</span>`}
+      <tr data-id="${esc(ad.id)}"${needsHook ? ' class="cr-needs-hook"' : ''}${rowStyle ? ` style="${rowStyle}"` : ''}>
+        <td data-col="data" data-field="data">${formatDateShort(ad.data)}</td>
+        <td data-col="nicho" data-field="nicho">
+          ${ad.nicho ? nichoBadge(ad.nicho) : '<span style="color:var(--text-muted)">—</span>'}
         </td>
-        <td data-field="angulo">
+        <td data-col="produto" data-field="produto" style="min-width:100px">
+          ${(ad.produtoDesconhecido || !ad.produto)
+            ? '<em style="color:var(--text-muted);font-style:italic">—</em>'
+            : `<span style="font-weight:500">${esc(ad.produto)}</span>`}
+        </td>
+        <td data-col="conta" data-field="conta" style="font-size:12px">
+          ${cleanedConta ? esc(cleanedConta) : '<span style="color:var(--text-muted)">—</span>'}
+        </td>
+        <td data-col="hook" data-field="hook" class="cr-hook-cell">
+          ${needsHook
+            ? `<span style="color:#BA7517;font-size:11px;font-weight:600">⚠ preencher</span>`
+            : ad.hook
+              ? `<span title="${esc(ad.hook)}">${esc(hookText)}${hookTrunc ? '…' : ''}</span>`
+              : '<span style="color:var(--text-muted)">—</span>'}
+        </td>
+        <td data-col="angulo" data-field="angulo">
           ${ad.angulo
             ? `<span style="background:var(--bg-card);border:0.5px solid var(--border);
-                border-radius:20px;padding:2px 8px;font-size:11px">${esc(ad.angulo)}</span>`
+                border-radius:20px;padding:2px 7px;font-size:11px">${esc(ad.angulo)}</span>`
             : '<span style="color:var(--text-muted)">—</span>'}
         </td>
-        <td data-field="formato" style="font-size:12px">${esc(ad.formato || '—')}</td>
-        <td data-field="views" style="font-weight:500;text-align:right">${formatViews(ad.views)}</td>
-        <td style="text-align:center">
+        <td data-col="formato" data-field="formato">
+          ${ad.formato
+            ? `<span style="background:var(--bg-card);border:0.5px solid var(--border);
+                border-radius:20px;padding:2px 7px;font-size:11px">${esc(ad.formato)}</span>`
+            : '<span style="color:var(--text-muted)">—</span>'}
+        </td>
+        <td data-col="views" data-field="views" style="text-align:right;font-weight:500">${formatViews(ad.views)}</td>
+        <td data-col="contas" style="text-align:center">
           ${isLateral
-            ? `<span style="color:#D85A30;font-weight:600;font-size:12px">🔄 lateralizado</span>`
+            ? `<span style="color:#D85A30;font-size:12px;font-weight:600">🔄</span>`
             : '<span style="color:var(--text-muted);font-size:12px">—</span>'}
         </td>
-        <td style="text-align:center">
+        <td data-col="destaque" style="text-align:center">
           <button class="btn btn-sm" data-action="star" data-id="${esc(ad.id)}"
             title="${ad.destaque ? 'Remover destaque' : 'Marcar como destaque'}"
-            style="font-size:16px;border:none;background:none;cursor:pointer;padding:2px 6px">
+            style="font-size:15px;border:none;background:none;cursor:pointer;padding:2px 4px;line-height:1">
             ${ad.destaque ? '⭐' : '☆'}
           </button>
         </td>
-        <td data-field="urlAnuncio">
+        <td data-col="urlAnuncio" data-field="urlAnuncio" style="text-align:center">
           ${ad.urlAnuncio
             ? `<a href="${esc(ad.urlAnuncio)}" target="_blank" rel="noopener"
-                style="font-size:11px;color:var(--accent)">↗ ver ad</a>`
+                style="font-size:15px;color:var(--accent);text-decoration:none;line-height:1"
+                title="${esc(ad.urlAnuncio)}">↗</a>`
             : '<span style="color:var(--text-muted)">—</span>'}
         </td>
         <td>
-          <div style="display:flex;gap:4px">
-            <button class="btn btn-sm btn-secondary" data-action="edit" data-id="${esc(ad.id)}">✏</button>
-            <button class="btn btn-sm btn-secondary" data-action="delete" data-id="${esc(ad.id)}"
-              style="color:#e55">✕</button>
+          <div class="cr-actions" style="display:flex;gap:2px;justify-content:flex-end">
+            <button data-action="edit" data-id="${esc(ad.id)}" title="Editar"
+              style="border:none;background:none;color:var(--text-muted);padding:3px 5px;
+                font-size:13px;cursor:pointer;line-height:1;border-radius:4px">✏</button>
+            <button data-action="delete" data-id="${esc(ad.id)}" title="Excluir"
+              style="border:none;background:none;color:#c44;padding:3px 5px;
+                font-size:13px;cursor:pointer;line-height:1;border-radius:4px">✕</button>
           </div>
         </td>
       </tr>
@@ -696,17 +807,26 @@ const Criativos = (() => {
 
   function init(showToastFn, getFunnelsFn) {
     _showToast = showToastFn;
-    _ads = loadAds();
+    _ads  = loadAds();
+    _cols = loadCols();
 
-    // Inject hover styles for editable cells
     if (!document.getElementById('cr-inline-styles')) {
       const s = document.createElement('style');
       s.id = 'cr-inline-styles';
-      s.textContent = '#cr-table td[data-field]{cursor:pointer}#cr-table td[data-field]:hover{background:rgba(0,212,255,.04)}';
+      s.textContent = [
+        '#cr-table td[data-field]{cursor:pointer}',
+        '#cr-table td[data-field]:hover{background:rgba(0,212,255,.04)}',
+        '#cr-table tbody tr .cr-actions{visibility:hidden}',
+        '#cr-table tbody tr:hover .cr-actions{visibility:visible}',
+        '#cr-table tbody tr:nth-child(even){background:rgba(255,255,255,.018)}',
+        '#cr-table tbody td{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;vertical-align:middle}',
+        '#cr-table td.cr-hook-cell{white-space:normal;max-width:220px}',
+        '#cr-table tr.cr-needs-hook td:first-child{border-left:2px solid #BA7517}',
+        '#cr-table thead th{white-space:nowrap}',
+      ].join('');
       document.head.appendChild(s);
     }
 
-    // Auto-import funnels that don't already have a criativo entry
     const funis = getFunnelsFn ? getFunnelsFn() : Storage.load();
     if (funis && funis.length) {
       const existingUrls = new Set(_ads.map(a => a.urlAnuncio).filter(Boolean));
