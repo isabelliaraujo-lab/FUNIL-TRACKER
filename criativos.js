@@ -289,7 +289,7 @@ const Criativos = (() => {
     const anguloAtual = container.dataset.angulo || '';
 
     const ads  = filteredAds(semAtual, nichoAtual, anguloAtual);
-    const dups = getDuplicates(filteredAds(semAtual, '', ''));
+    const dups = getDuplicates(ads);
     _currentDups = dups;
 
     const totalAds    = ads.length;
