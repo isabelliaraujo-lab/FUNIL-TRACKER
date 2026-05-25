@@ -336,7 +336,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   Escalada.init(getFunnels, getMonitoradas, toggleMonitorar);
   Tabela.init(getFunnels, saveFunnels, showToast, getMonitoradas, toggleMonitorar);
   Analise.init(getFunnels);
-  Criativos.init(showToast);
+  Criativos.init(showToast, getFunnels);
 
   Escalada.refresh();
 

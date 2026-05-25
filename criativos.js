@@ -17,8 +17,9 @@ const Criativos = (() => {
     localStorage.setItem(KEY, JSON.stringify(ads));
   }
 
-  let _ads = loadAds();
-  let _showToast = null;
+  let _ads         = loadAds();
+  let _showToast   = null;
+  let _currentDups = [];
 
   // ── Constantes ────────────────────────────────────────────────────────
 
@@ -113,19 +114,136 @@ const Criativos = (() => {
     ).join('');
   }
 
+  // ── Inline editing ────────────────────────────────────────────────────
+
+  function rerenderRow(id) {
+    const tr = document.querySelector(`#cr-table tr[data-id="${CSS.escape(id)}"]`);
+    if (!tr) return;
+    const ad = _ads.find(a => a.id === id);
+    if (!ad) return;
+    const tmp = document.createElement('tbody');
+    tmp.innerHTML = renderRow(ad, _currentDups);
+    tr.replaceWith(tmp.firstElementChild);
+  }
+
+  function makeEditable(td) {
+    if (td.querySelector('input, select, textarea')) return;
+    const tr = td.closest('tr');
+    const id = tr?.dataset.id;
+    if (!id) return;
+    const field = td.dataset.field;
+    if (!field) return;
+    const ad = _ads.find(a => a.id === id);
+    if (!ad) return;
+
+    let cancelled = false;
+    let saved     = false;
+
+    function applyAndSave() {
+      if (saved || cancelled) return;
+      saved = true;
+
+      let val;
+      if (input.tagName === 'SELECT') {
+        val = input.value;
+      } else if (input.type === 'number') {
+        val = parseInt(input.value) || 1;
+      } else {
+        val = input.value.trim();
+      }
+
+      if (field === 'views') {
+        if (!val) {
+          val = null;
+        } else {
+          const raw = String(val);
+          const n = parseFloat(raw.replace(/[kKmM]/, '')) *
+            (/[mM]/.test(raw) ? 1000000 : /[kK]/.test(raw) ? 1000 : 1);
+          val = isNaN(n) ? null : Math.round(n);
+        }
+      } else if (val === '' && field !== 'contas') {
+        val = null;
+      }
+
+      if (field === 'produto' && val) val = val.toUpperCase();
+      if (field === 'hook' && val && !ad.hookFingerprint) {
+        ad.hookFingerprint = val.toLowerCase().slice(0, 60);
+      }
+
+      ad[field] = val;
+      saveAds(_ads);
+      rerenderRow(id);
+    }
+
+    let input;
+
+    if (['nicho', 'angulo', 'formato'].includes(field)) {
+      input = document.createElement('select');
+      const opts = field === 'nicho' ? NICHOS : field === 'angulo' ? ANGULOS : FORMATOS;
+      input.innerHTML = `<option value="">—</option>` + optionsHtml(opts, ad[field] || '');
+      input.style.cssText = 'width:100%;font-size:12px;background:var(--surface);color:var(--text);border:1px solid var(--accent);border-radius:4px;padding:2px 4px';
+      let committed = false;
+      input.addEventListener('change', () => { committed = true; applyAndSave(); });
+      input.addEventListener('blur',   () => { if (!committed && !cancelled) rerenderRow(id); });
+      input.addEventListener('keydown', e => {
+        if (e.key === 'Escape') { cancelled = true; rerenderRow(id); }
+      });
+
+    } else if (field === 'data') {
+      input = document.createElement('input');
+      input.type  = 'date';
+      input.value = ad.data || '';
+      input.style.cssText = 'font-size:12px;background:var(--surface);color:var(--text);border:1px solid var(--accent);border-radius:4px;padding:2px 6px;color-scheme:dark';
+      let committed = false;
+      input.addEventListener('change', () => { committed = true; applyAndSave(); });
+      input.addEventListener('blur',   () => { if (!committed && !cancelled) rerenderRow(id); });
+      input.addEventListener('keydown', e => {
+        if (e.key === 'Escape') { cancelled = true; rerenderRow(id); }
+      });
+
+    } else if (field === 'hook') {
+      input = document.createElement('textarea');
+      input.value = ad[field] || '';
+      input.rows  = 2;
+      input.style.cssText = 'width:100%;min-width:160px;font-size:12px;background:var(--surface);color:var(--text);border:1px solid var(--accent);border-radius:4px;padding:4px 6px;resize:vertical';
+      input.addEventListener('keydown', e => {
+        if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); applyAndSave(); }
+        if (e.key === 'Escape') { cancelled = true; rerenderRow(id); }
+      });
+      input.addEventListener('blur', applyAndSave);
+
+    } else {
+      input = document.createElement('input');
+      input.type  = field === 'urlAnuncio' ? 'url' : 'text';
+      input.value = ad[field] != null ? String(ad[field]) : '';
+      input.style.cssText = 'width:100%;font-size:12px;background:var(--surface);color:var(--text);border:1px solid var(--accent);border-radius:4px;padding:2px 6px';
+      input.addEventListener('keydown', e => {
+        if (e.key === 'Enter') applyAndSave();
+        if (e.key === 'Escape') { cancelled = true; rerenderRow(id); }
+      });
+      input.addEventListener('blur', applyAndSave);
+    }
+
+    td.innerHTML = '';
+    td.appendChild(input);
+    input.focus();
+    if (typeof input.select === 'function') input.select();
+  }
+
   // ── Render principal ──────────────────────────────────────────────────
 
   function render() {
     const container = document.getElementById('tab-criativos');
     if (!container) return;
 
-    const semanas = getWeeks();
-    const semAtual = container.dataset.semana || semanas[1] || 'Todas as semanas';
+    const semanas     = getWeeks();
+    const semAtual    = container.dataset.semana || semanas[1] || 'Todas as semanas';
     const nichoAtual  = container.dataset.nicho  || '';
     const anguloAtual = container.dataset.angulo || '';
 
-    const ads = filteredAds(semAtual, nichoAtual, anguloAtual);
+    const ads  = filteredAds(semAtual, nichoAtual, anguloAtual);
     const dups = getDuplicates(filteredAds(semAtual, '', ''));
+    _currentDups = dups;
 
     // Métricas
     const totalAds    = ads.length;
@@ -262,15 +380,24 @@ const Criativos = (() => {
 
     // Delegação de eventos na tabela
     document.getElementById('cr-table')?.addEventListener('click', e => {
+      // Ignore clicks on active inputs / links
+      if (e.target.matches('input, select, textarea')) return;
+      if (e.target.closest('a[href]')) return;
+
       const btn = e.target.closest('[data-action]');
-      if (!btn) return;
-      const id = btn.dataset.id;
-      if (btn.dataset.action === 'edit')   openModal(id);
-      if (btn.dataset.action === 'delete') confirmDelete(id);
-      if (btn.dataset.action === 'star') {
-        const ad = _ads.find(a => a.id === id);
-        if (ad) { ad.destaque = !ad.destaque; saveAds(_ads); render(); }
+      if (btn) {
+        const id = btn.dataset.id;
+        if (btn.dataset.action === 'edit')   openModal(id);
+        if (btn.dataset.action === 'delete') confirmDelete(id);
+        if (btn.dataset.action === 'star') {
+          const ad = _ads.find(a => a.id === id);
+          if (ad) { ad.destaque = !ad.destaque; saveAds(_ads); rerenderRow(id); }
+        }
+        return;
       }
+
+      const td = e.target.closest('td[data-field]');
+      if (td) makeEditable(td);
     });
   }
 
@@ -311,30 +438,31 @@ const Criativos = (() => {
   // ── Linha da tabela ───────────────────────────────────────────────────
 
   function renderRow(ad, dups) {
-    const isLateral = dups.some(g =>
-      g.length > 1 &&
-      g.some(a => a.id === ad.id)
-    );
-    const score = calcScore(ad);
-    const bg    = ad.destaque ? 'background:rgba(255,200,0,0.07)' : '';
+    const isLateral  = dups.some(g => g.length > 1 && g.some(a => a.id === ad.id));
+    const needsHook  = ad._importado && !ad.hook;
+    const rowBg      = ad.destaque   ? 'background:rgba(255,200,0,0.07)'
+                     : needsHook     ? 'background:rgba(255,180,0,0.05)'
+                     : '';
 
     return `
-      <tr style="${bg}">
-        <td>${esc(ad.data || '—')}</td>
-        <td>${nichoBadge(ad.nicho)}</td>
-        <td style="font-weight:500">${esc(ad.produto || '—')}</td>
-        <td style="font-size:12px">${esc(ad.conta || '—')}</td>
-        <td style="font-size:12px;max-width:200px">
-          <span title="${esc(ad.hook||'')}">${esc((ad.hook||'').slice(0,60))}${(ad.hook||'').length>60?'…':''}</span>
+      <tr data-id="${esc(ad.id)}" style="${rowBg}">
+        <td data-field="data">${esc(ad.data || '—')}</td>
+        <td data-field="nicho">${ad.nicho ? nichoBadge(ad.nicho) : '<span style="color:var(--text-muted)">—</span>'}</td>
+        <td data-field="produto" style="font-weight:500">${esc(ad.produto || '—')}</td>
+        <td data-field="conta" style="font-size:12px">${esc(ad.conta || '—')}</td>
+        <td data-field="hook" style="font-size:12px;max-width:200px">
+          ${needsHook
+            ? `<span style="color:#F59E0B;font-size:11px;font-weight:600">⚠ preencher hook</span>`
+            : `<span title="${esc(ad.hook||'')}">${esc((ad.hook||'').slice(0,60))}${(ad.hook||'').length>60?'…':''}</span>`}
         </td>
-        <td>
+        <td data-field="angulo">
           ${ad.angulo
             ? `<span style="background:var(--bg-card);border:0.5px solid var(--border);
                 border-radius:20px;padding:2px 8px;font-size:11px">${esc(ad.angulo)}</span>`
-            : '—'}
+            : '<span style="color:var(--text-muted)">—</span>'}
         </td>
-        <td style="font-size:12px">${esc(ad.formato || '—')}</td>
-        <td style="font-weight:500;text-align:right">${formatViews(ad.views)}</td>
+        <td data-field="formato" style="font-size:12px">${esc(ad.formato || '—')}</td>
+        <td data-field="views" style="font-weight:500;text-align:right">${formatViews(ad.views)}</td>
         <td style="text-align:center">
           ${isLateral
             ? `<span style="color:#D85A30;font-weight:600;font-size:12px">🔄 lateralizado</span>`
@@ -347,11 +475,11 @@ const Criativos = (() => {
             ${ad.destaque ? '⭐' : '☆'}
           </button>
         </td>
-        <td>
+        <td data-field="urlAnuncio">
           ${ad.urlAnuncio
             ? `<a href="${esc(ad.urlAnuncio)}" target="_blank" rel="noopener"
                 style="font-size:11px;color:var(--accent)">↗ ver ad</a>`
-            : '—'}
+            : '<span style="color:var(--text-muted)">—</span>'}
         </td>
         <td>
           <div style="display:flex;gap:4px">
@@ -367,10 +495,9 @@ const Criativos = (() => {
   // ── Modal de criativo ─────────────────────────────────────────────────
 
   function openModal(id) {
-    const ad = id ? _ads.find(a => a.id === id) : null;
+    const ad     = id ? _ads.find(a => a.id === id) : null;
     const isEdit = !!ad;
-
-    const today = new Date().toISOString().slice(0,10);
+    const today  = new Date().toISOString().slice(0,10);
 
     const html = `
       <div class="modal-overlay" id="cr-modal" role="dialog" aria-modal="true"
@@ -567,8 +694,51 @@ const Criativos = (() => {
 
   // ── API pública ───────────────────────────────────────────────────────
 
-  function init(showToastFn) {
+  function init(showToastFn, getFunnelsFn) {
     _showToast = showToastFn;
+    _ads = loadAds();
+
+    // Inject hover styles for editable cells
+    if (!document.getElementById('cr-inline-styles')) {
+      const s = document.createElement('style');
+      s.id = 'cr-inline-styles';
+      s.textContent = '#cr-table td[data-field]{cursor:pointer}#cr-table td[data-field]:hover{background:rgba(0,212,255,.04)}';
+      document.head.appendChild(s);
+    }
+
+    // Auto-import funnels that don't already have a criativo entry
+    const funis = getFunnelsFn ? getFunnelsFn() : Storage.load();
+    if (funis && funis.length) {
+      const existingUrls = new Set(_ads.map(a => a.urlAnuncio).filter(Boolean));
+      let imported = 0;
+      funis.forEach(funil => {
+        if (!funil.urlAnuncio || existingUrls.has(funil.urlAnuncio)) return;
+        existingUrls.add(funil.urlAnuncio);
+        _ads.push({
+          id:              Storage.genId(),
+          data:            funil.data    || null,
+          nicho:           funil.nicho   || null,
+          produto:         funil.produto || null,
+          conta:           funil.conta   || null,
+          urlAnuncio:      funil.urlAnuncio,
+          views:           funil.views   || null,
+          hook:            '',
+          copy:            '',
+          angulo:          '',
+          formato:         '',
+          contas:          1,
+          hookFingerprint: '',
+          obs:             '',
+          destaque:        false,
+          _importado:      true,
+        });
+        imported++;
+      });
+      if (imported > 0) {
+        saveAds(_ads);
+        _showToast?.(`${imported} funil(s) importado(s) automaticamente para Criativos!`);
+      }
+    }
   }
 
   function refresh() {
