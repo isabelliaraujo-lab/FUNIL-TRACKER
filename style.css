@@ -1469,3 +1469,58 @@ tbody tr.row-repeated:hover td {
   .stat-value     { font-size: 22px; }
   .logo           { font-size: 15px; }
 }
+
+/* ── PAGINATION ─────────────────────────────────────────────────────────── */
+.pagination-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 4px;
+  gap: 12px;
+  flex-wrap: wrap;
+  border-top: 0.5px solid var(--border);
+  margin-top: 4px;
+}
+.pagination-info {
+  font-size: 12px;
+  color: var(--text-muted);
+  font-family: var(--font-mono, monospace);
+}
+.pagination-controls {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.pg-btn {
+  background: var(--bg-card, var(--surface));
+  border: 0.5px solid var(--border);
+  border-radius: 6px;
+  color: var(--text);
+  cursor: pointer;
+  font-size: 13px;
+  padding: 4px 10px;
+  transition: background .12s;
+  font-family: var(--font, sans-serif);
+}
+.pg-btn:hover:not(:disabled) { background: var(--surface2, rgba(255,255,255,.06)); }
+.pg-btn:disabled { opacity: 0.35; cursor: default; }
+.pg-current {
+  font-size: 12px;
+  color: var(--text);
+  padding: 0 8px;
+  font-family: var(--font-mono, monospace);
+  white-space: nowrap;
+}
+.pg-per-page {
+  background: var(--bg-card, var(--surface));
+  border: 0.5px solid var(--border);
+  border-radius: 6px;
+  color: var(--text);
+  font-size: 12px;
+  padding: 4px 8px;
+  cursor: pointer;
+  font-family: var(--font, sans-serif);
+}
+@media (max-width: 600px) {
+  .pg-first, .pg-last { display: none; }
+}

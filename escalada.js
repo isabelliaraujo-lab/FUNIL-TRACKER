@@ -13,6 +13,10 @@ const Escalada = (() => {
   let filtroGlobal = { tipo: 'tudo', de: null, ate: null };
   let filtrosSecao = { secao1a: 'tudo', secao1b: 'tudo', secao2: 'tudo', secao3: 'tudo', secao4: 'tudo' };
 
+  // ── Paginação dos rankings ────────────────────────────────────────────
+  const _ESC_PER = 10;
+  let _escPages = { secao1a: 1, secao1b: 1, secao2: 1 };
+
   function filtrarFunisPorPeriodo(funis, filtro) {
     if (!filtro || filtro.tipo === 'tudo') return funis;
 
@@ -153,8 +157,7 @@ const Escalada = (() => {
       if (f.nicho) map[f.produto].nichos.add(f.nicho);
     });
     return Object.values(map)
-      .sort((a, b) => b.views - a.views)
-      .slice(0, 10);
+      .sort((a, b) => b.views - a.views);
   }
 
   function rankProdutosPorROI(funis) {
@@ -219,17 +222,18 @@ const Escalada = (() => {
 
   // ── HTML dos rankings ─────────────────────────────────────────────────
 
-  function rankViewsHTML(funis) {
-    const items = rankProdutosPorViews(funis);
-    if (!items.length) return '<p class="analysis-no-results">Nenhum produto no período selecionado.</p>';
-
-    return items.map((p, i) => {
+  function rankViewsHTML(funis, page) {
+    const all = rankProdutosPorViews(funis);
+    if (!all.length) return '<p class="analysis-no-results">Nenhum produto no período selecionado.</p>';
+    const { items, page: pg, totalPages, total } = Pagination.paginate(all, page || _escPages.secao1a, _ESC_PER);
+    _escPages.secao1a = pg;
+    const rows = items.map((p, i) => {
+      const globalIdx = (pg - 1) * _ESC_PER + i;
       const nichoTags = [...p.nichos].map(n =>
         `<span class="tag tag-nicho nicho-${esc(n)}" style="font-size:10px;padding:1px 6px">${esc(n)}</span>`
       ).join('');
-
       return `<div class="rank-item">
-        <span class="rank-pos ${i < 3 ? 'top' : ''}">#${i + 1}</span>
+        <span class="rank-pos ${globalIdx < 3 ? 'top' : ''}">#${globalIdx + 1}</span>
         <div style="flex:1;min-width:0;overflow:hidden">
           <div class="rank-nome" data-analise-produto="${esc(p.produto)}"
                style="font-weight:600;font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap"
@@ -242,17 +246,19 @@ const Escalada = (() => {
         </div>
       </div>`;
     }).join('');
+    return rows + Pagination.controlsHTML(pg, totalPages, total, _ESC_PER, 'secao1a');
   }
 
-  function rankROIProdutosHTML(funis) {
-    const items = rankProdutosPorROI(funis);
-    if (!items.length) return '<p class="analysis-no-results">Nenhum produto com performance no período.</p>';
-
-    return items.map((p, i) => {
+  function rankROIProdutosHTML(funis, page) {
+    const all = rankProdutosPorROI(funis);
+    if (!all.length) return '<p class="analysis-no-results">Nenhum produto com performance no período.</p>';
+    const { items, page: pg, totalPages, total } = Pagination.paginate(all, page || _escPages.secao1b, _ESC_PER);
+    _escPages.secao1b = pg;
+    const rows = items.map((p, i) => {
+      const globalIdx = (pg - 1) * _ESC_PER + i;
       const cor = p.roi >= 0 ? '#00c47a' : '#ff4d4d';
-
       return `<div class="rank-item">
-        <span class="rank-pos ${i < 3 ? 'top' : ''}">#${i + 1}</span>
+        <span class="rank-pos ${globalIdx < 3 ? 'top' : ''}">#${globalIdx + 1}</span>
         <div style="flex:1;min-width:0;overflow:hidden">
           <div class="rank-nome" data-analise-produto="${esc(p.produto)}"
                style="font-weight:600;font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap"
@@ -267,24 +273,23 @@ const Escalada = (() => {
         </div>
       </div>`;
     }).join('');
+    return rows + Pagination.controlsHTML(pg, totalPages, total, _ESC_PER, 'secao1b');
   }
 
-  function rankROIContasHTML(funis) {
-    const items = rankContasPorROI(funis);
-    if (!items.length) return '<p class="analysis-no-results">Nenhuma conta com dados de performance no período.</p>';
-
-    return items.map(c => {
+  function rankROIContasHTML(funis, page) {
+    const all = rankContasPorROI(funis);
+    if (!all.length) return '<p class="analysis-no-results">Nenhuma conta com dados de performance no período.</p>';
+    const { items, page: pg, totalPages, total } = Pagination.paginate(all, page || _escPages.secao2, _ESC_PER);
+    _escPages.secao2 = pg;
+    const rows = items.map(c => {
       const cor   = c.roi >= 0 ? '#00c47a' : '#ff4d4d';
       const badge = c.roi >= 0
         ? `<span class="tag-status" style="background:rgba(0,196,122,.15);color:#00c47a">💰 ROI+</span>`
         : `<span class="tag-status" style="background:rgba(255,77,77,.15);color:#ff4d4d">📉 ROI−</span>`;
-
       const nichoTags = [...c.nichos].map(n =>
         `<span class="tag tag-nicho nicho-${esc(n)}" style="font-size:10px;padding:1px 6px">${esc(n)}</span>`
       ).join('');
-
       const prodCount = c.produtos.size;
-
       return `<div class="rank-item" style="align-items:flex-start;gap:12px">
         <div style="flex:1;min-width:0;overflow:hidden">
           <div style="display:flex;align-items:center;flex-wrap:wrap;gap:6px;margin-bottom:4px">
@@ -303,6 +308,7 @@ const Escalada = (() => {
         </div>
       </div>`;
     }).join('');
+    return rows + Pagination.controlsHTML(pg, totalPages, total, _ESC_PER, 'secao2');
   }
 
   function melhorDominioHTML(funis) {
@@ -543,6 +549,23 @@ const Escalada = (() => {
     _toggleMonitorar = toggleMonitorar || (() => {});
 
     document.getElementById('tab-escalada').addEventListener('click', e => {
+      // Paginação dos rankings
+      const pgBtn = e.target.closest('.pg-btn[data-pg]');
+      if (pgBtn) {
+        e.stopPropagation();
+        const action  = pgBtn.dataset.pg;
+        const section = pgBtn.dataset.pgSection;
+        if (section && _escPages[section] !== undefined) {
+          const cur = _escPages[section];
+          if      (action === 'first') _escPages[section] = 1;
+          else if (action === 'prev')  _escPages[section] = Math.max(1, cur - 1);
+          else if (action === 'next')  _escPages[section]++;
+          else if (action === 'last')  _escPages[section] = 9999; // paginate() clamps it
+        }
+        renderSecaoPorNome(section);
+        return;
+      }
+
       const monitorBtn = e.target.closest('[data-monitor-conta]');
       if (monitorBtn) { _toggleMonitorar(monitorBtn.dataset.monitorConta); return; }
 

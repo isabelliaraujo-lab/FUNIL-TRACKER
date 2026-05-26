@@ -68,6 +68,9 @@ const Criativos = (() => {
   let _currentDups = [];
   let _cols        = loadCols();
   let _closeColsDd = null;
+  let _crPage       = 1;
+  let _crPerPage    = 25;
+  let _crTotalPages = 1;
 
   // ── Constantes ────────────────────────────────────────────────────────
 
@@ -315,6 +318,13 @@ const Criativos = (() => {
     const topViews    = ads.reduce((max, a) => Math.max(max, Number(a.views)||0), 0);
     const laterais    = dups.length;
 
+    const sortedAds = ads.slice().sort((a, b) => calcScore(b) - calcScore(a));
+    const { items: pageAds, page: pg, totalPages, total } =
+      Pagination.paginate(sortedAds, _crPage, _crPerPage);
+    _crPage       = pg;
+    _crTotalPages = totalPages;
+    const pgHtml  = Pagination.controlsHTML(_crPage, _crTotalPages, total, _crPerPage);
+
     container.innerHTML = `
 
       <!-- Filtros -->
@@ -403,6 +413,7 @@ const Criativos = (() => {
       ${renderAnguloChart(ads)}
 
       <!-- Tabela de criativos -->
+      ${pgHtml}
       <div class="table-wrapper">
         <table id="cr-table">
           <thead>
@@ -430,21 +441,22 @@ const Criativos = (() => {
                   <p>Clique em "+ Novo" para começar a registrar os ads da semana.</p>
                 </div>
               </td></tr>
-            ` : ads.sort((a,b) => calcScore(b) - calcScore(a)).map(ad => renderRow(ad, dups)).join('')}
+            ` : pageAds.map(ad => renderRow(ad, dups)).join('')}
           </tbody>
         </table>
       </div>
+      ${pgHtml}
     `;
 
     // Bind filtros
     document.getElementById('cr-filter-semana').addEventListener('change', e => {
-      container.dataset.semana = e.target.value; render();
+      container.dataset.semana = e.target.value; _crPage = 1; render();
     });
     document.getElementById('cr-filter-nicho').addEventListener('change', e => {
-      container.dataset.nicho = e.target.value; render();
+      container.dataset.nicho = e.target.value; _crPage = 1; render();
     });
     document.getElementById('cr-filter-angulo').addEventListener('change', e => {
-      container.dataset.angulo = e.target.value; render();
+      container.dataset.angulo = e.target.value; _crPage = 1; render();
     });
 
     document.getElementById('cr-btn-novo').addEventListener('click', () => openModal(null));
@@ -818,6 +830,24 @@ const Criativos = (() => {
     _showToast = showToastFn;
     _ads  = loadAds();
     _cols = loadCols();
+
+    const criativosTab = document.getElementById('tab-criativos');
+    criativosTab.addEventListener('click', e => {
+      const btn = e.target.closest('.pg-btn[data-pg]');
+      if (!btn || e.target.closest('#cr-table')) return;
+      const action = btn.dataset.pg;
+      if      (action === 'first') _crPage = 1;
+      else if (action === 'prev')  _crPage = Math.max(1, _crPage - 1);
+      else if (action === 'next')  _crPage = Math.min(_crTotalPages, _crPage + 1);
+      else if (action === 'last')  _crPage = _crTotalPages;
+      render();
+    });
+    criativosTab.addEventListener('change', e => {
+      if (!e.target.classList.contains('pg-per-page')) return;
+      _crPerPage = parseInt(e.target.value);
+      _crPage = 1;
+      render();
+    });
 
     if (!document.getElementById('cr-inline-styles')) {
       const s = document.createElement('style');

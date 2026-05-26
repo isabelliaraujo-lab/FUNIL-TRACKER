@@ -7,6 +7,11 @@ const Analise = (() => {
   let _getFunnels   = () => [];
   let _intelPeriodo = 'tudo';
 
+  let _pgDomAnuncio = 1;
+  let _pgDomFinal   = 1;
+  let _pgProduto    = 1;
+  const _ANALISE_PER = 10;
+
   const esc = Storage.escHtml;
 
   // ── Helpers de domínio ────────────────────────────────────────────────
@@ -312,7 +317,7 @@ const Analise = (() => {
       if (!Storage.isProdutoDesconhecido(f.produto)) byContas[k].produtos.add(f.produto);
     });
 
-    const items = Object.entries(byContas)
+    const allItems = Object.entries(byContas)
       .sort((a, b) => b[1].funnels.length - a[1].funnels.length)
       .map(([conta, d]) => ({
         title:        conta,
@@ -321,13 +326,18 @@ const Analise = (() => {
         funnels:      d.funnels,
       }));
 
+    const { items: pageItems, page: pg, totalPages, total } = Pagination.paginate(allItems, _pgDomAnuncio, _ANALISE_PER);
+    _pgDomAnuncio = pg;
+
     el.innerHTML =
       metricsHtml([
         { val: contas.size,    lbl: 'Contas'          },
         { val: matched.length, lbl: 'Funis'           },
         { val: produtos.size,  lbl: 'Produtos'        },
         { val: destinos.size,  lbl: 'Destinos finais' },
-      ], renderCardsTotais(matched)) + listHtml(items);
+      ], renderCardsTotais(matched)) +
+      listHtml(pageItems) +
+      Pagination.controlsHTML(pg, totalPages, total, _ANALISE_PER, 'dom-anuncio');
   }
 
   // ── Bloco 2 — por domínio final ───────────────────────────────────────
@@ -359,7 +369,7 @@ const Analise = (() => {
       if (!Storage.isProdutoDesconhecido(f.produto)) byContas[k].produtos.add(f.produto);
     });
 
-    const items = Object.entries(byContas)
+    const allItems = Object.entries(byContas)
       .sort((a, b) => b[1].funnels.length - a[1].funnels.length)
       .map(([conta, d]) => ({
         title:         conta,
@@ -368,13 +378,18 @@ const Analise = (() => {
         funnels:       d.funnels,
       }));
 
+    const { items: pageItems, page: pg, totalPages, total } = Pagination.paginate(allItems, _pgDomFinal, _ANALISE_PER);
+    _pgDomFinal = pg;
+
     el.innerHTML =
       metricsHtml([
         { val: contas.size,    lbl: 'Contas'        },
         { val: matched.length, lbl: 'Funis'         },
         { val: domsAn.size,    lbl: 'Dom. anúncio'  },
         { val: produtos.size,  lbl: 'Produtos'      },
-      ], renderCardsTotais(matched)) + listHtml(items);
+      ], renderCardsTotais(matched)) +
+      listHtml(pageItems) +
+      Pagination.controlsHTML(pg, totalPages, total, _ANALISE_PER, 'dom-final');
   }
 
   // ── Bloco 3 — por produto ─────────────────────────────────────────────
@@ -665,14 +680,34 @@ const Analise = (() => {
     });
 
     document.getElementById('search-dom-anuncio')
-      .addEventListener('input', searchDomAnuncio);
+      .addEventListener('input', () => { _pgDomAnuncio = 1; searchDomAnuncio(); });
     document.getElementById('search-dom-final')
-      .addEventListener('input', searchDomFinal);
+      .addEventListener('input', () => { _pgDomFinal = 1; searchDomFinal(); });
     document.getElementById('search-produto')
-      .addEventListener('input', searchProduto);
+      .addEventListener('input', () => { _pgProduto = 1; searchProduto(); });
 
     ['result-dom-anuncio', 'result-dom-final', 'result-produto'].forEach(id => {
       document.getElementById(id).addEventListener('click', onAnaliseClick);
+    });
+
+    document.getElementById('tab-analise').addEventListener('click', e => {
+      const btn = e.target.closest('.pg-btn[data-pg]');
+      if (!btn) return;
+      const section = btn.dataset.pgSection;
+      const action  = btn.dataset.pg;
+      if (section === 'dom-anuncio') {
+        if      (action === 'first') _pgDomAnuncio = 1;
+        else if (action === 'prev')  _pgDomAnuncio = Math.max(1, _pgDomAnuncio - 1);
+        else if (action === 'next')  _pgDomAnuncio++;
+        else if (action === 'last')  _pgDomAnuncio = 9999;
+        searchDomAnuncio();
+      } else if (section === 'dom-final') {
+        if      (action === 'first') _pgDomFinal = 1;
+        else if (action === 'prev')  _pgDomFinal = Math.max(1, _pgDomFinal - 1);
+        else if (action === 'next')  _pgDomFinal++;
+        else if (action === 'last')  _pgDomFinal = 9999;
+        searchDomFinal();
+      }
     });
 
     document.getElementById('btn-fechar-mfd').addEventListener('click', fecharModalFunil);

@@ -14,6 +14,11 @@ const Tabela = (() => {
   // ── Ordenação ─────────────────────────────────────────────────────────
   let sortOrder = 'desc';   // 'desc' = mais recente primeiro
 
+  // ── Paginação ─────────────────────────────────────────────────────────
+  let _page       = 1;
+  let _perPage    = 25;
+  let _totalPages = 1;
+
   function ordenarPorData(funis, ordem) {
     return [...funis].sort((a, b) => {
       const da = new Date(a.data || '1970-01-01');
@@ -226,14 +231,29 @@ const Tabela = (() => {
 
   // ── Render da tabela ──────────────────────────────────────────────────
   function renderTable() {
+    _page = 1;
+    _renderPage();
+  }
 
+  function _renderPage() {
     const funnels   = _getFunnels();
     const domCounts = Storage.getDomainCounts(funnels);
     const filters   = readFilters();
     const filtered  = ordenarPorData(applyFilters(funnels, filters, domCounts), sortOrder);
-    const tbody     = document.getElementById('table-body');
 
     renderDashboard(funnels);
+
+    const { items, page, totalPages, total } = Pagination.paginate(filtered, _page, _perPage);
+    _page       = page;
+    _totalPages = totalPages;
+
+    const pgTop    = document.getElementById('tabela-pg-top');
+    const pgBottom = document.getElementById('tabela-pg-bottom');
+    const pgHtml   = Pagination.controlsHTML(_page, _totalPages, total, _perPage);
+    if (pgTop)    pgTop.innerHTML    = pgHtml;
+    if (pgBottom) pgBottom.innerHTML = pgHtml;
+
+    const tbody = document.getElementById('table-body');
 
     if (filtered.length === 0) {
       const msg = funnels.length === 0
@@ -251,7 +271,7 @@ const Tabela = (() => {
 
     const topViews = computeTopViews(3);
 
-    tbody.innerHTML = filtered.map(f => {
+    tbody.innerHTML = items.map(f => {
       const repeated   = Storage.isRepeated(f, domCounts);
       const monitorada = _getMonitoradas().includes(f.conta);
 
@@ -541,6 +561,24 @@ const Tabela = (() => {
       if (e.target.matches('.obs-input') && e.key === 'Enter') e.target.blur();
     });
 
+    // Paginação — tabela de funis
+    document.getElementById('tab-funis').addEventListener('click', e => {
+      const btn = e.target.closest('.pg-btn[data-pg]');
+      if (!btn || btn.closest('#table-body')) return;
+      const action = btn.dataset.pg;
+      if      (action === 'first') _page = 1;
+      else if (action === 'prev')  _page = Math.max(1, _page - 1);
+      else if (action === 'next')  _page = Math.min(_totalPages, _page + 1);
+      else if (action === 'last')  _page = _totalPages;
+      _renderPage();
+    });
+    document.getElementById('tab-funis').addEventListener('change', e => {
+      if (!e.target.classList.contains('pg-per-page')) return;
+      _perPage = parseInt(e.target.value);
+      _page = 1;
+      _renderPage();
+    });
+
     // Escape fecha modal de performance ou modal de edição
     document.addEventListener('keydown', e => {
       if (e.key === 'Escape') {
@@ -630,7 +668,7 @@ const Tabela = (() => {
       _showToast('Funil atualizado!');
     });
 
-    // Filtros — atualizam tabela em tempo real
+    // Filtros — atualizam tabela em tempo real (resetam para página 1)
     const filterIds = [
       'filter-search', 'filter-nicho', 'filter-famoso',
       'filter-split',  'filter-repetido',
