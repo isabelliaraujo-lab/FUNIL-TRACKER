@@ -75,6 +75,7 @@ const Storage = (() => {
 
   const CSV_HEADERS = [
     'Data',
+    'Hora',
     'Conta',
     'Nicho',
     'Produto',
@@ -101,6 +102,7 @@ const Storage = (() => {
 
     const rows = funnels.map(f => [
       f.data,
+      f.hora ?? '',
       f.conta,
       f.nicho,
       f.produto,
@@ -173,6 +175,7 @@ const Storage = (() => {
     const col = (test) => normHeaders.findIndex(test);
 
     const iData      = col(h => h === 'data');
+    const iHora      = col(h => h === 'hora');
     const iConta     = col(h => h === 'conta');
     const iNicho     = col(h => h === 'nicho');
     const iProduto   = col(h => h === 'produto');
@@ -208,6 +211,7 @@ const Storage = (() => {
         funnels.push({
           id:            genId(),
           data:          get(row, iData),
+          hora:          get(row, iHora) || null,
           conta:         get(row, iConta),
           nicho:         get(row, iNicho),
           produto:       normalizeProduto(get(row, iProduto)),

@@ -158,6 +158,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (!_parsed) return;
     _parsed.data  = document.getElementById('preview-data').value  || _parsed.data;
     _parsed.moeda = document.getElementById('preview-moeda').value || 'BRL';
+    _parsed.hora  = new Date().toTimeString().slice(0, 5);
     _parsed.id    = Storage.genId();
     funnels.unshift(_parsed);
     saveFunnels(funnels);
@@ -170,6 +171,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   // ── Formulário manual ─────────────────────────────────────────────────
   document.getElementById('m-data').value = new Date().toISOString().slice(0, 10);
+  document.getElementById('m-hora').value = new Date().toTimeString().slice(0, 5);
 
   document.getElementById('manual-form').addEventListener('submit', e => {
     e.preventDefault();
@@ -195,7 +197,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     const viewsRaw = v('m-views');
     const urlAn    = v('m-urlAnuncio');
     const funnel = {
-      id: Storage.genId(), data: v('m-data'), conta, nicho,
+      id: Storage.genId(), data: v('m-data'), hora: v('m-hora') || null, conta, nicho,
       produto: produto.toUpperCase(), urlAnuncio: urlAn, urlAnuncioFull: urlAn,
       views: viewsRaw ? Parser.parseViews(viewsRaw) : null,
       famoso: v('m-famoso') || null, domAnuncio, domAnuncioFull,
@@ -213,6 +215,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   function resetManual() {
     document.getElementById('manual-form').reset();
     document.getElementById('m-data').value = new Date().toISOString().slice(0, 10);
+    document.getElementById('m-hora').value = new Date().toTimeString().slice(0, 5);
   }
 
   // ── CSV Export/Import ─────────────────────────────────────────────────
@@ -337,7 +340,8 @@ document.addEventListener('DOMContentLoaded', async () => {
     const duplicados = [];
     const dataEscolhida = await pedirDataImport(novos, duplicados);
     if (dataEscolhida === null) return;
-    novos.forEach(f => { f.id = Storage.genId(); f.data = dataEscolhida; });
+    const horaImport = new Date().toTimeString().slice(0, 5);
+    novos.forEach(f => { f.id = Storage.genId(); f.data = dataEscolhida; f.hora = horaImport; });
     funnels = [...novos, ...funnels];
     saveFunnels(funnels);
     Tabela.renderTable();

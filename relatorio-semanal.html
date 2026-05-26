@@ -152,6 +152,9 @@ select option{background:#1a1a24}
 .daily-copy-btn{width:100%;margin-top:12px;padding:12px;background:none;border:1px solid var(--accent);border-radius:8px;color:var(--accent);font-family:'Syne',sans-serif;font-size:13px;font-weight:700;cursor:pointer;transition:all .15s}
 .daily-copy-btn:hover{background:rgba(200,255,87,.08)}
 
+.nicho-count-input.is-auto{background:rgba(200,255,87,.07);border-color:rgba(200,255,87,.25)}
+.auto-badge{font-size:9px;color:var(--muted);margin-left:3px;opacity:.6;pointer-events:none;vertical-align:middle}
+
 @media print{
   body{background:#fff;color:#111}
   .app-nav,.report-actions,.app-panel:not(#panel-semanal){display:none!important}
@@ -305,9 +308,9 @@ const JANELAS=[
 ];
 
 let dailyData={
-  manha:{nichos:{},nichoAlta:'',feeling:''},
-  tarde:{nichos:{},nichoAlta:'',feeling:''},
-  noite:{nichos:{},nichoAlta:'',feeling:''},
+  manha:{nichos:{},nichoAuto:{},nichoAlta:'',feeling:''},
+  tarde:{nichos:{},nichoAuto:{},nichoAlta:'',feeling:''},
+  noite:{nichos:{},nichoAuto:{},nichoAlta:'',feeling:''},
 };
 let selectedFonte='NATIVE';
 
@@ -348,25 +351,72 @@ function renderJanelas(){
       </div>
       <div class="field-label" style="margin-top:14px;margin-bottom:8px">🔻 Funis colhidos por nicho</div>
       <div class="nicho-count-row">
-        ${ALL_NICHOS.map(n=>`
-          <div class="nicho-count-item">
+        ${ALL_NICHOS.map(n=>{
+          const isAuto=!!dailyData[j.id].nichoAuto[n];
+          return `<div class="nicho-count-item">
             <span class="nicho-count-label" style="background:${NICHO_COLORS[n]}">${n}</span>
-            <input class="nicho-count-input" type="number" min="0" placeholder="0"
+            <input class="nicho-count-input${isAuto?' is-auto':''}" type="number" min="0" placeholder="0"
               value="${dailyData[j.id].nichos[n]||''}"
-              onchange="dailyData['${j.id}'].nichos['${n}']=parseInt(this.value)||0"/>
-          </div>
-        `).join('')}
+              onchange="dailyData['${j.id}'].nichos['${n}']=parseInt(this.value)||0;delete dailyData['${j.id}'].nichoAuto['${n}'];this.classList.remove('is-auto');const _b=this.nextElementSibling;if(_b&&_b.classList.contains('auto-badge'))_b.remove()"/>
+            ${isAuto?'<span class="auto-badge">(auto)</span>':''}
+          </div>`;
+        }).join('')}
         <div class="nicho-count-item">
           <span class="nicho-count-label" style="background:#555">OUTROS</span>
-          <input class="nicho-count-input" type="number" min="0" placeholder="0"
+          <input class="nicho-count-input${dailyData[j.id].nichoAuto['OUTROS']?' is-auto':''}" type="number" min="0" placeholder="0"
             value="${dailyData[j.id].nichos['OUTROS']||''}"
-            onchange="dailyData['${j.id}'].nichos['OUTROS']=parseInt(this.value)||0"/>
+            onchange="dailyData['${j.id}'].nichos['OUTROS']=parseInt(this.value)||0;delete dailyData['${j.id}'].nichoAuto['OUTROS'];this.classList.remove('is-auto');const _b=this.nextElementSibling;if(_b&&_b.classList.contains('auto-badge'))_b.remove()"/>
+          ${dailyData[j.id].nichoAuto['OUTROS']?'<span class="auto-badge">(auto)</span>':''}
         </div>
       </div>
     </div>
   `).join('');
 }
-renderJanelas();
+
+// ── Integração com Funil Tracker (localStorage) ───────────────────────────
+
+function getJanela(hora){
+  if(!hora)return'noite';
+  const h=parseInt(hora.split(':')[0]);
+  if(h<12)return'manha';
+  if(h<18)return'tarde';
+  return'noite';
+}
+
+function carregarDadosDoDia(dataStr){
+  if(!dataStr)return;
+  let funnels=[];
+  try{funnels=JSON.parse(localStorage.getItem('funil-tracker-v1')||'[]');}catch{}
+  const dodia=funnels.filter(f=>f.data===dataStr);
+
+  // Zerar contadores e marcar auto
+  ['manha','tarde','noite'].forEach(j=>{
+    dailyData[j].nichos={};
+    dailyData[j].nichoAuto={};
+  });
+
+  dodia.forEach(f=>{
+    const janela=getJanela(f.hora);
+    const nicho=f.nicho||'OUTROS';
+    dailyData[janela].nichos[nicho]=(dailyData[janela].nichos[nicho]||0)+1;
+    dailyData[janela].nichoAuto[nicho]=true;
+  });
+
+  // Nicho em alta automático por janela
+  ['manha','tarde','noite'].forEach(j=>{
+    const entries=Object.entries(dailyData[j].nichos);
+    if(entries.length){
+      const top=entries.sort((a,b)=>b[1]-a[1])[0];
+      dailyData[j].nichoAlta=top[0];
+    }
+  });
+
+  renderJanelas();
+}
+
+// Carregar ao inicializar e ao trocar data
+carregarDadosDoDia(document.getElementById('d-data').value);
+document.getElementById('d-data').addEventListener('change',e=>carregarDadosDoDia(e.target.value));
 
 function generateDaily(){
   const data=document.getElementById('d-data').value;

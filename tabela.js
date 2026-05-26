@@ -356,6 +356,7 @@ const Tabela = (() => {
 
     set('e-id',           f.id);
     set('e-data',         f.data         || '');
+    set('e-hora',         f.hora         || '');
     set('e-conta',        f.conta        || '');
     set('e-nicho',        f.nicho        || '');
     set('e-produto',      f.produto      || '');
@@ -604,6 +605,7 @@ const Tabela = (() => {
 
       Object.assign(f, {
         data:           val('e-data'),
+        hora:           val('e-hora') || null,
         conta:          val('e-conta'),
         nicho:          val('e-nicho'),
         produto:        Storage.normalizeProduto(val('e-produto')),
