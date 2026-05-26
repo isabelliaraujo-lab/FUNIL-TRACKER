@@ -319,6 +319,26 @@ const Tabela = (() => {
     }).join('');
   }
 
+  // ── Sync views → criativos ────────────────────────────────────────────
+  function syncViewsParaCriativos(funil) {
+    const CRIATIVOS_KEY = 'funil-tracker-criativos-v1';
+    if (!funil.urlAnuncio) return;
+    try {
+      const ads = JSON.parse(localStorage.getItem(CRIATIVOS_KEY) || '[]');
+      let alterou = false;
+      const updated = ads.map(a => {
+        if (a.urlAnuncio && a.urlAnuncio === funil.urlAnuncio && a.views !== funil.views) {
+          alterou = true;
+          return { ...a, views: funil.views };
+        }
+        return a;
+      });
+      if (alterou) localStorage.setItem(CRIATIVOS_KEY, JSON.stringify(updated));
+    } catch (e) {
+      console.error('Erro ao sincronizar views para criativos:', e);
+    }
+  }
+
   // ── Modal de edição ───────────────────────────────────────────────────
 
   function closeEditModal() {
@@ -601,6 +621,8 @@ const Tabela = (() => {
       });
 
       _saveFunnels(funnels);
+      syncViewsParaCriativos(f);
+      if (!document.getElementById('tab-criativos')?.hidden) Criativos.refresh();
       closeEditModal();
       renderTable();
       _showToast('Funil atualizado!');

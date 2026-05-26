@@ -18,6 +18,20 @@ const Criativos = (() => {
     localStorage.setItem(KEY, JSON.stringify(ads));
   }
 
+  function syncViewsParaFunis(ad) {
+    if (!ad.urlAnuncio) return;
+    const funnels = Storage.load();
+    let alterou = false;
+    const updated = funnels.map(f => {
+      if (f.urlAnuncio && f.urlAnuncio === ad.urlAnuncio && f.views !== ad.views) {
+        alterou = true;
+        return { ...f, views: ad.views };
+      }
+      return f;
+    });
+    if (alterou) Storage.save(updated);
+  }
+
   // ── Colunas visíveis ──────────────────────────────────────────────────
 
   const COLUMNS = [
@@ -219,6 +233,10 @@ const Criativos = (() => {
 
       ad[field] = val;
       saveAds(_ads);
+      if (field === 'views') {
+        syncViewsParaFunis(ad);
+        if (!document.getElementById('tab-escalada')?.hidden) Escalada.refresh();
+      }
       rerenderRow(id);
     }
 
@@ -751,6 +769,8 @@ const Criativos = (() => {
       }
 
       saveAds(_ads);
+      syncViewsParaFunis(record);
+      if (!document.getElementById('tab-escalada')?.hidden) Escalada.refresh();
       close();
       render();
       _showToast?.(isEdit ? 'Criativo atualizado!' : 'Criativo salvo!');

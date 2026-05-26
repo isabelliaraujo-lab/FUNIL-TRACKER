@@ -350,6 +350,25 @@ document.addEventListener('DOMContentLoaded', async () => {
   Analise.init(getFunnels);
   Criativos.init(showToast, getFunnels);
 
+  // Migração única: funis são fonte de verdade para views em criativos existentes
+  {
+    const CRIATIVOS_KEY = 'funil-tracker-criativos-v1';
+    try {
+      const criativos = JSON.parse(localStorage.getItem(CRIATIVOS_KEY) || '[]');
+      let migrou = false;
+      const criativosAtualizados = criativos.map(a => {
+        if (!a.urlAnuncio) return a;
+        const funil = funnels.find(f => f.urlAnuncio && f.urlAnuncio === a.urlAnuncio);
+        if (funil && funil.views != null && funil.views !== a.views) {
+          migrou = true;
+          return { ...a, views: funil.views };
+        }
+        return a;
+      });
+      if (migrou) localStorage.setItem(CRIATIVOS_KEY, JSON.stringify(criativosAtualizados));
+    } catch (e) { console.error('Erro na migração inicial de views:', e); }
+  }
+
   Escalada.refresh();
 
 });
