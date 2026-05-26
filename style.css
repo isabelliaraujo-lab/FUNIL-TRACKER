@@ -1529,7 +1529,7 @@ tbody tr.row-repeated:hover td {
 .global-filters {
   background: var(--bg-secondary, #111);
   border-bottom: 0.5px solid var(--border);
-  padding: 8px 20px;
+  padding: 6px 20px;
   position: sticky;
   top: 48px;
   z-index: 90;
@@ -1538,7 +1538,7 @@ tbody tr.row-repeated:hover td {
   display: flex;
   align-items: center;
   gap: 8px;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
   max-width: 1200px;
   margin: 0 auto;
 }
@@ -1549,6 +1549,7 @@ tbody tr.row-repeated:hover td {
   text-transform: uppercase;
   letter-spacing: .08em;
   flex-shrink: 0;
+  white-space: nowrap;
   transition: color .15s;
 }
 .global-filters__label.gf-active {
@@ -1560,6 +1561,18 @@ tbody tr.row-repeated:hover td {
   flex-shrink: 0;
 }
 .gf-input {
-  width: auto;
+  width: auto !important;
   min-width: 0;
+  flex-shrink: 1;
+  padding: 5px 10px !important;
+  font-size: 12px !important;
+  height: 32px;
+}
+input.gf-input[type=date] {
+  width: 140px !important;
+  flex-shrink: 0;
+}
+select.gf-input {
+  width: 150px !important;
+  flex-shrink: 0;
 }
