@@ -110,11 +110,10 @@ const Criativos = (() => {
 
   // ── Filtro de semana ──────────────────────────────────────────────────
 
-  function filteredAds(semana, nicho, angulo) {
-    return _ads.filter(a => {
+  function filteredAds(pool, semana, angulo) {
+    return pool.filter(a => {
       if (semana && semana !== 'Todas as semanas' && getWeekLabel(a.data) !== semana) return false;
-      if (nicho  && a.nicho   !== nicho)  return false;
-      if (angulo && a.angulo  !== angulo) return false;
+      if (angulo && a.angulo !== angulo) return false;
       return true;
     });
   }
@@ -306,10 +305,10 @@ const Criativos = (() => {
 
     const semanas     = getWeeks();
     const semAtual    = container.dataset.semana || semanas[1] || 'Todas as semanas';
-    const nichoAtual  = container.dataset.nicho  || '';
     const anguloAtual = container.dataset.angulo || '';
 
-    const ads  = filteredAds(semAtual, nichoAtual, anguloAtual);
+    const gfPool = GlobalFilters.filter(_ads);
+    const ads    = filteredAds(gfPool, semAtual, anguloAtual);
     const dups = getDuplicates(ads);
     _currentDups = dups;
 
@@ -333,10 +332,6 @@ const Criativos = (() => {
           ${semanas.map(s =>
             `<option value="${esc(s)}" ${s===semAtual?'selected':''}>${esc(s)}</option>`
           ).join('')}
-        </select>
-        <select id="cr-filter-nicho" class="filter-input">
-          <option value="">Todos os nichos</option>
-          ${NICHOS.map(n => `<option value="${esc(n)}" ${n===nichoAtual?'selected':''}>${esc(n)}</option>`).join('')}
         </select>
         <select id="cr-filter-angulo" class="filter-input">
           <option value="">Todos os ângulos</option>
@@ -451,9 +446,6 @@ const Criativos = (() => {
     // Bind filtros
     document.getElementById('cr-filter-semana').addEventListener('change', e => {
       container.dataset.semana = e.target.value; _crPage = 1; render();
-    });
-    document.getElementById('cr-filter-nicho').addEventListener('change', e => {
-      container.dataset.nicho = e.target.value; _crPage = 1; render();
     });
     document.getElementById('cr-filter-angulo').addEventListener('change', e => {
       container.dataset.angulo = e.target.value; _crPage = 1; render();
@@ -902,6 +894,7 @@ const Criativos = (() => {
 
   function refresh() {
     _ads = loadAds();
+    _crPage = 1;
     render();
   }
 

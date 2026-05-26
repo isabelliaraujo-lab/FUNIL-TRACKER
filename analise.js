@@ -5,7 +5,6 @@
 const Analise = (() => {
 
   let _getFunnels   = () => [];
-  let _intelPeriodo = 'tudo';
 
   let _pgDomAnuncio = 1;
   let _pgDomFinal   = 1;
@@ -295,7 +294,7 @@ const Analise = (() => {
     const el = document.getElementById('result-dom-anuncio');
     if (!q) { el.innerHTML = ''; return; }
 
-    const matched = _getFunnels().filter(
+    const matched = GlobalFilters.filter(_getFunnels()).filter(
       f => (f.domAnuncio || '').toUpperCase().includes(q)
     );
 
@@ -347,7 +346,7 @@ const Analise = (() => {
     const el = document.getElementById('result-dom-final');
     if (!q) { el.innerHTML = ''; return; }
 
-    const matched = _getFunnels().filter(
+    const matched = GlobalFilters.filter(_getFunnels()).filter(
       f => (f.domFinal || '').toUpperCase().includes(q)
     );
 
@@ -399,7 +398,7 @@ const Analise = (() => {
     const el = document.getElementById('result-produto');
     if (!q) { el.innerHTML = ''; return; }
 
-    const matched = _getFunnels().filter(
+    const matched = GlobalFilters.filter(_getFunnels()).filter(
       f => (f.produto || '').toUpperCase().includes(q)
     );
 
@@ -459,42 +458,6 @@ const Analise = (() => {
   }
 
   // ── Painel de inteligência do período ────────────────────────────────
-
-  function filtrarPorPeriodo(funis, tipo) {
-    if (!tipo || tipo === 'tudo') return funis;
-    const hoje = new Date();
-    hoje.setHours(23, 59, 59, 999);
-    let de;
-    if (tipo === 'mes') {
-      de = new Date(hoje.getFullYear(), hoje.getMonth(), 1);
-    } else {
-      const dias = { '7d': 7, '15d': 15, '30d': 30 }[tipo] || 7;
-      de = new Date(hoje);
-      de.setDate(de.getDate() - dias + 1);
-      de.setHours(0, 0, 0, 0);
-    }
-    return funis.filter(f => {
-      if (!f.data) return false;
-      const d = new Date(f.data + (f.data.includes('T') ? '' : 'T00:00:00'));
-      return d >= de && d <= hoje;
-    });
-  }
-
-  function intelPeriodoBtnsHTML() {
-    const opts = [
-      { v: '7d',   l: '7 dias'   },
-      { v: '15d',  l: '15 dias'  },
-      { v: '30d',  l: '30 dias'  },
-      { v: 'mes',  l: 'Este mês' },
-      { v: 'tudo', l: 'Tudo'     },
-    ];
-    return `<div class="escalada-filtros__rapidos" style="margin-bottom:20px">
-      ${opts.map(o =>
-        `<button class="filtro-rapido${_intelPeriodo === o.v ? ' ativo' : ''}"
-                 data-intel-periodo="${esc(o.v)}" type="button">${esc(o.l)}</button>`
-      ).join('')}
-    </div>`;
-  }
 
   function intelNichosHTML(funis) {
     const counts = {};
@@ -629,12 +592,10 @@ const Analise = (() => {
   function renderIntel() {
     const el = document.getElementById('analise-intel');
     if (!el) return;
-    const allFunis = _getFunnels();
-    const funis    = filtrarPorPeriodo(allFunis, _intelPeriodo);
+    const funis = GlobalFilters.filter(_getFunnels());
     el.innerHTML = `
       <div class="escalada-section">
         <h3 class="escalada-section__title">🧠 Inteligência do período</h3>
-        ${intelPeriodoBtnsHTML()}
         <div class="escalada-grid">
           <div class="escalada-card">
             <div class="escalada-card__title">Nichos em volume</div>
@@ -650,7 +611,7 @@ const Analise = (() => {
           </div>
           <div class="escalada-card">
             <div class="escalada-card__title">Produtos novos na semana</div>
-            ${intelProdutosNovosHTML(allFunis)}
+            ${intelProdutosNovosHTML(funis)}
           </div>
           <div class="escalada-card" style="grid-column:span 2">
             <div class="escalada-card__title">Contas mais ativas</div>
@@ -671,13 +632,6 @@ const Analise = (() => {
   // ── Inicialização ─────────────────────────────────────────────────────
   function init(getFunnels) {
     _getFunnels = getFunnels;
-
-    document.getElementById('tab-analise').addEventListener('click', e => {
-      const btn = e.target.closest('[data-intel-periodo]');
-      if (!btn) return;
-      _intelPeriodo = btn.dataset.intelPeriodo;
-      renderIntel();
-    });
 
     document.getElementById('search-dom-anuncio')
       .addEventListener('input', () => { _pgDomAnuncio = 1; searchDomAnuncio(); });

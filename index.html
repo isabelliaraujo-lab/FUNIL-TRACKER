@@ -46,6 +46,24 @@
     </div>
   </header>
 
+  <!-- ===== GLOBAL FILTERS ===== -->
+  <div class="global-filters" id="global-filters">
+    <div class="global-filters__inner">
+      <span class="global-filters__label" id="gf-label">Filtrar:</span>
+      <input type="date" id="gf-de"  class="filter-input gf-input" />
+      <span class="global-filters__sep">até</span>
+      <input type="date" id="gf-ate" class="filter-input gf-input" />
+      <select id="gf-nicho" class="filter-input gf-input">
+        <option value="">Todos os nichos</option>
+        <option>WL</option><option>DB</option><option>ML</option>
+        <option>ED</option><option>NP</option><option>DA</option>
+        <option>PT</option><option>VL</option><option>TN</option>
+        <option>LG</option><option>RJ</option><option>RE</option>
+      </select>
+      <button class="btn btn-secondary btn-sm" id="gf-limpar">Limpar</button>
+    </div>
+  </div>
+
   <!-- ===== MAIN ===== -->
   <main class="main">
 
@@ -260,26 +278,6 @@
           placeholder="Buscar em todos os campos…"
           autocomplete="off"
         />
-
-        <select id="filter-nicho" class="filter-input">
-          <option value="">Todos os nichos</option>
-          <option>WL</option><option>DB</option><option>ML</option>
-          <option>ED</option><option>NP</option><option>DA</option>
-          <option>PT</option><option>VL</option><option>TN</option>
-          <option>LG</option><option>RJ</option><option>RE</option>
-        </select>
-
-        <select id="filter-famoso" class="filter-input">
-          <option value="">Famoso: todos</option>
-          <option value="sim">Com famoso</option>
-          <option value="não">Sem famoso</option>
-        </select>
-
-        <select id="filter-split" class="filter-input">
-          <option value="">Split: todos</option>
-          <option value="true">Com split</option>
-          <option value="false">Sem split</option>
-        </select>
 
         <select id="filter-repetido" class="filter-input">
           <option value="">Repetido: todos</option>

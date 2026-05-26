@@ -1524,3 +1524,42 @@ tbody tr.row-repeated:hover td {
 @media (max-width: 600px) {
   .pg-first, .pg-last { display: none; }
 }
+
+/* ── Global Filters ─────────────────────────────────────────── */
+.global-filters {
+  background: var(--bg-secondary, #111);
+  border-bottom: 0.5px solid var(--border);
+  padding: 8px 20px;
+  position: sticky;
+  top: 48px;
+  z-index: 90;
+}
+.global-filters__inner {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  max-width: 1200px;
+  margin: 0 auto;
+}
+.global-filters__label {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: .08em;
+  flex-shrink: 0;
+  transition: color .15s;
+}
+.global-filters__label.gf-active {
+  color: var(--accent);
+}
+.global-filters__sep {
+  font-size: 12px;
+  color: var(--text-muted);
+  flex-shrink: 0;
+}
+.gf-input {
+  width: auto;
+  min-width: 0;
+}

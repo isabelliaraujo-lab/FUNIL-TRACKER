@@ -194,24 +194,12 @@ const Tabela = (() => {
   function readFilters() {
     return {
       search:   (document.getElementById('filter-search').value   || '').toLowerCase().trim(),
-      nicho:     document.getElementById('filter-nicho').value,
-      famoso:    document.getElementById('filter-famoso').value,
-      split:     document.getElementById('filter-split').value,
       repetido:  document.getElementById('filter-repetido').value,
     };
   }
 
   function applyFilters(funnels, f, domCounts) {
-    return funnels.filter(row => {
-      if (f.nicho  && row.nicho  !== f.nicho)  return false;
-      if (f.famoso && row.famoso !== f.famoso) return false;
-
-      if (f.split !== '') {
-        const s = isSplit(row);
-        if (f.split === 'true'  && !s) return false;
-        if (f.split === 'false' &&  s) return false;
-      }
-
+    return GlobalFilters.filter(funnels).filter(row => {
       if (f.repetido !== '') {
         const rep = Storage.isRepeated(row, domCounts);
         if (f.repetido === 'sim' && !rep) return false;
@@ -669,10 +657,7 @@ const Tabela = (() => {
     });
 
     // Filtros — atualizam tabela em tempo real (resetam para página 1)
-    const filterIds = [
-      'filter-search', 'filter-nicho', 'filter-famoso',
-      'filter-split',  'filter-repetido',
-    ];
+    const filterIds = ['filter-search', 'filter-repetido'];
     filterIds.forEach(id => {
       const el = document.getElementById(id);
       el.addEventListener('input',  renderTable);

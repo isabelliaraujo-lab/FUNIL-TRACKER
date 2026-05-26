@@ -2,6 +2,25 @@
    main.js — inicialização e conexão entre módulos
    ============================================================ */
 
+const GlobalFilters = {
+  get de()    { return document.getElementById('gf-de')?.value    || null },
+  get ate()   { return document.getElementById('gf-ate')?.value   || null },
+  get nicho() { return document.getElementById('gf-nicho')?.value || '' },
+
+  filter(items) {
+    const de    = this.de;
+    const ate   = this.ate;
+    const nicho = this.nicho;
+    if (!de && !ate && !nicho) return items;
+    return items.filter(f => {
+      if (de    && (f.data || '') <  de)    return false;
+      if (ate   && (f.data || '') >  ate)   return false;
+      if (nicho && f.nicho !== nicho)       return false;
+      return true;
+    });
+  },
+};
+
 document.addEventListener('DOMContentLoaded', async () => {
 
   let funnels     = [];
@@ -346,6 +365,37 @@ document.addEventListener('DOMContentLoaded', async () => {
     saveFunnels(funnels);
     Tabela.renderTable();
     showToast(`${novos.length} funil(s) importado(s) com sucesso!`, 3500);
+  });
+
+  // ── Filtro global ─────────────────────────────────────────────────────
+
+  function refreshActiveTab() {
+    if (!document.getElementById('tab-funis').hidden)     Tabela.renderTable();
+    if (!document.getElementById('tab-escalada').hidden)  Escalada.refresh();
+    if (!document.getElementById('tab-analise').hidden)   Analise.refresh();
+    if (!document.getElementById('tab-criativos').hidden) Criativos.refresh();
+  }
+
+  function updateGfIndicator() {
+    const count = [GlobalFilters.de, GlobalFilters.ate, GlobalFilters.nicho].filter(Boolean).length;
+    const label = document.getElementById('gf-label');
+    if (!label) return;
+    label.textContent = count > 0 ? `Filtrar: ${count}` : 'Filtrar:';
+    label.classList.toggle('gf-active', count > 0);
+  }
+
+  ['gf-de', 'gf-ate', 'gf-nicho'].forEach(id => {
+    document.getElementById(id)?.addEventListener('change', () => {
+      updateGfIndicator();
+      refreshActiveTab();
+    });
+  });
+  document.getElementById('gf-limpar')?.addEventListener('click', () => {
+    document.getElementById('gf-de').value    = '';
+    document.getElementById('gf-ate').value   = '';
+    document.getElementById('gf-nicho').value = '';
+    updateGfIndicator();
+    refreshActiveTab();
   });
 
   // ── Inicializar módulos ───────────────────────────────────────────────

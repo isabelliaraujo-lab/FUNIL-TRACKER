@@ -8,122 +8,9 @@ const Escalada = (() => {
   let _getMonitoradas  = () => [];
   let _toggleMonitorar = () => {};
 
-  // ── Filtro de data ────────────────────────────────────────────────────
-
-  let filtroGlobal = { tipo: 'tudo', de: null, ate: null };
-  let filtrosSecao = { secao1a: 'tudo', secao1b: 'tudo', secao2: 'tudo', secao3: 'tudo', secao4: 'tudo' };
-
   // ── Paginação dos rankings ────────────────────────────────────────────
   const _ESC_PER = 10;
   let _escPages = { secao1a: 1, secao1b: 1, secao2: 1 };
-
-  function filtrarFunisPorPeriodo(funis, filtro) {
-    if (!filtro || filtro.tipo === 'tudo') return funis;
-
-    const hoje = new Date();
-    hoje.setHours(23, 59, 59, 999);
-    let de, ate;
-
-    if (filtro.tipo === 'custom') {
-      if (!filtro.de && !filtro.ate) return funis;
-      de  = filtro.de  ? new Date(filtro.de  + 'T00:00:00') : null;
-      ate = filtro.ate ? new Date(filtro.ate + 'T23:59:59') : null;
-    } else {
-      ate = hoje;
-      if (filtro.tipo === 'mes') {
-        de = new Date(hoje.getFullYear(), hoje.getMonth(), 1);
-      } else {
-        const dias = { '7d': 7, '15d': 15, '30d': 30 }[filtro.tipo] || 30;
-        de = new Date(hoje);
-        de.setDate(de.getDate() - dias + 1);
-        de.setHours(0, 0, 0, 0);
-      }
-    }
-
-    return funis.filter(f => {
-      if (!f.data) return false;
-      const d = new Date(f.data + (f.data.includes('T') ? '' : 'T00:00:00'));
-      if (de  && d < de)  return false;
-      if (ate && d > ate) return false;
-      return true;
-    });
-  }
-
-  function getFiltroEfetivo(nomeSecao) {
-    const s = filtrosSecao[nomeSecao];
-    if (s && s !== 'tudo') return { tipo: s, de: null, ate: null };
-    return filtroGlobal;
-  }
-
-  // ── HTML dos controles de filtro ──────────────────────────────────────
-
-  function filtrosBarHTML() {
-    const t = filtroGlobal.tipo;
-    const optsRapidos = [
-      { v: 'tudo', l: 'Tudo' },
-      { v: '7d',   l: '7 dias' },
-      { v: '15d',  l: '15 dias' },
-      { v: '30d',  l: '30 dias' },
-      { v: 'mes',  l: 'Este mês' },
-    ];
-    const btns = optsRapidos.map(o =>
-      `<button class="filtro-rapido${t === o.v ? ' ativo' : ''}" data-periodo="${o.v}" type="button">${o.l}</button>`
-    ).join('');
-    const deVal  = filtroGlobal.de  || '';
-    const ateVal = filtroGlobal.ate || '';
-    return `<div class="escalada-filtros">
-      <div class="escalada-filtros__rapidos">${btns}</div>
-      <div class="escalada-filtros__custom">
-        <input type="date" class="filtro-input-data" id="filtro-de"  value="${deVal}">
-        <span class="escalada-filtros__sep">até</span>
-        <input type="date" class="filtro-input-data" id="filtro-ate" value="${ateVal}">
-        <button class="filtro-rapido" data-action="aplicar-custom" type="button">Aplicar</button>
-        <button class="filtro-rapido" data-action="limpar-filtro"  type="button">Limpar</button>
-      </div>
-    </div>`;
-  }
-
-  function secaoFiltrosHTML(nomeSecao) {
-    const t = filtrosSecao[nomeSecao] || 'tudo';
-    const opts = [
-      { v: 'tudo', l: 'Tudo' },
-      { v: '7d',   l: '7d' },
-      { v: '15d',  l: '15d' },
-      { v: '30d',  l: '30d' },
-    ];
-    const btns = opts.map(o =>
-      `<button class="filtro-secao${t === o.v ? ' ativo' : ''}" data-secao="${nomeSecao}" data-periodo="${o.v}" type="button">${o.l}</button>`
-    ).join('');
-    return `<div class="escalada-filtros__secao">${btns}</div>`;
-  }
-
-  // ── Ações de filtro ───────────────────────────────────────────────────
-
-  function aplicarFiltroRapido(tipo) {
-    filtroGlobal = { tipo, de: null, ate: null };
-    Object.keys(filtrosSecao).forEach(k => { filtrosSecao[k] = 'tudo'; });
-    refresh();
-  }
-
-  function aplicarFiltroCustom() {
-    const de  = document.getElementById('filtro-de')?.value  || null;
-    const ate = document.getElementById('filtro-ate')?.value || null;
-    if (!de && !ate) return;
-    filtroGlobal = { tipo: 'custom', de, ate };
-    Object.keys(filtrosSecao).forEach(k => { filtrosSecao[k] = 'tudo'; });
-    refresh();
-  }
-
-  function limparFiltroData() {
-    filtroGlobal = { tipo: 'tudo', de: null, ate: null };
-    Object.keys(filtrosSecao).forEach(k => { filtrosSecao[k] = 'tudo'; });
-    refresh();
-  }
-
-  function aplicarFiltroSecao(secao, tipo) {
-    filtrosSecao[secao] = tipo;
-    renderSecaoPorNome(secao);
-  }
 
   // ── Formatação ────────────────────────────────────────────────────────
 
@@ -362,46 +249,38 @@ const Escalada = (() => {
   // ── Seções ────────────────────────────────────────────────────────────
 
   function secaoProdutos(funis) {
-    const funis1a = filtrarFunisPorPeriodo(funis, getFiltroEfetivo('secao1a'));
-    const funis1b = filtrarFunisPorPeriodo(funis, getFiltroEfetivo('secao1b'));
     return `
       <div class="escalada-section">
         <h3 class="escalada-section__title">🔥 Produtos em escalada</h3>
         <div class="escalada-grid">
           <div class="escalada-card" data-secao-content="secao1a">
             <div class="escalada-card__title">Ranking por views</div>
-            ${secaoFiltrosHTML('secao1a')}
-            ${rankViewsHTML(funis1a)}
+            ${rankViewsHTML(funis)}
           </div>
           <div class="escalada-card" data-secao-content="secao1b">
             <div class="escalada-card__title">Ranking por ROI</div>
-            ${secaoFiltrosHTML('secao1b')}
-            ${rankROIProdutosHTML(funis1b)}
+            ${rankROIProdutosHTML(funis)}
           </div>
         </div>
       </div>`;
   }
 
   function secaoContasROI(funis) {
-    const funisF = filtrarFunisPorPeriodo(funis, getFiltroEfetivo('secao2'));
     return `
       <div class="escalada-section">
         <h3 class="escalada-section__title">💰 Contas com melhor ROI</h3>
         <div data-secao-content="secao2">
-          ${secaoFiltrosHTML('secao2')}
-          <div class="escalada-card">${rankROIContasHTML(funisF)}</div>
+          <div class="escalada-card">${rankROIContasHTML(funis)}</div>
         </div>
       </div>`;
   }
 
   function secaoDominioPorProduto(funis) {
-    const funisF = filtrarFunisPorPeriodo(funis, getFiltroEfetivo('secao3'));
     return `
       <div class="escalada-section">
         <h3 class="escalada-section__title">🏆 Melhor domínio por produto</h3>
         <div data-secao-content="secao3">
-          ${secaoFiltrosHTML('secao3')}
-          ${melhorDominioHTML(funisF)}
+          ${melhorDominioHTML(funis)}
         </div>
       </div>`;
   }
@@ -466,13 +345,11 @@ const Escalada = (() => {
   }
 
   function secaoMonitoradas(funis) {
-    const funisF = filtrarFunisPorPeriodo(funis, getFiltroEfetivo('secao4'));
     return `
       <div class="escalada-section">
         <h3 class="escalada-section__title">👁 Contas monitoradas</h3>
         <div data-secao-content="secao4">
-          ${secaoFiltrosHTML('secao4')}
-          ${secaoMonitoradasContent(funisF)}
+          ${secaoMonitoradasContent(funis)}
         </div>
       </div>`;
   }
@@ -482,36 +359,27 @@ const Escalada = (() => {
   function renderSecaoPorNome(nomeSecao) {
     const el = document.querySelector(`[data-secao-content="${nomeSecao}"]`);
     if (!el) return;
-    const funis  = _getFunnels();
-    const funisF = filtrarFunisPorPeriodo(funis, getFiltroEfetivo(nomeSecao));
+    const funis = GlobalFilters.filter(_getFunnels());
 
     switch (nomeSecao) {
       case 'secao1a':
         el.innerHTML = `
           <div class="escalada-card__title">Ranking por views</div>
-          ${secaoFiltrosHTML('secao1a')}
-          ${rankViewsHTML(funisF)}`;
+          ${rankViewsHTML(funis)}`;
         break;
       case 'secao1b':
         el.innerHTML = `
           <div class="escalada-card__title">Ranking por ROI</div>
-          ${secaoFiltrosHTML('secao1b')}
-          ${rankROIProdutosHTML(funisF)}`;
+          ${rankROIProdutosHTML(funis)}`;
         break;
       case 'secao2':
-        el.innerHTML = `
-          ${secaoFiltrosHTML('secao2')}
-          <div class="escalada-card">${rankROIContasHTML(funisF)}</div>`;
+        el.innerHTML = `<div class="escalada-card">${rankROIContasHTML(funis)}</div>`;
         break;
       case 'secao3':
-        el.innerHTML = `
-          ${secaoFiltrosHTML('secao3')}
-          ${melhorDominioHTML(funisF)}`;
+        el.innerHTML = melhorDominioHTML(funis);
         break;
       case 'secao4':
-        el.innerHTML = `
-          ${secaoFiltrosHTML('secao4')}
-          ${secaoMonitoradasContent(funisF)}`;
+        el.innerHTML = secaoMonitoradasContent(funis);
         break;
     }
   }
@@ -521,9 +389,8 @@ const Escalada = (() => {
   function refresh() {
     const el = document.getElementById('tab-escalada');
     if (!el) return;
-    const funis = _getFunnels();
+    const funis = GlobalFilters.filter(_getFunnels());
     el.innerHTML =
-      filtrosBarHTML() +
       secaoProdutos(funis) +
       secaoContasROI(funis) +
       secaoDominioPorProduto(funis) +
@@ -571,18 +438,6 @@ const Escalada = (() => {
 
       const nomeEl = e.target.closest('[data-analise-produto]');
       if (nomeEl) { abrirAnaliseProduto(nomeEl.dataset.analiseProduto); return; }
-
-      const filtroRapidoBtn = e.target.closest('.filtro-rapido[data-periodo]');
-      if (filtroRapidoBtn) { aplicarFiltroRapido(filtroRapidoBtn.dataset.periodo); return; }
-
-      const aplicarBtn = e.target.closest('[data-action="aplicar-custom"]');
-      if (aplicarBtn) { aplicarFiltroCustom(); return; }
-
-      const limparBtn = e.target.closest('[data-action="limpar-filtro"]');
-      if (limparBtn) { limparFiltroData(); return; }
-
-      const filtroSecaoBtn = e.target.closest('.filtro-secao[data-periodo]');
-      if (filtroSecaoBtn) { aplicarFiltroSecao(filtroSecaoBtn.dataset.secao, filtroSecaoBtn.dataset.periodo); return; }
     });
   }
 
