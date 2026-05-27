@@ -278,6 +278,7 @@ select option{background:#1a1a24}
 
 </div><!-- /panel-semanal -->
 
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script>
 // ── UTILS ─────────────────────────────────────────────────────────────────
 const NICHO_COLORS={WL:'#378ADD',ML:'#7F77DD',DB:'#639922',PT:'#BA7517',DA:'#1D9E75',ED:'#E24B4A',NP:'#D85A30',VL:'#D4537E',RJ:'#888780'};
@@ -286,6 +287,7 @@ const ALL_NICHOS=['WL','ML','DB','PT','DA','NP','ED','VL','RJ'];
 
 const SUPABASE_URL = 'https://dworzfcetqllydpnzsbi.supabase.co';
 const SUPABASE_KEY = 'sb_publishable_SSDXOOiqFFL-VvMwJLSK6A_YLHhS6zP';
+const _sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
 function esc(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;')}
 function fmtDate(d){if(!d)return'';return new Date(d+'T12:00:00').toLocaleDateString('pt-BR',{day:'2-digit',month:'2-digit',year:'2-digit'})}
@@ -394,22 +396,18 @@ async function carregarDadosDoDia(dataStr){
   let funnels=[];
 
   try{
-    const res=await fetch(
-      `${SUPABASE_URL}/rest/v1/funis?data=eq.${dataStr}&select=nicho,hora`,
-      {headers:{'apikey':SUPABASE_KEY,'Authorization':`Bearer ${SUPABASE_KEY}`}}
-    );
-    if(res.ok){
-      funnels=await res.json();
-    } else {
-      throw new Error('Supabase HTTP '+res.status);
-    }
+    const {data,error}=await _sb
+      .from('funis')
+      .select('nicho,hora')
+      .eq('data',dataStr);
+    if(error)throw error;
+    funnels=data||[];
+    console.log('Funis do dia',dataStr,':',funnels.length);
   }catch(e){
     console.warn('Supabase indisponível, usando localStorage:', e.message);
     const raw=localStorage.getItem('funil-tracker-v1');
     funnels=JSON.parse(raw||'[]').filter(f=>f.data===dataStr);
   }
-
-  console.log('Funis do dia',dataStr,':',funnels.length);
 
   // Zerar contadores e marcar auto
   ['manha','tarde','noite'].forEach(j=>{

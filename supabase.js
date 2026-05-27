@@ -32,6 +32,7 @@ const SupabaseStorage = (() => {
       gasto:            f.gasto     != null ? parseFloat(f.gasto)     : null,
       conversao:        f.conversao != null ? parseFloat(f.conversao) : null,
       moeda:            f.moeda            || 'BRL',
+      hora:             f.hora             || null,
       anuncios:         Array.isArray(f.anuncios) ? f.anuncios : [],
     };
   }
@@ -57,6 +58,7 @@ const SupabaseStorage = (() => {
       gasto:          r.gasto,
       conversao:      r.conversao,
       moeda:          r.moeda || 'BRL',
+      hora:           r.hora,
       anuncios:       r.anuncios || [],
     };
   }
