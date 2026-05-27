@@ -393,6 +393,13 @@ function getJanela(hora){
 async function carregarDadosDoDia(dataStr){
   if(!dataStr)return;
 
+  // Reset completo antes de qualquer operação
+  dailyData={
+    manha:{nichos:{},nichoAuto:{},nichoAlta:'',feeling:''},
+    tarde:{nichos:{},nichoAuto:{},nichoAlta:'',feeling:''},
+    noite:{nichos:{},nichoAuto:{},nichoAlta:'',feeling:''},
+  };
+
   let funnels=[];
 
   try{
@@ -408,12 +415,6 @@ async function carregarDadosDoDia(dataStr){
     const raw=localStorage.getItem('funil-tracker-v1');
     funnels=JSON.parse(raw||'[]').filter(f=>f.data===dataStr);
   }
-
-  // Zerar contadores e marcar auto
-  ['manha','tarde','noite'].forEach(j=>{
-    dailyData[j].nichos={};
-    dailyData[j].nichoAuto={};
-  });
 
   funnels.forEach(f=>{
     const janela=getJanela(f.hora);
