@@ -284,6 +284,9 @@ const NICHO_COLORS={WL:'#378ADD',ML:'#7F77DD',DB:'#639922',PT:'#BA7517',DA:'#1D9
 const NICHO_NAMES={WL:'Weight Loss',ML:'Memória',DB:'Diabetes',PT:'Próstata',DA:'Dores',ED:'Disfunção Erétil',NP:'Nerve Pain',VL:'Visão',RJ:'Rejuvenescimento'};
 const ALL_NICHOS=['WL','ML','DB','PT','DA','NP','ED','VL','RJ'];
 
+const SUPABASE_URL = 'https://dworzfcetqllydpnzsbi.supabase.co';
+const SUPABASE_KEY = 'sb_publishable_SSDXOOiqFFL-VvMwJLSK6A_YLHhS6zP';
+
 function esc(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;')}
 function fmtDate(d){if(!d)return'';return new Date(d+'T12:00:00').toLocaleDateString('pt-BR',{day:'2-digit',month:'2-digit',year:'2-digit'})}
 function getLocalDate(){const d=new Date();const pad=n=>String(n).padStart(2,'0');return`${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`}
@@ -385,13 +388,28 @@ function getJanela(hora){
   return'noite';
 }
 
-function carregarDadosDoDia(dataStr){
+async function carregarDadosDoDia(dataStr){
   if(!dataStr)return;
-  const raw=localStorage.getItem('funil-tracker-v1');
-  console.log('localStorage funil-tracker-v1:', raw ? JSON.parse(raw).length+' funis' : 'VAZIO');
-  const funnels=JSON.parse(raw||'[]');
-  const dodia=funnels.filter(f=>f.data===dataStr);
-  console.log('Funis do dia',dataStr,':',dodia.length);
+
+  let funnels=[];
+
+  try{
+    const res=await fetch(
+      `${SUPABASE_URL}/rest/v1/funis?data=eq.${dataStr}&select=nicho,hora`,
+      {headers:{'apikey':SUPABASE_KEY,'Authorization':`Bearer ${SUPABASE_KEY}`}}
+    );
+    if(res.ok){
+      funnels=await res.json();
+    } else {
+      throw new Error('Supabase HTTP '+res.status);
+    }
+  }catch(e){
+    console.warn('Supabase indisponível, usando localStorage:', e.message);
+    const raw=localStorage.getItem('funil-tracker-v1');
+    funnels=JSON.parse(raw||'[]').filter(f=>f.data===dataStr);
+  }
+
+  console.log('Funis do dia',dataStr,':',funnels.length);
 
   // Zerar contadores e marcar auto
   ['manha','tarde','noite'].forEach(j=>{
@@ -399,7 +417,7 @@ function carregarDadosDoDia(dataStr){
     dailyData[j].nichoAuto={};
   });
 
-  dodia.forEach(f=>{
+  funnels.forEach(f=>{
     const janela=getJanela(f.hora);
     const nicho=f.nicho||'OUTROS';
     dailyData[janela].nichos[nicho]=(dailyData[janela].nichos[nicho]||0)+1;
@@ -419,9 +437,9 @@ function carregarDadosDoDia(dataStr){
 }
 
 // Carregar ao inicializar e ao trocar data
-carregarDadosDoDia(today);
+carregarDadosDoDia(today).catch(console.error);
 document.getElementById('d-data').addEventListener('change', function() {
-  carregarDadosDoDia(this.value);
+  carregarDadosDoDia(this.value).catch(console.error);
 });
 
 function generateDaily(){
