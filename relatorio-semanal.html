@@ -315,7 +315,8 @@ let dailyData={
 let selectedFonte='NATIVE';
 
 // Data padrão = hoje
-document.getElementById('d-data').value=new Date().toISOString().slice(0,10);
+const today = new Date().toISOString().slice(0, 10);
+document.getElementById('d-data').value = today;
 
 // Fonte picker
 document.querySelectorAll('.fonte-btn').forEach(btn=>{
@@ -415,8 +416,10 @@ function carregarDadosDoDia(dataStr){
 }
 
 // Carregar ao inicializar e ao trocar data
-carregarDadosDoDia(document.getElementById('d-data').value);
-document.getElementById('d-data').addEventListener('change',e=>carregarDadosDoDia(e.target.value));
+carregarDadosDoDia(today);
+document.getElementById('d-data').addEventListener('change', function() {
+  carregarDadosDoDia(this.value);
+});
 
 function generateDaily(){
   const data=document.getElementById('d-data').value;
