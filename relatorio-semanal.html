@@ -286,6 +286,7 @@ const ALL_NICHOS=['WL','ML','DB','PT','DA','NP','ED','VL','RJ'];
 
 function esc(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;')}
 function fmtDate(d){if(!d)return'';return new Date(d+'T12:00:00').toLocaleDateString('pt-BR',{day:'2-digit',month:'2-digit',year:'2-digit'})}
+function getLocalDate(){const d=new Date();const pad=n=>String(n).padStart(2,'0');return`${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`}
 
 // ── APP TABS ──────────────────────────────────────────────────────────────
 document.querySelectorAll('.app-tab').forEach(tab=>{
@@ -315,7 +316,7 @@ let dailyData={
 let selectedFonte='NATIVE';
 
 // Data padrão = hoje
-const today = new Date().toISOString().slice(0, 10);
+const today = getLocalDate();
 document.getElementById('d-data').value = today;
 
 // Fonte picker
@@ -386,9 +387,11 @@ function getJanela(hora){
 
 function carregarDadosDoDia(dataStr){
   if(!dataStr)return;
-  let funnels=[];
-  try{funnels=JSON.parse(localStorage.getItem('funil-tracker-v1')||'[]');}catch{}
+  const raw=localStorage.getItem('funil-tracker-v1');
+  console.log('localStorage funil-tracker-v1:', raw ? JSON.parse(raw).length+' funis' : 'VAZIO');
+  const funnels=JSON.parse(raw||'[]');
   const dodia=funnels.filter(f=>f.data===dataStr);
+  console.log('Funis do dia',dataStr,':',dodia.length);
 
   // Zerar contadores e marcar auto
   ['manha','tarde','noite'].forEach(j=>{
