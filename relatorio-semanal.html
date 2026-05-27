@@ -382,11 +382,19 @@ function renderJanelas(){
 
 // ── Integração com Funil Tracker (localStorage) ───────────────────────────
 
-function getJanela(hora){
-  if(!hora)return'noite';
-  const h=parseInt(hora.split(':')[0]);
-  if(h<12)return'manha';
-  if(h<18)return'tarde';
+function getJanela(hora,createdAt){
+  if(hora){
+    const h=parseInt(hora.split(':')[0]);
+    if(h<12)return'manha';
+    if(h<18)return'tarde';
+    return'noite';
+  }
+  if(createdAt){
+    const h=new Date(createdAt).getHours();
+    if(h<12)return'manha';
+    if(h<18)return'tarde';
+    return'noite';
+  }
   return'noite';
 }
 
@@ -405,7 +413,7 @@ async function carregarDadosDoDia(dataStr){
   try{
     const {data,error}=await _sb
       .from('funis')
-      .select('nicho,hora')
+      .select('nicho,hora,created_at')
       .eq('data',dataStr);
     if(error)throw error;
     funnels=data||[];
@@ -417,7 +425,7 @@ async function carregarDadosDoDia(dataStr){
   }
 
   funnels.forEach(f=>{
-    const janela=getJanela(f.hora);
+    const janela=getJanela(f.hora,f.created_at);
     const nicho=f.nicho||'OUTROS';
     dailyData[janela].nichos[nicho]=(dailyData[janela].nichos[nicho]||0)+1;
     dailyData[janela].nichoAuto[nicho]=true;
