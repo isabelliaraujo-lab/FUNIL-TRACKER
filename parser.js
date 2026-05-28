@@ -60,7 +60,15 @@ const Parser = (() => {
     return isUrlLine(line) && /facebook\.com/i.test(line);
   }
 
+  function isInstagramLine(line) {
+    return isUrlLine(line) && /instagram\.com/i.test(line);
+  }
+
   function extractUrl(line) {
+    // Markdown: [texto](url)
+    const md = line.match(/\[.*?\]\((https?:\/\/[^)]+)\)/);
+    if (md) return md[1].trim();
+
     // Com underscores: __https://...__ ou __https://...
     const m1 = line.match(/__+(https?:\/\/.+?)__+\s*$/i) ||
                 line.match(/__+(https?:\/\/.+?)__*/i);
@@ -142,31 +150,38 @@ const Parser = (() => {
       }
     }
 
-    // REGRA 2 — URL do anúncio (Facebook)
-    const fbLine = lines.find(isFacebookLine);
-    if (fbLine) {
-      urlAnuncio = extractUrl(fbLine) || '';
+    // REGRA 2 — URL do anúncio (Facebook ou Instagram como fallback)
+    const adLine = lines.find(isFacebookLine) || lines.find(isInstagramLine);
+    if (adLine) {
+      urlAnuncio = extractUrl(adLine) || '';
       urlAnuncioFull = urlAnuncio;
 
-      // Remove a URL da linha para buscar views e famoso no restante
-      const after = fbLine
-        .replace(/__+(https?:\/\/.+?)(__+)?/i, '')
-        .replace(/^\s*https?:\/\/[^\s]+/i, '')
-        .trim();
+      // Views e famoso só existem em linhas Facebook — pular se for Instagram
+      if (isFacebookLine(adLine)) {
+        const after = adLine
+          .replace(/__+(https?:\/\/.+?)(__+)?/i, '')
+          .replace(/^\s*https?:\/\/[^\s]+/i, '')
+          .trim();
 
-      const vm = after.match(/([\d]+[,.][\d]+\s*[KkMm]?|[\d]+\s*[KkMm]+)/i);
-      if (vm) views = parseViews(vm[1]);
+        const vm = after.match(/([\d]+[,.][\d]+\s*[KkMm]?|[\d]+\s*[KkMm]+)/i);
+        if (vm) views = parseViews(vm[1]);
 
-      const tokens = after.replace(vm ? vm[0] : '', '').trim().split(/\s+/);
-      for (const t of tokens) {
-        const c = stripInvisible(t).toUpperCase();
-        if (c === 'F') { famoso = 'sim'; break; }
-        if (c === 'S') { famoso = 'nao'; break; }
+        const tokens = after.replace(vm ? vm[0] : '', '').trim().split(/\s+/);
+        for (const t of tokens) {
+          const c = stripInvisible(t).toUpperCase();
+          if (c === 'F') { famoso = 'sim'; break; }
+          if (c === 'S') { famoso = 'nao'; break; }
+        }
       }
     }
 
-    // REGRA 4 — URLs finais (não Facebook)
-    const finalLines = lines.filter(l => isUrlLine(l) && !isFacebookLine(l));
+    // REGRA 4 — URLs finais (não Facebook, não Instagram, não ig_redirect)
+    const finalLines = lines.filter(l =>
+      isUrlLine(l) &&
+      !isFacebookLine(l) &&
+      !isInstagramLine(l) &&
+      !/ig_redirect/i.test(l)
+    );
     const finalUrls  = finalLines.map(extractUrl).filter(Boolean);
 
     if (finalUrls.length === 1) {
