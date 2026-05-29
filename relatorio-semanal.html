@@ -398,10 +398,14 @@ function getJanela(hora,createdAt){
   return'noite';
 }
 
+let _loadToken=0;
+
 async function carregarDadosDoDia(dataStr){
   if(!dataStr)return;
 
-  // Reset completo antes de qualquer operação
+  const token=++_loadToken;
+
+  // Reset imediato
   dailyData={
     manha:{nichos:{},nichoAuto:{},nichoAlta:'',feeling:''},
     tarde:{nichos:{},nichoAuto:{},nichoAlta:'',feeling:''},
@@ -415,10 +419,14 @@ async function carregarDadosDoDia(dataStr){
       .from('funis')
       .select('nicho,hora,created_at')
       .eq('data',dataStr);
+
+    if(token!==_loadToken)return;
+
     if(error)throw error;
     funnels=data||[];
     console.log('Funis do dia',dataStr,':',funnels.length);
   }catch(e){
+    if(token!==_loadToken)return;
     console.warn('Supabase indisponível, usando localStorage:', e.message);
     const raw=localStorage.getItem('funil-tracker-v1');
     funnels=JSON.parse(raw||'[]').filter(f=>f.data===dataStr);
@@ -431,7 +439,6 @@ async function carregarDadosDoDia(dataStr){
     dailyData[janela].nichoAuto[nicho]=true;
   });
 
-  // Nicho em alta automático por janela
   ['manha','tarde','noite'].forEach(j=>{
     const entries=Object.entries(dailyData[j].nichos);
     if(entries.length){
