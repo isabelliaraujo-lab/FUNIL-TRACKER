@@ -291,7 +291,8 @@ document.addEventListener('DOMContentLoaded', async () => {
       modal.hidden = false;
       function onConfirm() {
         const data = document.getElementById('import-modal-date').value || hoje;
-        modal.hidden = true; btnConfirm.disabled = false; cleanup(); resolve(data);
+        const hora = document.getElementById('import-modal-janela').value || '09:00';
+        modal.hidden = true; btnConfirm.disabled = false; cleanup(); resolve({ data, hora });
       }
       function onCancel() {
         modal.hidden = true; btnConfirm.disabled = false; cleanup(); resolve(null);
@@ -357,10 +358,9 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (!parsed.length) { showToast('Não foi possível extrair nenhum funil válido.'); return; }
     const novos      = parsed;
     const duplicados = [];
-    const dataEscolhida = await pedirDataImport(novos, duplicados);
-    if (dataEscolhida === null) return;
-    const horaImport = new Date().toTimeString().slice(0, 5);
-    novos.forEach(f => { f.id = Storage.genId(); f.data = dataEscolhida; f.hora = horaImport; });
+    const resultado = await pedirDataImport(novos, duplicados);
+    if (resultado === null) return;
+    novos.forEach(f => { f.id = Storage.genId(); f.data = resultado.data; f.hora = resultado.hora; });
     funnels = [...novos, ...funnels];
     saveFunnels(funnels);
     Tabela.renderTable();
