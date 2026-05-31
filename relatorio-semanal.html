@@ -171,6 +171,7 @@ select option{background:#1a1a24}
 <nav class="app-nav">
   <button class="app-tab active" data-panel="diario">📊 Diário</button>
   <button class="app-tab" data-panel="semanal">📋 Semanal</button>
+  <button class="app-tab" data-panel="historico">📁 Histórico</button>
 </nav>
 
 <!-- ══════════════ PAINEL DIÁRIO ══════════════ -->
@@ -211,6 +212,7 @@ select option{background:#1a1a24}
     <div class="section-sub">Relatório gerado</div>
     <div class="daily-report-output" id="daily-text"></div>
     <button class="daily-copy-btn" onclick="copyDaily()">⎘ Copiar para WhatsApp / ClickUp</button>
+    <button class="daily-copy-btn" style="border-color:var(--accent2);color:var(--accent2)" onclick="salvarDiario()">💾 Salvar no histórico</button>
   </div>
 </div>
 </div>
@@ -271,12 +273,24 @@ select option{background:#1a1a24}
       <button class="btn-back" onclick="backToWeeklyForm()">← Editar</button>
       <button class="btn-copy-report" onclick="copyWeekly()">⎘ Copiar para ClickUp</button>
       <button class="btn-print" onclick="window.print()">↓ Salvar PDF</button>
+      <button class="btn-print" style="border-color:#00c47a;color:#00c47a" onclick="salvarSemanal()">💾 Salvar no histórico</button>
     </div>
     <div id="report-weekly-content"></div>
   </div>
   </div>
 
 </div><!-- /panel-semanal -->
+
+<!-- ══════════════ PAINEL HISTÓRICO ══════════════ -->
+<div class="app-panel" id="panel-historico">
+  <div class="page-wrap">
+    <div class="form-header">
+      <div class="eyebrow">⚡ Funil Tracker</div>
+      <h1>Histórico<br><em style="font-style:italic;color:var(--muted)">de Relatórios</em></h1>
+    </div>
+    <div id="historico-lista"></div>
+  </div>
+</div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script>
@@ -300,6 +314,7 @@ document.querySelectorAll('.app-tab').forEach(tab=>{
     document.querySelectorAll('.app-panel').forEach(p=>p.classList.remove('active'));
     tab.classList.add('active');
     document.getElementById('panel-'+tab.dataset.panel).classList.add('active');
+    if(tab.dataset.panel==='historico') carregarHistorico();
   });
 });
 
@@ -781,6 +796,115 @@ function showWeeklyCopyFeedback(){
   btn.textContent='✓ Copiado!';
   setTimeout(()=>btn.textContent=orig,2000);
 }
+
+// ══════════════════════════════════════════════════════════════════════════
+// HISTÓRICO
+// ══════════════════════════════════════════════════════════════════════════
+
+async function salvarDiario(){
+  const data=document.getElementById('d-data').value;
+  const resp=document.getElementById('d-resp').value.trim()||'—';
+  const titulo=`Diário ${fmtDate(data)} — ${resp}`;
+  const html=document.getElementById('daily-text').textContent;
+
+  const {error}=await _sb.from('relatorios').insert({
+    tipo:'diario',
+    titulo,
+    conteudo:{data,resp,fonte:selectedFonte,dailyData},
+    html_gerado:html,
+  });
+
+  if(error){alert('Erro ao salvar: '+error.message);return;}
+  alert('✓ Relatório salvo no histórico!');
+  carregarHistorico();
+}
+
+async function salvarSemanal(){
+  const de=document.getElementById('meta-de').value;
+  const ate=document.getElementById('meta-ate').value;
+  const resp=document.getElementById('meta-resp').value.trim()||'—';
+  const titulo=`Semanal ${fmtDate(de)}${ate?' – '+fmtDate(ate):''} — ${resp}`;
+  const html=document.getElementById('report-weekly-content').innerHTML;
+
+  const {error}=await _sb.from('relatorios').insert({
+    tipo:'semanal',
+    titulo,
+    conteudo:{de,ate,resp,activeNichos,nichoData},
+    html_gerado:html,
+  });
+
+  if(error){alert('Erro ao salvar: '+error.message);return;}
+  alert('✓ Relatório salvo no histórico!');
+  carregarHistorico();
+}
+
+async function carregarHistorico(){
+  const lista=document.getElementById('historico-lista');
+  if(!lista)return;
+  lista.innerHTML='<p style="color:var(--muted);font-size:13px">Carregando...</p>';
+
+  const {data,error}=await _sb
+    .from('relatorios')
+    .select('id,tipo,titulo,created_at')
+    .order('created_at',{ascending:false});
+
+  if(error||!data?.length){
+    lista.innerHTML='<p style="color:var(--muted);font-size:13px">Nenhum relatório salvo ainda.</p>';
+    return;
+  }
+
+  lista.innerHTML=data.map(r=>`
+    <div style="background:var(--bg2);border:0.5px solid var(--border2);border-radius:12px;padding:16px 20px;margin-bottom:10px;display:flex;align-items:center;justify-content:space-between;gap:12px">
+      <div>
+        <div style="font-size:13px;font-weight:700;margin-bottom:4px">${esc(r.titulo)}</div>
+        <div style="font-size:11px;color:var(--muted);font-family:'DM Mono',monospace">
+          ${r.tipo==='diario'?'📊 Diário':'📋 Semanal'} · ${new Date(r.created_at).toLocaleDateString('pt-BR')}
+        </div>
+      </div>
+      <div style="display:flex;gap:8px;flex-shrink:0">
+        <button class="btn-back" style="padding:7px 14px;font-size:12px"
+          onclick="verRelatorio('${r.id}')">Ver</button>
+        <button class="btn-back" style="padding:7px 14px;font-size:12px"
+          onclick="copiarLinkRelatorio('${r.id}')">🔗 Link</button>
+      </div>
+    </div>
+  `).join('');
+}
+
+async function verRelatorio(id){
+  const {data,error}=await _sb
+    .from('relatorios')
+    .select('*')
+    .eq('id',id)
+    .single();
+
+  if(error||!data){alert('Erro ao carregar relatório.');return;}
+
+  const overlay=document.createElement('div');
+  overlay.style.cssText='position:fixed;inset:0;background:var(--bg);z-index:999;overflow-y:auto;padding:40px 24px';
+  overlay.innerHTML=`
+    <div style="max-width:860px;margin:0 auto">
+      <div style="display:flex;gap:10px;margin-bottom:32px">
+        <button class="btn-back" onclick="this.closest('[style]').remove()">← Fechar</button>
+        <button class="btn-copy-report" onclick="copiarLinkRelatorio('${id}')">🔗 Copiar link</button>
+      </div>
+      ${data.tipo==='diario'
+        ?`<pre class="daily-report-output">${esc(data.html_gerado)}</pre>`
+        :data.html_gerado}
+    </div>
+  `;
+  document.body.appendChild(overlay);
+}
+
+function copiarLinkRelatorio(id){
+  const url=`${location.origin}${location.pathname}?id=${id}`;
+  navigator.clipboard.writeText(url).then(()=>alert('✓ Link copiado!'));
+}
+
+// Abrir relatório direto pela URL (?id=UUID)
+const _urlParams=new URLSearchParams(window.location.search);
+const _relId=_urlParams.get('id');
+if(_relId) verRelatorio(_relId);
 </script>
 </body>
 </html>
