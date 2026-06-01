@@ -626,6 +626,16 @@ const Analise = (() => {
     </div>`;
   }
 
+  // ── Atualiza apenas a lista do BLOCO 2 ───────────────────────────────
+
+  function refreshDomAnuncioList(allFunis) {
+    const listEl = document.getElementById('analise-dom-anuncio-list');
+    if (!listEl) return;
+    const nichoFiltro = document.getElementById('analise-dom-nicho')?.value || '';
+    const funisFiltrados = nichoFiltro ? allFunis.filter(f => f.nicho === nichoFiltro) : allFunis;
+    listEl.innerHTML = intelDomFinalSortableHTML(funisFiltrados);
+  }
+
   // ── Painel de inteligência do período ────────────────────────────────
 
   function renderIntel() {
@@ -643,14 +653,21 @@ const Analise = (() => {
             ${intelNichosHTML(funis)}
           </div>
           <div class="escalada-card">
-            <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:14px">
+            <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:14px;flex-wrap:wrap">
               <span class="escalada-card__title" style="margin-bottom:0">Domínios do anúncio</span>
-              <div style="display:flex;gap:4px">
+              <div style="display:flex;gap:4px;align-items:center;flex-wrap:wrap">
                 <button class="${sortCls('funis')}" data-sort-dom-final="funis" style="font-size:10px;padding:2px 8px">Por funis</button>
                 <button class="${sortCls('biblioteca')}" data-sort-dom-final="biblioteca" style="font-size:10px;padding:2px 8px">Por biblioteca</button>
+                <select id="analise-dom-nicho" style="background:var(--bg);border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:11px;padding:4px 8px;cursor:pointer;margin-left:4px">
+                  <option value="">Todos os nichos</option>
+                  <option>WL</option><option>DB</option><option>ML</option>
+                  <option>ED</option><option>NP</option><option>DA</option>
+                  <option>PT</option><option>VL</option><option>TN</option>
+                  <option>LG</option><option>RJ</option><option>RE</option>
+                </select>
               </div>
             </div>
-            ${intelDomFinalSortableHTML(funis)}
+            <div id="analise-dom-anuncio-list">${intelDomFinalSortableHTML(funis)}</div>
           </div>
           <div class="escalada-card">
             <div class="escalada-card__title">Top 3 produtos por nicho</div>
@@ -714,9 +731,16 @@ const Analise = (() => {
       const sortBtn = e.target.closest('[data-sort-dom-final]');
       if (!sortBtn) return;
       _domFinalSort = sortBtn.dataset.sortDomFinal;
-      renderIntel();
+      intelEl.querySelectorAll('[data-sort-dom-final]').forEach(btn => {
+        btn.className = `btn btn-sm ${btn.dataset.sortDomFinal === _domFinalSort ? 'btn-primary' : 'btn-secondary'}`;
+      });
+      refreshDomAnuncioList(GlobalFilters.filter(_getFunnels()));
     });
     intelEl.addEventListener('change', e => {
+      if (e.target.id === 'analise-dom-nicho') {
+        refreshDomAnuncioList(GlobalFilters.filter(_getFunnels()));
+        return;
+      }
       const inp = e.target.closest('.dom-lib-input');
       if (!inp) return;
       saveAdsLibraryCount(inp.dataset.dom, inp.value.trim());
