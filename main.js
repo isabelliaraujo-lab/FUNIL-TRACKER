@@ -606,3 +606,5 @@ document.addEventListener('DOMContentLoaded', async () => {
   Escalada.refresh();
 
 });
+
+window.abrirDetalhe = abrirDetalhe;
