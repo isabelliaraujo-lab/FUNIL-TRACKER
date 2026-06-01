@@ -107,7 +107,7 @@ const Parser = (() => {
     let views = null, famoso = null;
     let domAnuncio = null, domAnuncioFull = null;
     let domFinal = null, domFinalFull = null, split = false;
-    let obs = '', gasto = null, conversao = null, moeda = 'BRL';
+    let obs = '', gasto = null, conversao = null, moeda = 'BRL', urlVsl = null;
 
     // REGRA 1 — linha 0: adId | conta | nicho | produto
     if (lines.length > 0) {
@@ -180,8 +180,18 @@ const Parser = (() => {
       isUrlLine(l) &&
       !isFacebookLine(l) &&
       !isInstagramLine(l) &&
-      !/ig_redirect/i.test(l)
+      !/ig_redirect/i.test(l) &&
+      !/converteai\.net/i.test(l)
     );
+
+    // REGRA 5 — URL da VSL (linha contendo converteai.net e .m3u8)
+    const vslLine = lines.find(l =>
+      /converteai\.net/i.test(l) && /\.m3u8/i.test(l)
+    );
+    if (vslLine) {
+      const vslMatch = vslLine.match(/(https?:\/\/[^\s]+\.m3u8[^\s]*)/i);
+      if (vslMatch) urlVsl = vslMatch[1].trim();
+    }
     const finalUrls  = finalLines.map(extractUrl).filter(Boolean);
 
     if (finalUrls.length === 1) {
@@ -196,7 +206,7 @@ const Parser = (() => {
     }
 
     return { adId, data, conta, nicho, produto, urlAnuncio, urlAnuncioFull, views, famoso,
-             domAnuncio, domAnuncioFull, domFinal, domFinalFull, split, obs, gasto, conversao, moeda };
+             domAnuncio, domAnuncioFull, domFinal, domFinalFull, split, obs, gasto, conversao, moeda, urlVsl };
   }
 
   // ── Preview dos campos extraídos ───────────────────────────────────────
@@ -213,6 +223,7 @@ const Parser = (() => {
     { key: 'domFinal',       label: 'Dom. Final' },
     { key: 'domFinalFull',   label: 'URL Final',         truncate: 60 },
     { key: 'split',          label: 'Split',             fmt: v => v ? 'Sim' : 'Não' },
+    { key: 'urlVsl',         label: 'URL VSL',           truncate: 60 },
   ];
 
   function buildPreviewHTML(data) {
