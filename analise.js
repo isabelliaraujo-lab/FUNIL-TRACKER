@@ -492,30 +492,17 @@ const Analise = (() => {
     }).join('');
   }
 
-  // ── BLOCO 2: Domínios finais (sortable + ads na biblioteca) ───────────
+  // ── BLOCO 2: Domínios do anúncio (sortable + ads na biblioteca) ──────
 
   function intelDomFinalSortableHTML(funis) {
     const domMap = {};
     funis.forEach(f => {
-      if (!f.domFinal) return;
-      const doms = (f.split === true || f.split === 'true')
-        ? f.domFinal.split(' / ').map(d => d.trim()).filter(Boolean)
-        : [f.domFinal.trim()];
-      doms.forEach(d => {
-        if (!domMap[d]) domMap[d] = { count: 0, produtos: new Set(), urls: [] };
-        domMap[d].count++;
-        if (f.produto && !Storage.isProdutoDesconhecido(f.produto)) domMap[d].produtos.add(f.produto);
-        if (f.domFinalFull) {
-          f.domFinalFull.split('\n').forEach(u => {
-            u = u.trim();
-            if (!u) return;
-            try {
-              const h = new URL(u).hostname.replace(/^www\./i, '').toUpperCase();
-              if (h === d && !domMap[d].urls.includes(u)) domMap[d].urls.push(u);
-            } catch {}
-          });
-        }
-      });
+      if (!f.domAnuncio) return;
+      const d = f.domAnuncio.trim();
+      if (!domMap[d]) domMap[d] = { count: 0, produtos: new Set(), url: null };
+      domMap[d].count++;
+      if (f.produto && !Storage.isProdutoDesconhecido(f.produto)) domMap[d].produtos.add(f.produto);
+      if (!domMap[d].url && f.domAnuncioFull) domMap[d].url = f.domAnuncioFull;
     });
 
     const counts = getAdsLibraryCounts();
@@ -544,7 +531,7 @@ const Analise = (() => {
       const libCount = counts[dom] != null ? counts[dom] : '';
       const domLower = dom.toLowerCase().replace(/^www\./i, '');
       const fbLibUrl = `https://www.facebook.com/ads/library/?active_status=active&ad_type=all&country=ALL&q=${encodeURIComponent(domLower)}&search_type=keyword_unordered`;
-      const domUrl   = d.urls[0] || ('https://' + domLower);
+      const domUrl   = d.url || ('https://' + domLower);
 
       return `<div class="rank-item" style="align-items:flex-start;gap:6px">
         <span class="rank-pos ${i < 3 ? 'top' : ''}">#${i + 1}</span>
@@ -657,7 +644,7 @@ const Analise = (() => {
           </div>
           <div class="escalada-card">
             <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:14px">
-              <span class="escalada-card__title" style="margin-bottom:0">Domínios finais</span>
+              <span class="escalada-card__title" style="margin-bottom:0">Domínios do anúncio</span>
               <div style="display:flex;gap:4px">
                 <button class="${sortCls('funis')}" data-sort-dom-final="funis" style="font-size:10px;padding:2px 8px">Por funis</button>
                 <button class="${sortCls('biblioteca')}" data-sort-dom-final="biblioteca" style="font-size:10px;padding:2px 8px">Por biblioteca</button>
