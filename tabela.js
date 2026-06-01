@@ -676,6 +676,10 @@ const Tabela = (() => {
     renderTable();
   }
 
+  function openEditModalById(id) {
+    openEditModal(id);
+  }
+
   // ── API pública ───────────────────────────────────────────────────────
-  return { init, renderTable, renderDashboard, toggleSort };
+  return { init, renderTable, renderDashboard, toggleSort, openEditModalById };
 })();
