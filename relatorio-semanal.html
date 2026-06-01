@@ -288,6 +288,9 @@ select option{background:#1a1a24}
       <div class="eyebrow">⚡ Funil Tracker</div>
       <h1>Histórico<br><em style="font-style:italic;color:var(--muted)">de Relatórios</em></h1>
     </div>
+    <div style="display:flex;justify-content:flex-end;margin-bottom:20px">
+      <button class="btn-copy-report" onclick="copiarLinkHistorico()">🔗 Compartilhar histórico</button>
+    </div>
     <div id="historico-lista"></div>
   </div>
 </div>
@@ -864,8 +867,6 @@ async function carregarHistorico(){
       <div style="display:flex;gap:8px;flex-shrink:0">
         <button class="btn-back" style="padding:7px 14px;font-size:12px"
           onclick="verRelatorio('${r.id}')">Ver</button>
-        <button class="btn-back" style="padding:7px 14px;font-size:12px"
-          onclick="copiarLinkRelatorio('${r.id}')">🔗 Link</button>
       </div>
     </div>
   `).join('');
@@ -901,10 +902,28 @@ function copiarLinkRelatorio(id){
   navigator.clipboard.writeText(url).then(()=>alert('✓ Link copiado!'));
 }
 
-// Abrir relatório direto pela URL (?id=UUID)
+function copiarLinkHistorico(){
+  const url=`${location.origin}${location.pathname}?historico=1`;
+  navigator.clipboard.writeText(url).then(()=>{
+    const btn=document.querySelector('[onclick="copiarLinkHistorico()"]');
+    const orig=btn.textContent;
+    btn.textContent='✓ Link copiado!';
+    setTimeout(()=>btn.textContent=orig,2000);
+  });
+}
+
+// Abrir direto pela URL (?id=UUID ou ?historico=1)
 const _urlParams=new URLSearchParams(window.location.search);
 const _relId=_urlParams.get('id');
-if(_relId) verRelatorio(_relId);
+if(_relId){
+  verRelatorio(_relId);
+} else if(_urlParams.get('historico')==='1'){
+  document.querySelectorAll('.app-tab').forEach(t=>t.classList.remove('active'));
+  document.querySelectorAll('.app-panel').forEach(p=>p.classList.remove('active'));
+  document.querySelector('[data-panel="historico"]').classList.add('active');
+  document.getElementById('panel-historico').classList.add('active');
+  carregarHistorico();
+}
 </script>
 </body>
 </html>
