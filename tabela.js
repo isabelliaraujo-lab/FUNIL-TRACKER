@@ -386,6 +386,7 @@ const Tabela = (() => {
     set('e-domAnuncioFull', f.domAnuncioFull || '');
     set('e-domFinal',     f.domFinal     || '');
     set('e-domFinalFull', f.domFinalFull || '');
+    set('e-urlVsl',       f.urlVsl      || '');
     set('e-split',        isSplit(f) ? 'true' : 'false');
     set('e-obs',          f.obs          || '');
 
@@ -644,6 +645,7 @@ const Tabela = (() => {
         domAnuncioFull: val('e-domAnuncioFull') || (domAnuncio ? 'https://' + domAnuncio.toLowerCase() : ''),
         domFinal,
         domFinalFull,
+        urlVsl:         val('e-urlVsl') || null,
         split:          splitVal,
         obs:            val('e-obs'),
       });

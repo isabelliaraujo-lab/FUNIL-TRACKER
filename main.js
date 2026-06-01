@@ -218,6 +218,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     const funnel = {
       id: Storage.genId(), data: v('m-data'), hora: v('m-hora') || null, conta, nicho,
       produto: produto.toUpperCase(), urlAnuncio: urlAn, urlAnuncioFull: urlAn,
+      urlVsl: v('m-urlVsl') || null,
       views: viewsRaw ? Parser.parseViews(viewsRaw) : null,
       famoso: v('m-famoso') || null, domAnuncio, domAnuncioFull,
       domFinal, domFinalFull, split: splitVal, obs: v('m-obs'),

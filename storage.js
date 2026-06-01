@@ -81,6 +81,7 @@ const Storage = (() => {
     'Produto',
     'URL anúncio',
     'Visualizações',
+    'VSL',
     'Famoso',
     'Domínio anúncio',
     'URL anúncio completa',
@@ -108,6 +109,7 @@ const Storage = (() => {
       f.produto,
       f.urlAnuncio,
       f.views ?? '',
+      f.urlVsl ?? '',
       f.famoso ?? '',
       f.domAnuncio,
       f.urlAnuncioFull ?? f.urlAnuncio,
@@ -181,6 +183,7 @@ const Storage = (() => {
     const iProduto   = col(h => h === 'produto');
     const iUrlAn     = col(h => h.includes('url an') && !h.includes('complet'));
     const iViews     = col(h => h.includes('visual'));
+    const iVsl       = col(h => h.includes('vsl'));
     const iFamoso    = col(h => h === 'famoso');
     const iDomAn     = col(h => h.includes('dominio') && h.includes('anun'));
     const iUrlAnFull = col(h => h.includes('url an') &&  h.includes('complet'));
@@ -218,6 +221,7 @@ const Storage = (() => {
           urlAnuncio:    get(row, iUrlAn),
           urlAnuncioFull: get(row, iUrlAnFull) || get(row, iUrlAn),
           views:         viewsStr ? (parseInt(viewsStr, 10) || null) : null,
+          urlVsl:        get(row, iVsl) || null,
           famoso:        get(row, iFamoso) || null,
           domAnuncio,
           domAnuncioFull: domAnuncio ? 'https://' + domAnuncio.toLowerCase() : '',
