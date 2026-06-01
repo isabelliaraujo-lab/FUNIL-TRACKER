@@ -12,7 +12,8 @@ const Analise = (() => {
   let _pgProduto    = 1;
   const _ANALISE_PER = 10;
 
-  const esc = Storage.escHtml;
+  const esc      = Storage.escHtml;
+  const fmtViews = v => Parser.formatViews(v);
 
   // ── Ads na biblioteca (localStorage) ─────────────────────────────────
 
@@ -626,6 +627,126 @@ const Analise = (() => {
     </div>`;
   }
 
+  // ── BLOCO 5: VSLs em destaque ─────────────────────────────────────────
+
+  function intelVslHTML(funis) {
+    const map = {};
+    funis.forEach(f => {
+      if (!f.urlVsl) return;
+      const key = f.urlVsl.trim();
+      if (!map[key]) map[key] = { urlVsl: key, funis: 0, views: 0, nichos: new Set(), produtos: new Set(), ids: [] };
+      map[key].funis++;
+      map[key].views += f.views || 0;
+      if (f.nicho) map[key].nichos.add(f.nicho);
+      if (f.produto && !Storage.isProdutoDesconhecido(f.produto)) map[key].produtos.add(f.produto);
+      map[key].ids.push(f.id);
+    });
+
+    const items = Object.values(map)
+      .map(v => ({ ...v, score: v.funis * 10 + Math.floor(v.views / 1000) + v.nichos.size * 5 }))
+      .sort((a, b) => b.score - a.score)
+      .slice(0, 10);
+
+    if (!items.length) return '<p class="analysis-no-results">Nenhuma VSL cadastrada nos funis do período.</p>';
+
+    return items.map((v, i) => {
+      const nichoTags = [...v.nichos].map(n =>
+        `<span class="tag tag-nicho nicho-${esc(n)}" style="font-size:10px;padding:1px 6px">${esc(n)}</span>`
+      ).join('');
+      const prodTags = [...v.produtos].slice(0, 4).map(p =>
+        `<span class="tag" style="font-size:10px">${esc(p)}</span>`
+      ).join('');
+      const verFunisIds = v.ids.join(',');
+      return `
+        <div class="rank-item" style="align-items:flex-start;gap:14px;padding:14px 0">
+          <span class="rank-pos ${i < 3 ? 'top' : ''}">#${i + 1}</span>
+          <div style="flex-shrink:0;width:160px;height:90px;background:#000;border-radius:8px;overflow:hidden;position:relative"
+               data-vsl-url="${esc(v.urlVsl)}">
+            <canvas style="width:100%;height:100%;display:none"></canvas>
+            <div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:#ffffff66;font-size:10px;font-family:monospace">carregando...</div>
+          </div>
+          <div style="flex:1;min-width:0">
+            <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:6px">
+              ${nichoTags}
+              <span style="font-family:monospace;font-size:10px;color:var(--text-muted)">${v.funis} funil(s)</span>
+              <span style="font-family:monospace;font-size:10px;color:#a78bfa">${fmtViews(v.views)} views</span>
+            </div>
+            ${prodTags ? `<div style="display:flex;flex-wrap:wrap;gap:4px;margin-bottom:8px">${prodTags}</div>` : ''}
+            <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+              <a href="${esc(v.urlVsl)}" target="_blank"
+                 style="font-family:monospace;font-size:10px;color:var(--accent);word-break:break-all;max-width:300px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;display:block"
+                 title="${esc(v.urlVsl)}">${esc(v.urlVsl)}</a>
+              <button class="btn btn-sm btn-secondary" style="flex-shrink:0;font-size:11px"
+                onclick="analiseVerFunisVsl('${esc(verFunisIds)}')">Ver funis</button>
+            </div>
+          </div>
+          <div style="text-align:right;flex-shrink:0">
+            <div style="font-size:13px;font-weight:700;color:var(--accent)">Score ${v.score}</div>
+            <div style="font-size:10px;color:var(--text-muted);margin-top:2px">${v.nichos.size} nicho(s)</div>
+          </div>
+        </div>`;
+    }).join('');
+  }
+
+  function capturarFrameVslEmContainer(url, container) {
+    if (!window.Hls || !Hls.isSupported()) return;
+    const canvas  = container.querySelector('canvas');
+    const loading = container.querySelector('div');
+    if (!canvas) return;
+
+    const video = document.createElement('video');
+    video.crossOrigin = 'anonymous';
+    video.muted = true;
+    video.style.display = 'none';
+    document.body.appendChild(video);
+
+    const hls = new Hls({ enableWorker: false });
+    hls.loadSource(url);
+    hls.attachMedia(video);
+
+    let done = false;
+
+    function capture() {
+      if (done) return;
+      done = true;
+      try {
+        canvas.width  = video.videoWidth  || 320;
+        canvas.height = video.videoHeight || 180;
+        canvas.getContext('2d').drawImage(video, 0, 0, canvas.width, canvas.height);
+        canvas.style.display = 'block';
+        if (loading) loading.style.display = 'none';
+      } catch {
+        if (loading) loading.textContent = 'CORS';
+      }
+      cleanup();
+    }
+
+    hls.on(Hls.Events.MANIFEST_PARSED, () => { video.currentTime = 1; video.play().catch(() => {}); });
+    video.addEventListener('seeked', capture);
+    video.addEventListener('loadeddata', () => setTimeout(capture, 300));
+
+    const t = setTimeout(() => { if (loading) loading.textContent = '—'; cleanup(); }, 10000);
+
+    function cleanup() { clearTimeout(t); try { hls.destroy(); } catch {} video.remove(); }
+
+    hls.on(Hls.Events.ERROR, (_, d) => { if (d.fatal) { if (loading) loading.textContent = '—'; cleanup(); } });
+  }
+
+  function initVslFrames() {
+    const observer = new IntersectionObserver(entries => {
+      entries.forEach(entry => {
+        if (!entry.isIntersecting) return;
+        const container = entry.target;
+        const url = container.dataset.vslUrl;
+        if (!url || container.dataset.vslLoaded) return;
+        container.dataset.vslLoaded = '1';
+        observer.unobserve(container);
+        capturarFrameVslEmContainer(url, container);
+      });
+    }, { threshold: 0.1 });
+    document.querySelectorAll('[data-vsl-url]').forEach(el => observer.observe(el));
+  }
+
   // ── Atualiza apenas a lista do BLOCO 2 ───────────────────────────────
 
   function refreshDomAnuncioList(allFunis) {
@@ -677,6 +798,10 @@ const Analise = (() => {
             <div class="escalada-card__title">Top 3 ads por views por nicho</div>
             ${top3ViewsPorNichoHTML(funis)}
           </div>
+          <div class="escalada-card" style="grid-column:span 2">
+            <div class="escalada-card__title">🎬 VSLs em destaque</div>
+            ${intelVslHTML(funis)}
+          </div>
         </div>
       </div>`;
   }
@@ -685,6 +810,7 @@ const Analise = (() => {
 
   function refresh() {
     renderIntel();
+    initVslFrames();
     searchDomAnuncio();
     searchDomFinal();
     searchProduto();
@@ -754,3 +880,27 @@ const Analise = (() => {
 
   return { init, refresh, searchDomAnuncio, searchDomFinal, searchProduto };
 })();
+
+function analiseVerFunisVsl(idsStr) {
+  const ids   = idsStr.split(',');
+  const funis = (window._funnelsGlobal || []).filter(f => ids.includes(f.id));
+  if (!funis.length) return;
+
+  const overlay = document.createElement('div');
+  overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:999;display:flex;align-items:center;justify-content:center;padding:20px';
+  overlay.innerHTML = `
+    <div style="background:var(--bg);border:1px solid var(--border);border-radius:14px;padding:24px;max-width:600px;width:100%;max-height:80vh;overflow-y:auto">
+      <div style="font-size:13px;font-weight:700;margin-bottom:16px">Funis com esta VSL (${funis.length})</div>
+      ${funis.map(f => `
+        <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 0;border-bottom:1px solid var(--border);gap:8px">
+          <div>
+            <div style="font-size:12px;font-weight:600">${Storage.escHtml(f.conta || '—')}</div>
+            <div style="font-size:11px;color:var(--text-muted)">${Storage.escHtml(f.nicho || '')} · ${Storage.escHtml(f.produto || '—')} · ${f.views ? Parser.formatViews(f.views) + ' views' : 'sem views'}</div>
+          </div>
+          <button class="btn btn-sm btn-secondary" onclick="abrirDetalhe('${f.id}');this.closest('div[style*=fixed]').remove()">👁</button>
+        </div>`).join('')}
+      <button class="btn btn-secondary" style="width:100%;margin-top:16px" onclick="this.closest('div[style*=fixed]').remove()">Fechar</button>
+    </div>`;
+  overlay.addEventListener('click', e => { if (e.target === overlay) overlay.remove(); });
+  document.body.appendChild(overlay);
+}
