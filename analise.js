@@ -5,6 +5,7 @@
 const Analise = (() => {
 
   let _getFunnels   = () => [];
+  let _domFinalSort = 'funis';
 
   let _pgDomAnuncio = 1;
   let _pgDomFinal   = 1;
@@ -12,6 +13,21 @@ const Analise = (() => {
   const _ANALISE_PER = 10;
 
   const esc = Storage.escHtml;
+
+  // ── Ads na biblioteca (localStorage) ─────────────────────────────────
+
+  function getAdsLibraryCounts() {
+    try { return JSON.parse(localStorage.getItem('funil-tracker-ads-library-counts') || '{}'); }
+    catch { return {}; }
+  }
+
+  function saveAdsLibraryCount(domain, val) {
+    const d = getAdsLibraryCounts();
+    const n = parseInt(val, 10);
+    if (!isNaN(n) && n > 0) d[domain] = n;
+    else delete d[domain];
+    localStorage.setItem('funil-tracker-ads-library-counts', JSON.stringify(d));
+  }
 
   // ── Helpers de domínio ────────────────────────────────────────────────
 
@@ -113,7 +129,7 @@ const Analise = (() => {
     </div>`;
   }
 
-  // ── Modal de detalhe ──────────────────────────────────────────────────
+  // ── Modal de detalhe (v1) ─────────────────────────────────────────────
 
   function abrirModalFunil(id) {
     const f = _getFunnels().find(x => x.id === id);
@@ -209,8 +225,6 @@ const Analise = (() => {
     </div>`;
   }
 
-  // pills: Array de string | { label, funnelId }
-  // items: [{ title, titleFunnelId?, pills, funnels }]
   function listHtml(items) {
     if (!items.length) return '<p class="analysis-no-results">Nenhum resultado.</p>';
     return `<div class="analysis-list">
@@ -266,9 +280,8 @@ const Analise = (() => {
   // ── Delegação de eventos ──────────────────────────────────────────────
 
   function onAnaliseClick(e) {
-    // Abrir modal de detalhe do funil
     const funiRow = e.target.closest('.af-funil-row[data-funnel-id]');
-    if (funiRow && !e.target.closest('a')) {
+    if (funiRow && !e.target.closest('a') && !e.target.closest('button')) {
       abrirModalFunil(funiRow.dataset.funnelId);
       return;
     }
@@ -279,7 +292,6 @@ const Analise = (() => {
       return;
     }
 
-    // Expand/collapse do card
     const header = e.target.closest('.analysis-item--expandable .analysis-item__header');
     if (header) {
       const item     = header.closest('.analysis-item');
@@ -288,7 +300,7 @@ const Analise = (() => {
     }
   }
 
-  // ── Bloco 1 — por domínio de anúncio ─────────────────────────────────
+  // ── Busca por domínio de anúncio ──────────────────────────────────────
 
   function searchDomAnuncio() {
     const q  = document.getElementById('search-dom-anuncio').value.trim().toUpperCase();
@@ -320,10 +332,10 @@ const Analise = (() => {
     const allItems = Object.entries(byContas)
       .sort((a, b) => b[1].funnels.length - a[1].funnels.length)
       .map(([conta, d]) => ({
-        title:        conta,
+        title:         conta,
         titleFunnelId: d.funnels[0]?.id,
-        pills:        [`${d.funnels.length} funil(s)`, ...[...d.produtos]],
-        funnels:      d.funnels,
+        pills:         [`${d.funnels.length} funil(s)`, ...[...d.produtos]],
+        funnels:       d.funnels,
       }));
 
     const { items: pageItems, page: pg, totalPages, total } = Pagination.paginate(allItems, _pgDomAnuncio, _ANALISE_PER);
@@ -340,7 +352,7 @@ const Analise = (() => {
       Pagination.controlsHTML(pg, totalPages, total, _ANALISE_PER, 'dom-anuncio');
   }
 
-  // ── Bloco 2 — por domínio final ───────────────────────────────────────
+  // ── Busca por domínio final ───────────────────────────────────────────
 
   function searchDomFinal() {
     const q  = document.getElementById('search-dom-final').value.trim().toUpperCase();
@@ -392,7 +404,7 @@ const Analise = (() => {
       Pagination.controlsHTML(pg, totalPages, total, _ANALISE_PER, 'dom-final');
   }
 
-  // ── Bloco 3 — por produto ─────────────────────────────────────────────
+  // ── Busca por produto ─────────────────────────────────────────────────
 
   function searchProduto() {
     const q  = document.getElementById('search-produto').value.trim().toUpperCase();
@@ -458,7 +470,7 @@ const Analise = (() => {
       );
   }
 
-  // ── Painel de inteligência do período ────────────────────────────────
+  // ── BLOCO 1: Nichos em volume ─────────────────────────────────────────
 
   function intelNichosHTML(funis) {
     const counts = {};
@@ -480,7 +492,9 @@ const Analise = (() => {
     }).join('');
   }
 
-  function intelDomFinalHTML(funis) {
+  // ── BLOCO 2: Domínios finais (sortable + ads na biblioteca) ───────────
+
+  function intelDomFinalSortableHTML(funis) {
     const domMap = {};
     funis.forEach(f => {
       if (!f.domFinal) return;
@@ -488,112 +502,151 @@ const Analise = (() => {
         ? f.domFinal.split(' / ').map(d => d.trim()).filter(Boolean)
         : [f.domFinal.trim()];
       doms.forEach(d => {
-        if (!domMap[d]) domMap[d] = { count: 0, produtos: new Set() };
+        if (!domMap[d]) domMap[d] = { count: 0, produtos: new Set(), urls: [] };
         domMap[d].count++;
-        if (!Storage.isProdutoDesconhecido(f.produto)) domMap[d].produtos.add(f.produto);
+        if (f.produto && !Storage.isProdutoDesconhecido(f.produto)) domMap[d].produtos.add(f.produto);
+        if (f.domFinalFull) {
+          f.domFinalFull.split('\n').forEach(u => {
+            u = u.trim();
+            if (!u) return;
+            try {
+              const h = new URL(u).hostname.replace(/^www\./i, '').toUpperCase();
+              if (h === d && !domMap[d].urls.includes(u)) domMap[d].urls.push(u);
+            } catch {}
+          });
+        }
       });
     });
-    const items = Object.entries(domMap).sort((a, b) => b[1].count - a[1].count).slice(0, 10);
+
+    const counts = getAdsLibraryCounts();
+    let items = Object.entries(domMap);
+
+    if (_domFinalSort === 'biblioteca') {
+      items.sort((a, b) => {
+        const ca = counts[a[0]] != null ? counts[a[0]] : -1;
+        const cb = counts[b[0]] != null ? counts[b[0]] : -1;
+        if (ca === -1 && cb === -1) return b[1].count - a[1].count;
+        if (ca === -1) return 1;
+        if (cb === -1) return -1;
+        return cb - ca;
+      });
+    } else {
+      items.sort((a, b) => b[1].count - a[1].count);
+    }
+
+    items = items.slice(0, 15);
     if (!items.length) return '<p class="analysis-no-results">Nenhum domínio final no período.</p>';
+
     return items.map(([dom, d], i) => {
       const prodTags = [...d.produtos].map(p =>
         `<span class="tag" style="font-size:10px;padding:1px 5px">${esc(p)}</span>`
       ).join('');
-      return `<div class="rank-item">
-        <span class="rank-pos ${i < 3 ? 'top' : ''}">#${i + 1}</span>
-        <div style="flex:1;min-width:0;overflow:hidden">
-          <div style="font-weight:600;font-size:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${esc(dom)}">${esc(dom)}</div>
-          ${prodTags ? `<div style="margin-top:3px;display:flex;flex-wrap:wrap;gap:3px">${prodTags}</div>` : ''}
-        </div>
-        <span style="font-size:13px;font-weight:700;color:var(--accent);flex-shrink:0;margin-left:6px">${d.count}</span>
-      </div>`;
-    }).join('');
-  }
+      const libCount = counts[dom] != null ? counts[dom] : '';
+      const domLower = dom.toLowerCase().replace(/^www\./i, '');
+      const fbLibUrl = `https://www.facebook.com/ads/library/?active_status=active&ad_type=all&country=ALL&q=${encodeURIComponent(domLower)}&search_type=keyword_unordered`;
+      const domUrl   = d.urls[0] || ('https://' + domLower);
 
-  function intelTopViewsHTML(funis) {
-    const items = [...funis].filter(f => f.views > 0).sort((a, b) => (b.views || 0) - (a.views || 0)).slice(0, 10);
-    if (!items.length) return '<p class="analysis-no-results">Nenhum funil com views no período.</p>';
-    return items.map((f, i) => {
-      const url      = f.urlAnuncioFull || f.urlAnuncio || '';
-      const prodLabel = Storage.isProdutoDesconhecido(f.produto) ? '—' : esc(f.produto || '—');
-      const nichoTag  = f.nicho
-        ? `<span class="tag tag-nicho nicho-${esc(f.nicho)}" style="font-size:10px;padding:1px 5px">${esc(f.nicho)}</span>`
-        : '';
-      const row = `<div class="rank-item"${url ? ' style="cursor:pointer"' : ''}>
+      return `<div class="rank-item" style="align-items:flex-start;gap:6px">
         <span class="rank-pos ${i < 3 ? 'top' : ''}">#${i + 1}</span>
         <div style="flex:1;min-width:0;overflow:hidden">
-          <div style="font-size:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${esc(f.conta || '—')}">${esc(f.conta || '—')}</div>
-          <div style="display:flex;flex-wrap:wrap;align-items:center;gap:3px;margin-top:2px">
-            ${nichoTag}
-            <span style="font-size:10px;color:var(--text-muted)">${prodLabel}</span>
+          <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-bottom:2px">
+            <a href="${esc(domUrl)}" target="_blank" rel="noopener" style="font-weight:600;font-size:12px;color:var(--accent);text-decoration:none;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:130px;display:inline-block" title="${esc(dom)}">${esc(dom)}</a>
+            <span style="font-size:10px;color:var(--text-muted);flex-shrink:0">${d.count} funis</span>
+          </div>
+          ${prodTags ? `<div style="display:flex;flex-wrap:wrap;gap:3px;margin-bottom:4px">${prodTags}</div>` : ''}
+          <div style="display:flex;align-items:center;gap:5px">
+            <span style="font-size:10px;color:var(--text-muted);white-space:nowrap">Ads ativos:</span>
+            <input type="number" min="0" class="dom-lib-input" data-dom="${esc(dom)}" value="${esc(String(libCount))}" placeholder="—" style="width:56px;padding:2px 5px;font-size:11px;border:1px solid var(--border);border-radius:4px;background:var(--bg);color:var(--text)">
+            <a href="${esc(fbLibUrl)}" target="_blank" rel="noopener" title="Buscar na Biblioteca de Anúncios" style="text-decoration:none;line-height:1;font-size:14px">🔍</a>
           </div>
         </div>
-        <div style="font-size:13px;font-weight:700;color:#a78bfa;flex-shrink:0;margin-left:6px">${Parser.formatViews(f.views)}</div>
       </div>`;
-      return url
-        ? `<a href="${esc(url)}" target="_blank" rel="noopener" style="text-decoration:none;color:inherit;display:block">${row}</a>`
-        : row;
     }).join('');
   }
 
-  function intelProdutosNovosHTML(allFunis) {
-    const hoje = new Date();
-    hoje.setHours(23, 59, 59, 999);
-    const limite = new Date(hoje);
-    limite.setDate(limite.getDate() - 6);
-    limite.setHours(0, 0, 0, 0);
+  // ── BLOCO 3: Top 3 produtos por nicho ─────────────────────────────────
 
-    const recentes   = new Set();
-    const anteriores = new Set();
-    allFunis.forEach(f => {
-      if (Storage.isProdutoDesconhecido(f.produto) || !f.data) return;
-      const d = new Date(f.data + (f.data.includes('T') ? '' : 'T00:00:00'));
-      if (d >= limite) recentes.add(f.produto);
-      else             anteriores.add(f.produto);
-    });
-    const novos = [...recentes].filter(p => !anteriores.has(p)).sort();
-    if (!novos.length) return '<p class="analysis-no-results">Nenhum produto novo identificado no período.</p>';
-    return novos.map(p =>
-      `<div class="rank-item">
-        <span style="font-size:11px;color:#00c47a;flex-shrink:0">★</span>
-        <span style="font-size:13px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${esc(p)}">${esc(p)}</span>
-      </div>`
-    ).join('');
-  }
-
-  function intelContasAtivasHTML(funis) {
-    const map = {};
+  function top3ProdutosPorNichoHTML(funis) {
+    const nichoMap = {};
     funis.forEach(f => {
-      if (!f.conta) return;
-      if (!map[f.conta]) map[f.conta] = { count: 0, nichos: new Set(), produtos: new Set() };
-      map[f.conta].count++;
-      if (f.nicho) map[f.conta].nichos.add(f.nicho);
-      if (!Storage.isProdutoDesconhecido(f.produto)) map[f.conta].produtos.add(f.produto);
+      if (!f.nicho) return;
+      if (!nichoMap[f.nicho]) nichoMap[f.nicho] = { total: 0, produtos: {} };
+      nichoMap[f.nicho].total++;
+      if (f.produto && !Storage.isProdutoDesconhecido(f.produto)) {
+        nichoMap[f.nicho].produtos[f.produto] = (nichoMap[f.nicho].produtos[f.produto] || 0) + 1;
+      }
     });
-    const items = Object.entries(map).sort((a, b) => b[1].count - a[1].count).slice(0, 10);
-    if (!items.length) return '<p class="analysis-no-results">Nenhuma conta no período.</p>';
-    return items.map(([conta, d], i) => {
-      const nichoTags = [...d.nichos].map(n =>
-        `<span class="tag tag-nicho nicho-${esc(n)}" style="font-size:10px;padding:1px 5px">${esc(n)}</span>`
-      ).join('');
-      const prodTags = [...d.produtos].map(p =>
-        `<span class="tag" style="font-size:10px;padding:1px 5px">${esc(p)}</span>`
-      ).join('');
-      return `<div class="rank-item" style="align-items:flex-start">
-        <span class="rank-pos ${i < 3 ? 'top' : ''}" style="padding-top:1px">#${i + 1}</span>
-        <div style="flex:1;min-width:0;overflow:hidden">
-          <div style="font-weight:600;font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${esc(conta)}">${esc(conta)}</div>
-          ${nichoTags || prodTags ? `<div style="margin-top:4px;display:flex;flex-wrap:wrap;gap:3px">${nichoTags}${prodTags}</div>` : ''}
-        </div>
-        <span style="font-size:12px;font-weight:700;color:var(--accent);flex-shrink:0;white-space:nowrap;margin-left:8px;padding-top:1px">${d.count} funil(s)</span>
-      </div>`;
-    }).join('');
+
+    const nichos = Object.entries(nichoMap).sort((a, b) => b[1].total - a[1].total);
+    if (!nichos.length) return '<p class="analysis-no-results">Nenhum nicho no período.</p>';
+
+    return `<div style="display:flex;flex-direction:column;gap:10px">
+      ${nichos.map(([nicho, d]) => {
+        const top3 = Object.entries(d.produtos).sort((a, b) => b[1] - a[1]).slice(0, 3);
+        return `<div style="background:var(--bg);border-radius:6px;padding:8px 10px">
+          <div style="display:flex;align-items:center;gap:6px;margin-bottom:6px">
+            <span class="tag tag-nicho nicho-${esc(nicho)}" style="font-size:10px;padding:2px 8px">${esc(nicho)}</span>
+            <span style="font-size:10px;color:var(--text-muted)">${d.total} funis</span>
+          </div>
+          ${top3.length
+            ? top3.map(([prod, cnt]) => `
+              <div style="display:flex;align-items:center;justify-content:space-between;gap:4px;padding:3px 0;border-top:1px solid var(--border)">
+                <span style="font-size:11px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1" title="${esc(prod)}">${esc(prod)}</span>
+                <span style="font-size:11px;font-weight:700;color:var(--accent);flex-shrink:0;margin-left:6px">${cnt}</span>
+              </div>`).join('')
+            : `<div style="font-size:10px;color:var(--text-muted);padding-top:4px;border-top:1px solid var(--border)">sem produtos identificados</div>`
+          }
+        </div>`;
+      }).join('')}
+    </div>`;
   }
+
+  // ── BLOCO 4: Top 3 ads por views por nicho ────────────────────────────
+
+  function top3ViewsPorNichoHTML(funis) {
+    const nichoMap = {};
+    funis.filter(f => f.views > 0 && f.nicho).forEach(f => {
+      if (!nichoMap[f.nicho]) nichoMap[f.nicho] = { maxViews: 0, funnels: [] };
+      if (f.views > nichoMap[f.nicho].maxViews) nichoMap[f.nicho].maxViews = f.views;
+      nichoMap[f.nicho].funnels.push(f);
+    });
+
+    const nichos = Object.entries(nichoMap).sort((a, b) => b[1].maxViews - a[1].maxViews);
+    if (!nichos.length) return '<p class="analysis-no-results">Nenhum funil com views no período.</p>';
+
+    return `<div style="display:flex;flex-direction:column;gap:10px">
+      ${nichos.map(([nicho, d]) => {
+        const top3 = [...d.funnels].sort((a, b) => b.views - a.views).slice(0, 3);
+        return `<div style="background:var(--bg);border-radius:6px;padding:8px 10px">
+          <div style="margin-bottom:6px">
+            <span class="tag tag-nicho nicho-${esc(nicho)}" style="font-size:10px;padding:2px 8px">${esc(nicho)}</span>
+          </div>
+          ${top3.map(f => {
+            const prod = (!f.produto || Storage.isProdutoDesconhecido(f.produto)) ? '' : f.produto;
+            return `<div style="display:flex;align-items:center;gap:4px;padding:3px 0;border-top:1px solid var(--border)">
+              <div style="flex:1;min-width:0;overflow:hidden">
+                <div style="font-size:11px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${esc(f.conta || '—')}">${esc(f.conta || '—')}</div>
+                ${prod ? `<div style="font-size:10px;color:var(--text-muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(prod)}</div>` : ''}
+              </div>
+              <div style="display:flex;align-items:center;gap:3px;flex-shrink:0">
+                <span style="font-size:11px;font-weight:700;color:#a78bfa">${Parser.formatViews(f.views)}</span>
+                <button class="btn btn-sm btn-secondary" onclick="abrirDetalhe('${esc(f.id)}')" title="Ver detalhes" style="padding:1px 4px;font-size:11px;min-width:auto">👁</button>
+              </div>
+            </div>`;
+          }).join('')}
+        </div>`;
+      }).join('')}
+    </div>`;
+  }
+
+  // ── Painel de inteligência do período ────────────────────────────────
 
   function renderIntel() {
     const el = document.getElementById('analise-intel');
     if (!el) return;
     const funis = GlobalFilters.filter(_getFunnels());
+    const sortCls = v => `btn btn-sm ${_domFinalSort === v ? 'btn-primary' : 'btn-secondary'}`;
+
     el.innerHTML = `
       <div class="escalada-section">
         <h3 class="escalada-section__title">🧠 Inteligência do período</h3>
@@ -603,26 +656,29 @@ const Analise = (() => {
             ${intelNichosHTML(funis)}
           </div>
           <div class="escalada-card">
-            <div class="escalada-card__title">Domínios finais mais repetidos</div>
-            ${intelDomFinalHTML(funis)}
+            <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:14px">
+              <span class="escalada-card__title" style="margin-bottom:0">Domínios finais</span>
+              <div style="display:flex;gap:4px">
+                <button class="${sortCls('funis')}" data-sort-dom-final="funis" style="font-size:10px;padding:2px 8px">Por funis</button>
+                <button class="${sortCls('biblioteca')}" data-sort-dom-final="biblioteca" style="font-size:10px;padding:2px 8px">Por biblioteca</button>
+              </div>
+            </div>
+            ${intelDomFinalSortableHTML(funis)}
           </div>
           <div class="escalada-card">
-            <div class="escalada-card__title">Ads com mais views</div>
-            ${intelTopViewsHTML(funis)}
+            <div class="escalada-card__title">Top 3 produtos por nicho</div>
+            ${top3ProdutosPorNichoHTML(funis)}
           </div>
           <div class="escalada-card">
-            <div class="escalada-card__title">Produtos novos na semana</div>
-            ${intelProdutosNovosHTML(funis)}
-          </div>
-          <div class="escalada-card" style="grid-column:span 2">
-            <div class="escalada-card__title">Contas mais ativas</div>
-            ${intelContasAtivasHTML(funis)}
+            <div class="escalada-card__title">Top 3 ads por views por nicho</div>
+            ${top3ViewsPorNichoHTML(funis)}
           </div>
         </div>
       </div>`;
   }
 
   // ── Re-executa todas as buscas ativas ─────────────────────────────────
+
   function refresh() {
     renderIntel();
     searchDomAnuncio();
@@ -631,6 +687,7 @@ const Analise = (() => {
   }
 
   // ── Inicialização ─────────────────────────────────────────────────────
+
   function init(getFunnels) {
     _getFunnels = getFunnels;
 
@@ -663,6 +720,19 @@ const Analise = (() => {
         else if (action === 'last')  _pgDomFinal = 9999;
         searchDomFinal();
       }
+    });
+
+    const intelEl = document.getElementById('analise-intel');
+    intelEl.addEventListener('click', e => {
+      const sortBtn = e.target.closest('[data-sort-dom-final]');
+      if (!sortBtn) return;
+      _domFinalSort = sortBtn.dataset.sortDomFinal;
+      renderIntel();
+    });
+    intelEl.addEventListener('change', e => {
+      const inp = e.target.closest('.dom-lib-input');
+      if (!inp) return;
+      saveAdsLibraryCount(inp.dataset.dom, inp.value.trim());
     });
 
     document.getElementById('btn-fechar-mfd').addEventListener('click', fecharModalFunil);

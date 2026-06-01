@@ -344,52 +344,26 @@
       <!-- Painel de inteligência do período -->
       <div id="analise-intel"></div>
 
-      <!-- Block 1: por domínio de anúncio -->
-      <div class="analysis-block">
-        <h3 class="analysis-block__title">
-          <span class="analysis-block__icon">🔍</span>
-          Buscar por domínio de anúncio
-        </h3>
-        <input
-          type="search"
-          id="search-dom-anuncio"
-          class="analysis-search"
-          placeholder="Ex: healthofbrain"
-          autocomplete="off"
-        />
-        <div id="result-dom-anuncio" class="analysis-result"></div>
-      </div>
-
-      <!-- Block 2: por domínio final -->
-      <div class="analysis-block">
-        <h3 class="analysis-block__title">
-          <span class="analysis-block__icon">🎯</span>
-          Buscar por domínio final
-        </h3>
-        <input
-          type="search"
-          id="search-dom-final"
-          class="analysis-search"
-          placeholder="Ex: mmemoryhealth"
-          autocomplete="off"
-        />
-        <div id="result-dom-final" class="analysis-result"></div>
-      </div>
-
-      <!-- Block 3: por produto -->
-      <div class="analysis-block">
-        <h3 class="analysis-block__title">
-          <span class="analysis-block__icon">📦</span>
-          Buscar por produto
-        </h3>
-        <input
-          type="search"
-          id="search-produto"
-          class="analysis-search"
-          placeholder="Ex: lean drops"
-          autocomplete="off"
-        />
-        <div id="result-produto" class="analysis-result"></div>
+      <!-- Buscas compactas -->
+      <div class="analysis-block" style="padding:14px 18px">
+        <div style="font-size:11px;text-transform:uppercase;letter-spacing:.1em;color:var(--text-muted);font-weight:700;margin-bottom:12px">Buscas</div>
+        <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:16px">
+          <div>
+            <div style="font-size:10px;text-transform:uppercase;letter-spacing:.05em;color:var(--text-muted);font-weight:600;margin-bottom:5px">🔍 Dom. Anúncio</div>
+            <input type="search" id="search-dom-anuncio" class="analysis-search" placeholder="Ex: healthofbrain" autocomplete="off" style="max-width:100%;padding:6px 10px;font-size:12px;margin-bottom:10px">
+            <div id="result-dom-anuncio" class="analysis-result"></div>
+          </div>
+          <div>
+            <div style="font-size:10px;text-transform:uppercase;letter-spacing:.05em;color:var(--text-muted);font-weight:600;margin-bottom:5px">🎯 Dom. Final</div>
+            <input type="search" id="search-dom-final" class="analysis-search" placeholder="Ex: mmemoryhealth" autocomplete="off" style="max-width:100%;padding:6px 10px;font-size:12px;margin-bottom:10px">
+            <div id="result-dom-final" class="analysis-result"></div>
+          </div>
+          <div>
+            <div style="font-size:10px;text-transform:uppercase;letter-spacing:.05em;color:var(--text-muted);font-weight:600;margin-bottom:5px">📦 Produto</div>
+            <input type="search" id="search-produto" class="analysis-search" placeholder="Ex: lean drops" autocomplete="off" style="max-width:100%;padding:6px 10px;font-size:12px;margin-bottom:10px">
+            <div id="result-produto" class="analysis-result"></div>
+          </div>
+        </div>
       </div>
 
     </div><!-- /tab-analise -->
