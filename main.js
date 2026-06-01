@@ -21,10 +21,187 @@ const GlobalFilters = {
   },
 };
 
+// ── Escopo global: acessível por onclick inline ───────────────────────────
+
+let funnels     = [];
+let prevFunnels = [];
+
+const NICHO_COLORS = {
+  WL:'#378ADD', DB:'#639922', ML:'#7F77DD', PT:'#BA7517',
+  DA:'#1D9E75', ED:'#E24B4A', NP:'#D85A30', VL:'#D4537E',
+  TN:'#888780', LG:'#888780', RJ:'#888780', RE:'#888780'
+};
+
+function abrirDetalhe(id) {
+  const f = funnels.find(x => x.id === id);
+  if (!f) return;
+
+  const esc = Storage.escHtml;
+  const domCounts = Storage.getDomainCounts(funnels);
+  const repetido = Storage.isRepeated(f, domCounts);
+
+  let roiHtml = '';
+  if (f.gasto != null && f.conversao != null && parseFloat(f.gasto) > 0) {
+    const roi = ((parseFloat(f.conversao) - parseFloat(f.gasto)) / parseFloat(f.gasto)) * 100;
+    const cor = roi >= 0 ? '#00c47a' : '#ff4d4d';
+    roiHtml = `<span style="color:${cor};font-weight:700">${roi >= 0 ? '+' : ''}${roi.toFixed(1)}%</span>`;
+  }
+
+  const vslHtml = f.urlVsl ? `
+    <div style="margin-bottom:20px">
+      <div style="font-size:11px;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:.08em;margin-bottom:8px">VSL</div>
+      <div id="mfd2-vsl-container" style="position:relative;width:100%;max-width:480px;background:#000;border-radius:10px;overflow:hidden;aspect-ratio:16/9;display:flex;align-items:center;justify-content:center">
+        <canvas id="mfd2-vsl-canvas" style="width:100%;height:100%;display:none"></canvas>
+        <div id="mfd2-vsl-loading" style="color:#fff;font-size:12px;font-family:monospace">Carregando frame...</div>
+      </div>
+      <a href="${esc(f.urlVsl)}" target="_blank" style="font-family:monospace;font-size:11px;color:var(--accent2);word-break:break-all;display:block;margin-top:6px">${esc(f.urlVsl)}</a>
+    </div>
+  ` : '';
+
+  document.getElementById('mfd2-conteudo').innerHTML = `
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:20px;padding-bottom:16px;border-bottom:0.5px solid var(--border)">
+      <span style="background:${NICHO_COLORS[f.nicho]||'#888'};color:#fff;border-radius:8px;padding:4px 10px;font-size:12px;font-weight:800">${esc(f.nicho||'—')}</span>
+      <div>
+        <div style="font-size:16px;font-weight:700">${esc(f.conta||'—')}</div>
+        <div style="font-size:12px;color:var(--text-muted)">${esc(f.data||'—')}</div>
+      </div>
+    </div>
+
+    ${vslHtml}
+
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:20px">
+      <div>
+        <div style="font-size:11px;color:var(--text-muted);text-transform:uppercase;letter-spacing:.08em;margin-bottom:4px">Produto</div>
+        <div style="font-size:13px;font-weight:600">${f.produto ? esc(f.produto) : '<em style="color:var(--text-muted)">—</em>'}</div>
+      </div>
+      <div>
+        <div style="font-size:11px;color:var(--text-muted);text-transform:uppercase;letter-spacing:.08em;margin-bottom:4px">Views</div>
+        <div style="font-size:13px;font-weight:600">${f.views || '—'}</div>
+      </div>
+      <div>
+        <div style="font-size:11px;color:var(--text-muted);text-transform:uppercase;letter-spacing:.08em;margin-bottom:4px">Dom. Anúncio</div>
+        <div style="font-size:12px">${f.domAnuncioFull
+          ? `<a href="${esc(f.domAnuncioFull)}" target="_blank" style="color:var(--accent2)">${esc(f.domAnuncio||f.domAnuncioFull)}</a>`
+          : esc(f.domAnuncio||'—')}</div>
+      </div>
+      <div>
+        <div style="font-size:11px;color:var(--text-muted);text-transform:uppercase;letter-spacing:.08em;margin-bottom:4px">
+          Dom. Final ${repetido ? '<span style="color:#D85A30;font-size:10px">● repetido</span>' : ''}
+        </div>
+        <div style="font-size:12px">${f.domFinalFull
+          ? `<a href="${esc(f.domFinalFull.split('\n')[0])}" target="_blank" style="color:var(--accent2)">${esc(f.domFinal||'—')}</a>`
+          : esc(f.domFinal||'—')}</div>
+      </div>
+      ${f.gasto != null ? `
+      <div>
+        <div style="font-size:11px;color:var(--text-muted);text-transform:uppercase;letter-spacing:.08em;margin-bottom:4px">Gasto</div>
+        <div style="font-size:13px">${Storage.formatCurrency(f.gasto, f.moeda)}</div>
+      </div>
+      <div>
+        <div style="font-size:11px;color:var(--text-muted);text-transform:uppercase;letter-spacing:.08em;margin-bottom:4px">ROI</div>
+        <div style="font-size:13px">${roiHtml || '—'}</div>
+      </div>` : ''}
+    </div>
+
+    ${f.urlAnuncio ? `
+    <div style="margin-bottom:14px">
+      <div style="font-size:11px;color:var(--text-muted);text-transform:uppercase;letter-spacing:.08em;margin-bottom:4px">Link do anúncio</div>
+      <a href="${esc(f.urlAnuncio)}" target="_blank" style="font-family:monospace;font-size:11px;color:var(--accent2);word-break:break-all">${esc(f.urlAnuncio)}</a>
+    </div>` : ''}
+
+    ${f.obs ? `
+    <div style="margin-bottom:14px">
+      <div style="font-size:11px;color:var(--text-muted);text-transform:uppercase;letter-spacing:.08em;margin-bottom:4px">Observações</div>
+      <div style="font-size:13px;line-height:1.6">${esc(f.obs)}</div>
+    </div>` : ''}
+  `;
+
+  const modal = document.getElementById('modal-funil-detalhe-v2');
+  modal.hidden = false;
+
+  if (f.urlVsl) capturarFrameVsl(f.urlVsl);
+
+  document.getElementById('mfd2-btn-editar').onclick = () => {
+    modal.hidden = true;
+    Tabela.openEditModalById(id);
+  };
+  document.getElementById('mfd2-btn-fechar').onclick = () => { modal.hidden = true; };
+  modal.addEventListener('click', e => { if (e.target === modal) modal.hidden = true; }, { once: true });
+}
+
+function capturarFrameVsl(url) {
+  if (!window.Hls) return;
+
+  if (!Hls.isSupported()) {
+    const el = document.getElementById('mfd2-vsl-loading');
+    if (el) el.textContent = 'Player não suportado neste browser.';
+    return;
+  }
+
+  const video = document.createElement('video');
+  video.crossOrigin = 'anonymous';
+  video.muted = true;
+  video.style.display = 'none';
+  document.body.appendChild(video);
+
+  const hls = new Hls({ enableWorker: false });
+  hls.loadSource(url);
+  hls.attachMedia(video);
+
+  let captureAttempted = false;
+
+  function capture() {
+    if (captureAttempted) return;
+    captureAttempted = true;
+    try {
+      const canvas  = document.getElementById('mfd2-vsl-canvas');
+      const loading = document.getElementById('mfd2-vsl-loading');
+      if (!canvas || !loading) { cleanup(); return; }
+      canvas.width  = video.videoWidth  || 480;
+      canvas.height = video.videoHeight || 270;
+      canvas.getContext('2d').drawImage(video, 0, 0, canvas.width, canvas.height);
+      canvas.style.display  = 'block';
+      loading.style.display = 'none';
+    } catch (e) {
+      const el = document.getElementById('mfd2-vsl-loading');
+      if (el) el.textContent = 'Frame bloqueado (CORS).';
+    }
+    cleanup();
+  }
+
+  hls.on(Hls.Events.MANIFEST_PARSED, () => {
+    video.currentTime = 1;
+    video.play().catch(() => { video.currentTime = 0; });
+  });
+
+  video.addEventListener('seeked', capture);
+  video.addEventListener('loadeddata', () => { setTimeout(capture, 300); });
+
+  const timeout = setTimeout(() => {
+    const el = document.getElementById('mfd2-vsl-loading');
+    if (el && el.style.display !== 'none') el.textContent = 'Tempo esgotado.';
+    cleanup();
+  }, 12000);
+
+  function cleanup() {
+    clearTimeout(timeout);
+    try { hls.destroy(); } catch (e) {}
+    try { video.remove();  } catch (e) {}
+  }
+
+  hls.on(Hls.Events.ERROR, (_, data) => {
+    if (data.fatal) {
+      const el = document.getElementById('mfd2-vsl-loading');
+      if (el) el.textContent = 'Erro ao carregar VSL.';
+      cleanup();
+    }
+  });
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+
 document.addEventListener('DOMContentLoaded', async () => {
 
-  let funnels     = [];
-  let prevFunnels = [];
   let monitoradas = [];
 
   function getFunnels()     { return funnels; }
@@ -48,9 +225,9 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (!el) return;
     const map = {
       loading: ['sync-status--saving', 'sincronizando...'],
-      saving:  ['sync-status--saving', 'salvando na nuvem...'],
-      saved:   ['sync-status--saved',  '✓ salvo na nuvem'],
-      error:   ['sync-status--error',  '⚠ erro ao salvar — verifique a conexão'],
+      saving:  ['sync-status--saving', 'salvando...'],
+      saved:   ['sync-status--saved',  'salvo ✓'],
+      error:   ['sync-status--error',  'erro ao salvar'],
     };
     const [cls, txt] = map[state] || map.saved;
     el.className = 'sync-status ' + cls;
@@ -73,178 +250,6 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     if (!document.getElementById('tab-analise').hidden)  Analise.refresh();
     if (!document.getElementById('tab-escalada').hidden) Escalada.refresh();
-  }
-
-  const NICHO_COLORS = {
-    WL:'#378ADD', DB:'#639922', ML:'#7F77DD', PT:'#BA7517',
-    DA:'#1D9E75', ED:'#E24B4A', NP:'#D85A30', VL:'#D4537E',
-    TN:'#888780', LG:'#888780', RJ:'#888780', RE:'#888780'
-  };
-
-  function abrirDetalhe(id) {
-    const f = funnels.find(x => x.id === id);
-    if (!f) return;
-
-    const esc = Storage.escHtml;
-    const domCounts = Storage.getDomainCounts(funnels);
-    const repetido = Storage.isRepeated(f, domCounts);
-
-    let roiHtml = '';
-    if (f.gasto != null && f.conversao != null && parseFloat(f.gasto) > 0) {
-      const roi = ((parseFloat(f.conversao) - parseFloat(f.gasto)) / parseFloat(f.gasto)) * 100;
-      const cor = roi >= 0 ? '#00c47a' : '#ff4d4d';
-      roiHtml = `<span style="color:${cor};font-weight:700">${roi >= 0 ? '+' : ''}${roi.toFixed(1)}%</span>`;
-    }
-
-    const vslHtml = f.urlVsl ? `
-      <div style="margin-bottom:20px">
-        <div style="font-size:11px;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:.08em;margin-bottom:8px">VSL</div>
-        <div id="mfd2-vsl-container" style="position:relative;width:100%;max-width:480px;background:#000;border-radius:10px;overflow:hidden;aspect-ratio:16/9;display:flex;align-items:center;justify-content:center">
-          <canvas id="mfd2-vsl-canvas" style="width:100%;height:100%;display:none"></canvas>
-          <div id="mfd2-vsl-loading" style="color:#fff;font-size:12px;font-family:monospace">Carregando frame...</div>
-        </div>
-        <a href="${esc(f.urlVsl)}" target="_blank" style="font-family:monospace;font-size:11px;color:var(--accent2);word-break:break-all;display:block;margin-top:6px">${esc(f.urlVsl)}</a>
-      </div>
-    ` : '';
-
-    document.getElementById('mfd2-conteudo').innerHTML = `
-      <div style="display:flex;align-items:center;gap:10px;margin-bottom:20px;padding-bottom:16px;border-bottom:0.5px solid var(--border)">
-        <span style="background:${NICHO_COLORS[f.nicho]||'#888'};color:#fff;border-radius:8px;padding:4px 10px;font-size:12px;font-weight:800">${esc(f.nicho||'—')}</span>
-        <div>
-          <div style="font-size:16px;font-weight:700">${esc(f.conta||'—')}</div>
-          <div style="font-size:12px;color:var(--text-muted)">${esc(f.data||'—')}</div>
-        </div>
-      </div>
-
-      ${vslHtml}
-
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:20px">
-        <div>
-          <div style="font-size:11px;color:var(--text-muted);text-transform:uppercase;letter-spacing:.08em;margin-bottom:4px">Produto</div>
-          <div style="font-size:13px;font-weight:600">${f.produto ? esc(f.produto) : '<em style="color:var(--text-muted)">—</em>'}</div>
-        </div>
-        <div>
-          <div style="font-size:11px;color:var(--text-muted);text-transform:uppercase;letter-spacing:.08em;margin-bottom:4px">Views</div>
-          <div style="font-size:13px;font-weight:600">${f.views || '—'}</div>
-        </div>
-        <div>
-          <div style="font-size:11px;color:var(--text-muted);text-transform:uppercase;letter-spacing:.08em;margin-bottom:4px">Dom. Anúncio</div>
-          <div style="font-size:12px">${f.domAnuncioFull
-            ? `<a href="${esc(f.domAnuncioFull)}" target="_blank" style="color:var(--accent2)">${esc(f.domAnuncio||f.domAnuncioFull)}</a>`
-            : esc(f.domAnuncio||'—')}</div>
-        </div>
-        <div>
-          <div style="font-size:11px;color:var(--text-muted);text-transform:uppercase;letter-spacing:.08em;margin-bottom:4px">
-            Dom. Final ${repetido ? '<span style="color:#D85A30;font-size:10px">● repetido</span>' : ''}
-          </div>
-          <div style="font-size:12px">${f.domFinalFull
-            ? `<a href="${esc(f.domFinalFull.split('\n')[0])}" target="_blank" style="color:var(--accent2)">${esc(f.domFinal||'—')}</a>`
-            : esc(f.domFinal||'—')}</div>
-        </div>
-        ${f.gasto != null ? `
-        <div>
-          <div style="font-size:11px;color:var(--text-muted);text-transform:uppercase;letter-spacing:.08em;margin-bottom:4px">Gasto</div>
-          <div style="font-size:13px">${Storage.formatCurrency(f.gasto, f.moeda)}</div>
-        </div>
-        <div>
-          <div style="font-size:11px;color:var(--text-muted);text-transform:uppercase;letter-spacing:.08em;margin-bottom:4px">ROI</div>
-          <div style="font-size:13px">${roiHtml || '—'}</div>
-        </div>` : ''}
-      </div>
-
-      ${f.urlAnuncio ? `
-      <div style="margin-bottom:14px">
-        <div style="font-size:11px;color:var(--text-muted);text-transform:uppercase;letter-spacing:.08em;margin-bottom:4px">Link do anúncio</div>
-        <a href="${esc(f.urlAnuncio)}" target="_blank" style="font-family:monospace;font-size:11px;color:var(--accent2);word-break:break-all">${esc(f.urlAnuncio)}</a>
-      </div>` : ''}
-
-      ${f.obs ? `
-      <div style="margin-bottom:14px">
-        <div style="font-size:11px;color:var(--text-muted);text-transform:uppercase;letter-spacing:.08em;margin-bottom:4px">Observações</div>
-        <div style="font-size:13px;line-height:1.6">${esc(f.obs)}</div>
-      </div>` : ''}
-    `;
-
-    const modal = document.getElementById('modal-funil-detalhe-v2');
-    modal.hidden = false;
-
-    if (f.urlVsl) capturarFrameVsl(f.urlVsl);
-
-    document.getElementById('mfd2-btn-editar').onclick = () => {
-      modal.hidden = true;
-      Tabela.openEditModalById(id);
-    };
-    document.getElementById('mfd2-btn-fechar').onclick = () => { modal.hidden = true; };
-    modal.addEventListener('click', e => { if (e.target === modal) modal.hidden = true; }, { once: true });
-  }
-
-  function capturarFrameVsl(url) {
-    if (!window.Hls) return;
-
-    if (!Hls.isSupported()) {
-      const el = document.getElementById('mfd2-vsl-loading');
-      if (el) el.textContent = 'Player não suportado neste browser.';
-      return;
-    }
-
-    const video = document.createElement('video');
-    video.crossOrigin = 'anonymous';
-    video.muted = true;
-    video.style.display = 'none';
-    document.body.appendChild(video);
-
-    const hls = new Hls({ enableWorker: false });
-    hls.loadSource(url);
-    hls.attachMedia(video);
-
-    let captureAttempted = false;
-
-    function capture() {
-      if (captureAttempted) return;
-      captureAttempted = true;
-      try {
-        const canvas  = document.getElementById('mfd2-vsl-canvas');
-        const loading = document.getElementById('mfd2-vsl-loading');
-        if (!canvas || !loading) { cleanup(); return; }
-        canvas.width  = video.videoWidth  || 480;
-        canvas.height = video.videoHeight || 270;
-        canvas.getContext('2d').drawImage(video, 0, 0, canvas.width, canvas.height);
-        canvas.style.display  = 'block';
-        loading.style.display = 'none';
-      } catch (e) {
-        const el = document.getElementById('mfd2-vsl-loading');
-        if (el) el.textContent = 'Frame bloqueado (CORS).';
-      }
-      cleanup();
-    }
-
-    hls.on(Hls.Events.MANIFEST_PARSED, () => {
-      video.currentTime = 1;
-      video.play().catch(() => { video.currentTime = 0; });
-    });
-
-    video.addEventListener('seeked', capture);
-    video.addEventListener('loadeddata', () => { setTimeout(capture, 300); });
-
-    const timeout = setTimeout(() => {
-      const el = document.getElementById('mfd2-vsl-loading');
-      if (el && el.style.display !== 'none') el.textContent = 'Tempo esgotado.';
-      cleanup();
-    }, 12000);
-
-    function cleanup() {
-      clearTimeout(timeout);
-      try { hls.destroy(); } catch (e) {}
-      try { video.remove();  } catch (e) {}
-    }
-
-    hls.on(Hls.Events.ERROR, (_, data) => {
-      if (data.fatal) {
-        const el = document.getElementById('mfd2-vsl-loading');
-        if (el) el.textContent = 'Erro ao carregar VSL.';
-        cleanup();
-      }
-    });
   }
 
   let _toastTimer = null;
