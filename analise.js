@@ -109,6 +109,7 @@ const Analise = (() => {
     return `<div class="af-funil-row" data-funnel-id="${esc(f.id)}">
       <span class="af-funil-meta">${meta}</span>
       ${perf}${url}
+      <button class="btn btn-sm btn-secondary" onclick="abrirDetalhe('${esc(f.id)}')" title="Ver detalhes">👁</button>
     </div>`;
   }
 

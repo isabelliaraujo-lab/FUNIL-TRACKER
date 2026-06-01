@@ -64,6 +64,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     prevFunnels = funnels;
     funnels     = updated;
+    window._funnelsGlobal = updated;
 
     setSyncStatus('saving');
     SupabaseStorage.syncFunnels(updated, deletedIds)
@@ -178,7 +179,72 @@ document.addEventListener('DOMContentLoaded', async () => {
   }
 
   function capturarFrameVsl(url) {
-    // Implementado no Prompt 3
+    if (!window.Hls) return;
+
+    if (!Hls.isSupported()) {
+      const el = document.getElementById('mfd2-vsl-loading');
+      if (el) el.textContent = 'Player não suportado neste browser.';
+      return;
+    }
+
+    const video = document.createElement('video');
+    video.crossOrigin = 'anonymous';
+    video.muted = true;
+    video.style.display = 'none';
+    document.body.appendChild(video);
+
+    const hls = new Hls({ enableWorker: false });
+    hls.loadSource(url);
+    hls.attachMedia(video);
+
+    let captureAttempted = false;
+
+    function capture() {
+      if (captureAttempted) return;
+      captureAttempted = true;
+      try {
+        const canvas  = document.getElementById('mfd2-vsl-canvas');
+        const loading = document.getElementById('mfd2-vsl-loading');
+        if (!canvas || !loading) { cleanup(); return; }
+        canvas.width  = video.videoWidth  || 480;
+        canvas.height = video.videoHeight || 270;
+        canvas.getContext('2d').drawImage(video, 0, 0, canvas.width, canvas.height);
+        canvas.style.display  = 'block';
+        loading.style.display = 'none';
+      } catch (e) {
+        const el = document.getElementById('mfd2-vsl-loading');
+        if (el) el.textContent = 'Frame bloqueado (CORS).';
+      }
+      cleanup();
+    }
+
+    hls.on(Hls.Events.MANIFEST_PARSED, () => {
+      video.currentTime = 1;
+      video.play().catch(() => { video.currentTime = 0; });
+    });
+
+    video.addEventListener('seeked', capture);
+    video.addEventListener('loadeddata', () => { setTimeout(capture, 300); });
+
+    const timeout = setTimeout(() => {
+      const el = document.getElementById('mfd2-vsl-loading');
+      if (el && el.style.display !== 'none') el.textContent = 'Tempo esgotado.';
+      cleanup();
+    }, 12000);
+
+    function cleanup() {
+      clearTimeout(timeout);
+      try { hls.destroy(); } catch (e) {}
+      try { video.remove();  } catch (e) {}
+    }
+
+    hls.on(Hls.Events.ERROR, (_, data) => {
+      if (data.fatal) {
+        const el = document.getElementById('mfd2-vsl-loading');
+        if (el) el.textContent = 'Erro ao carregar VSL.';
+        cleanup();
+      }
+    });
   }
 
   let _toastTimer = null;
@@ -212,6 +278,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   });
   if (_migrou) saveFunnels(funnels);
 
+  window._funnelsGlobal = funnels;
   prevFunnels = [...funnels];
 
   try {

@@ -124,7 +124,7 @@ const Escalada = (() => {
         <div style="flex:1;min-width:0;overflow:hidden">
           <div class="rank-nome" data-analise-produto="${esc(p.produto)}"
                style="font-weight:600;font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap"
-               title="${esc(p.produto)}">${esc(p.produto)}</div>
+               title="${esc(p.produto)}">${esc(p.produto)}<span style="cursor:pointer;font-size:11px;color:var(--accent2);margin-left:6px" onclick="abrirDetalhePorProduto('${esc(p.produto)}')">ver funis</span></div>
           ${nichoTags ? `<div style="margin-top:3px;display:flex;flex-wrap:wrap;gap:3px">${nichoTags}</div>` : ''}
         </div>
         <div style="text-align:right;white-space:nowrap;flex-shrink:0;margin-left:8px">
@@ -444,3 +444,11 @@ const Escalada = (() => {
   return { init, refresh };
 
 })();
+
+function abrirDetalhePorProduto(produto) {
+  const funis = (window._funnelsGlobal || []).filter(f => f.produto === produto);
+  if (!funis.length) return;
+  if (funis.length === 1) { abrirDetalhe(funis[0].id); return; }
+  const top = funis.slice().sort((a, b) => (b.views || 0) - (a.views || 0))[0];
+  abrirDetalhe(top.id);
+}

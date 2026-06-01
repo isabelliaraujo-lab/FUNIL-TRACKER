@@ -602,6 +602,7 @@ const Criativos = (() => {
         </td>` : ''}
         <td>
           <div class="cr-actions" style="display:flex;gap:2px;justify-content:flex-end">
+            ${(() => { const funilId = (window._funnelsGlobal || []).find(f => f.urlAnuncio && f.urlAnuncio === ad.urlAnuncio)?.id; return funilId ? `<button class="btn btn-sm btn-secondary" onclick="abrirDetalhe('${funilId}')" title="Ver funil">🔗 funil</button>` : ''; })()}
             <button data-action="edit" data-id="${esc(ad.id)}" title="Editar"
               style="border:none;background:none;color:var(--text-muted);padding:3px 5px;
                 font-size:13px;cursor:pointer;line-height:1;border-radius:4px">✏</button>

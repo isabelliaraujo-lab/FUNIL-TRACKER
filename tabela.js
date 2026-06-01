@@ -310,6 +310,10 @@ const Tabela = (() => {
           ${perfCellContent(f)}
         </td>
         <td style="white-space:nowrap;">
+          <button class="btn btn-sm btn-secondary"
+                  onclick="abrirDetalhe('${esc(f.id)}')"
+                  title="Ver detalhes"
+                  type="button">👁</button>
           <button class="btn btn-icon edit-btn"
                   data-id="${esc(f.id)}"
                   title="Editar funil"
