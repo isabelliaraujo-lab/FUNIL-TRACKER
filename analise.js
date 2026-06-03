@@ -630,8 +630,10 @@ const Analise = (() => {
   // ── BLOCO 5: VSLs em destaque ─────────────────────────────────────────
 
   function intelVslHTML(funis) {
+    const nichoFiltro = document.getElementById('analise-vsl-nicho')?.value || '';
+    const funisFiltrados = nichoFiltro ? funis.filter(f => f.nicho === nichoFiltro) : funis;
     const map = {};
-    funis.forEach(f => {
+    funisFiltrados.forEach(f => {
       if (!f.urlVsl) return;
       const key = f.urlVsl.trim();
       if (!map[key]) map[key] = { urlVsl: key, funis: 0, views: 0, nichos: new Set(), produtos: new Set(), ids: [] };
@@ -757,6 +759,15 @@ const Analise = (() => {
     listEl.innerHTML = intelDomFinalSortableHTML(funisFiltrados);
   }
 
+  // ── Atualiza apenas a lista do BLOCO 5 ───────────────────────────────
+
+  function refreshVslList(allFunis) {
+    const listEl = document.getElementById('analise-vsl-list');
+    if (!listEl) return;
+    listEl.innerHTML = intelVslHTML(allFunis);
+    initVslFrames();
+  }
+
   // ── Painel de inteligência do período ────────────────────────────────
 
   function renderIntel() {
@@ -799,8 +810,17 @@ const Analise = (() => {
             ${top3ViewsPorNichoHTML(funis)}
           </div>
           <div class="escalada-card" style="grid-column:span 2">
-            <div class="escalada-card__title">🎬 VSLs em destaque</div>
-            ${intelVslHTML(funis)}
+            <div style="display:flex;align-items:center;margin-bottom:14px">
+              <span class="escalada-card__title" style="margin-bottom:0">🎬 VSLs em destaque</span>
+              <select id="analise-vsl-nicho" style="background:var(--bg);border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:11px;padding:4px 8px;cursor:pointer;margin-left:8px">
+                <option value="">Todos os nichos</option>
+                <option>WL</option><option>DB</option><option>ML</option>
+                <option>ED</option><option>NP</option><option>DA</option>
+                <option>PT</option><option>VL</option><option>TN</option>
+                <option>LG</option><option>RJ</option><option>RE</option>
+              </select>
+            </div>
+            <div id="analise-vsl-list">${intelVslHTML(funis)}</div>
           </div>
         </div>
       </div>`;
@@ -865,6 +885,10 @@ const Analise = (() => {
     intelEl.addEventListener('change', e => {
       if (e.target.id === 'analise-dom-nicho') {
         refreshDomAnuncioList(GlobalFilters.filter(_getFunnels()));
+        return;
+      }
+      if (e.target.id === 'analise-vsl-nicho') {
+        refreshVslList(GlobalFilters.filter(_getFunnels()));
         return;
       }
       const inp = e.target.closest('.dom-lib-input');
