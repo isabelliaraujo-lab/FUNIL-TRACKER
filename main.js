@@ -242,6 +242,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     prevFunnels = funnels;
     funnels     = updated;
     window._funnelsGlobal = updated;
+    window._saveFunnelsGlobal = saveFunnels;
 
     setSyncStatus('saving');
     SupabaseStorage.syncFunnels(updated, deletedIds)
@@ -608,6 +609,29 @@ document.addEventListener('DOMContentLoaded', async () => {
 });
 
 window.abrirDetalhe = abrirDetalhe;
+
+// Chamado pelo módulo Criativos ao salvar uma edição de views inline,
+// para registrar a entrada no histórico do funil correspondente.
+function registrarViewsHistoricoFunil(urlAnuncio, viewsAnterior, viewsNovo) {
+  if (viewsNovo == null || viewsNovo === viewsAnterior) return;
+  if (!window._saveFunnelsGlobal || !window._funnelsGlobal) return;
+  const hoje = new Date().toISOString().slice(0, 10);
+  let alterou = false;
+
+  const updated = (window._funnelsGlobal).map(f => {
+    if (f.urlAnuncio !== urlAnuncio) return f;
+    const historico = Array.isArray(f.viewsHistorico) ? [...f.viewsHistorico] : [];
+    if (historico.length === 0 && viewsAnterior != null) {
+      historico.push({ data: f.data || hoje, views: viewsAnterior });
+    }
+    historico.push({ data: hoje, views: viewsNovo });
+    alterou = true;
+    return { ...f, viewsHistorico: historico };
+  });
+
+  if (alterou) window._saveFunnelsGlobal(updated);
+}
+window.registrarViewsHistoricoFunil = registrarViewsHistoricoFunil;
 
 function abrirHistoricoViews(id) {
   const funil = funnels.find(f => f.id === id);

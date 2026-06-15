@@ -233,9 +233,13 @@ const Criativos = (() => {
         ad.hookFingerprint = val.toLowerCase().slice(0, 60);
       }
 
+      const viewsAnterior = field === 'views' ? ad.views : undefined;
       ad[field] = val;
       saveAds(_ads);
       if (field === 'views') {
+        if (window.registrarViewsHistoricoFunil && ad.urlAnuncio) {
+          window.registrarViewsHistoricoFunil(ad.urlAnuncio, viewsAnterior, val);
+        }
         syncViewsParaFunis(ad);
         if (!document.getElementById('tab-escalada')?.hidden) Escalada.refresh();
       }
@@ -580,7 +584,13 @@ const Criativos = (() => {
                 border-radius:20px;padding:2px 7px;font-size:11px">${esc(ad.formato)}</span>`
             : '<span style="color:var(--text-muted)">—</span>'}
         </td>` : ''}
-        ${show('views') ? `<td data-field="views" style="text-align:right;font-weight:500">${formatViews(ad.views)}</td>` : ''}
+        ${show('views') ? (() => {
+          const funilId = (window._funnelsGlobal || []).find(f => f.urlAnuncio && f.urlAnuncio === ad.urlAnuncio)?.id;
+          const histBtn = funilId
+            ? `<span onclick="event.stopPropagation();abrirHistoricoViews('${funilId}')" title="Ver histórico" style="cursor:pointer;font-size:11px;opacity:0.6;margin-left:4px">📋</span>`
+            : '';
+          return `<td data-field="views" style="text-align:right;font-weight:500">${formatViews(ad.views)}${histBtn}</td>`;
+        })() : ''}
         ${show('contas') ? `<td style="text-align:center">
           ${isLateral
             ? `<span style="color:#D85A30;font-size:12px;font-weight:600">🔄</span>`
