@@ -624,12 +624,17 @@ function abrirHistoricoViews(id) {
     const ordenado = [...historico].sort((a, b) => new Date(b.data) - new Date(a.data));
 
     document.getElementById('views-historico-lista').innerHTML = `
-      <table style="width:100%;border-collapse:collapse;font-size:13px">
+      <table>
+        <colgroup>
+          <col style="width:100px">
+          <col style="width:90px">
+          <col>
+        </colgroup>
         <thead>
-          <tr style="border-bottom:1px solid #2a2a2a">
-            <th style="text-align:left;padding:8px 6px;color:#555;font-size:11px;font-weight:600;text-transform:uppercase">Data</th>
-            <th style="text-align:left;padding:8px 6px;color:#555;font-size:11px;font-weight:600;text-transform:uppercase">Views</th>
-            <th style="text-align:left;padding:8px 6px;color:#555;font-size:11px;font-weight:600;text-transform:uppercase">Variação</th>
+          <tr>
+            <th>Data</th>
+            <th>Views</th>
+            <th>Variação</th>
           </tr>
         </thead>
         <tbody>
@@ -644,10 +649,10 @@ function abrirHistoricoViews(id) {
               variacao = `<span style="color:${cor}">${sinal}${Parser.formatViews(diff)} (${sinal}${pct}%)</span>`;
             }
             return `
-              <tr style="border-bottom:1px solid #1a1a1a">
-                <td style="padding:8px 6px;color:#00d4ff">${entry.data}</td>
-                <td style="padding:8px 6px;font-weight:500">${Parser.formatViews(entry.views)}</td>
-                <td style="padding:8px 6px">${variacao}</td>
+              <tr>
+                <td>${entry.data}</td>
+                <td style="font-weight:500">${Parser.formatViews(entry.views)}</td>
+                <td>${variacao}</td>
               </tr>
             `;
           }).join('')}
@@ -685,14 +690,21 @@ async function abrirHistoricoDominio(dominio) {
   );
 
   document.getElementById('dominio-historico-lista').innerHTML = `
-    <table style="width:100%;border-collapse:collapse;font-size:13px">
+    <table>
+      <colgroup>
+        <col style="width:90px">
+        <col style="width:70px">
+        <col style="width:80px">
+        <col style="width:80px">
+        <col style="width:90px">
+      </colgroup>
       <thead>
-        <tr style="border-bottom:1px solid #2a2a2a">
-          <th style="text-align:left;padding:8px 6px;color:#555;font-size:11px;text-transform:uppercase">Data</th>
-          <th style="text-align:left;padding:8px 6px;color:#555;font-size:11px;text-transform:uppercase">Hora</th>
-          <th style="text-align:left;padding:8px 6px;color:#555;font-size:11px;text-transform:uppercase">Anterior</th>
-          <th style="text-align:left;padding:8px 6px;color:#555;font-size:11px;text-transform:uppercase">Novo</th>
-          <th style="text-align:left;padding:8px 6px;color:#555;font-size:11px;text-transform:uppercase">Variação</th>
+        <tr>
+          <th>Data</th>
+          <th>Hora</th>
+          <th>Anterior</th>
+          <th>Novo</th>
+          <th>Variação</th>
         </tr>
       </thead>
       <tbody>
@@ -701,12 +713,12 @@ async function abrirHistoricoDominio(dominio) {
           const cor = diff > 0 ? '#00c47a' : diff < 0 ? '#ff4d4d' : '#555';
           const sinal = diff > 0 ? '+' : '';
           return `
-            <tr style="border-bottom:1px solid #1a1a1a">
-              <td style="padding:8px 6px;color:#00d4ff">${entry.data}</td>
-              <td style="padding:8px 6px;color:#555">${entry.hora}</td>
-              <td style="padding:8px 6px">${entry.anterior.toLocaleString()}</td>
-              <td style="padding:8px 6px;font-weight:500">${entry.novo.toLocaleString()}</td>
-              <td style="padding:8px 6px"><span style="color:${cor}">${sinal}${diff.toLocaleString()}</span></td>
+            <tr>
+              <td>${entry.data}</td>
+              <td style="color:#555">${entry.hora}</td>
+              <td>${entry.anterior.toLocaleString()}</td>
+              <td style="font-weight:500">${entry.novo.toLocaleString()}</td>
+              <td><span style="color:${cor}">${sinal}${diff.toLocaleString()}</span></td>
             </tr>
           `;
         }).join('')}

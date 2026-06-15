@@ -1576,3 +1576,50 @@ select.gf-input {
   width: 150px !important;
   flex-shrink: 0;
 }
+
+/* ── Modal histórico de domínio / views ─────────────────────────────── */
+
+#dominio-historico-lista table,
+#views-historico-lista table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+  table-layout: fixed;
+}
+
+#dominio-historico-lista th,
+#dominio-historico-lista td,
+#views-historico-lista th,
+#views-historico-lista td {
+  padding: 10px 12px;
+  text-align: left;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+#dominio-historico-lista th,
+#views-historico-lista th {
+  font-size: 10px;
+  color: #555;
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+  border-bottom: 1px solid #2a2a2a;
+  font-weight: 600;
+}
+
+#dominio-historico-lista tr,
+#views-historico-lista tr {
+  border-bottom: 1px solid #1a1a1a;
+  transition: background 0.15s;
+}
+
+#dominio-historico-lista tr:hover,
+#views-historico-lista tr:hover {
+  background: #1e1e1e;
+}
+
+#dominio-historico-lista td:first-child,
+#views-historico-lista td:first-child {
+  color: #00d4ff;
+}
