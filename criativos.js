@@ -418,7 +418,7 @@ const Criativos = (() => {
           <thead>
             <tr>
               ${_cols['data']       !== false ? '<th>Data</th>'                                  : ''}
-              ${_cols['nicho']      !== false ? '<th>Nicho</th>'                                 : ''}
+              ${_cols['nicho']      !== false ? '<th style="width:44px">Nicho</th>'                : ''}
               ${_cols['produto']    !== false ? '<th style="min-width:100px">Produto</th>'       : ''}
               ${_cols['conta']      !== false ? '<th>Conta</th>'                                 : ''}
               ${_cols['hook']       !== false ? '<th>Hook</th>'                                  : ''}
