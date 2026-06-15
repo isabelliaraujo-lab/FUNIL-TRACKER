@@ -666,3 +666,54 @@ function fecharHistoricoViews() {
 
 window.abrirHistoricoViews = abrirHistoricoViews;
 window.fecharHistoricoViews = fecharHistoricoViews;
+
+async function abrirHistoricoDominio(dominio) {
+  document.getElementById('dominio-historico-nome').textContent = dominio;
+  document.getElementById('dominio-historico-lista').innerHTML =
+    '<div style="color:#555;font-size:13px">Carregando...</div>';
+  document.getElementById('modal-dominio-historico').hidden = false;
+
+  const { historico } = await SupabaseStorage.getHistoricoDominio(dominio);
+
+  if (!historico.length) {
+    document.getElementById('dominio-historico-lista').innerHTML =
+      '<div style="color:#555;font-size:13px">Nenhuma alteração registrada ainda.</div>';
+    return;
+  }
+
+  const ordenado = [...historico].sort((a, b) =>
+    new Date(b.data + 'T' + b.hora) - new Date(a.data + 'T' + a.hora)
+  );
+
+  document.getElementById('dominio-historico-lista').innerHTML = `
+    <table style="width:100%;border-collapse:collapse;font-size:13px">
+      <thead>
+        <tr style="border-bottom:1px solid #2a2a2a">
+          <th style="text-align:left;padding:8px 6px;color:#555;font-size:11px;text-transform:uppercase">Data</th>
+          <th style="text-align:left;padding:8px 6px;color:#555;font-size:11px;text-transform:uppercase">Hora</th>
+          <th style="text-align:left;padding:8px 6px;color:#555;font-size:11px;text-transform:uppercase">Anterior</th>
+          <th style="text-align:left;padding:8px 6px;color:#555;font-size:11px;text-transform:uppercase">Novo</th>
+          <th style="text-align:left;padding:8px 6px;color:#555;font-size:11px;text-transform:uppercase">Variação</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${ordenado.map(entry => {
+          const diff = entry.novo - entry.anterior;
+          const cor = diff > 0 ? '#00c47a' : diff < 0 ? '#ff4d4d' : '#555';
+          const sinal = diff > 0 ? '+' : '';
+          return `
+            <tr style="border-bottom:1px solid #1a1a1a">
+              <td style="padding:8px 6px;color:#00d4ff">${entry.data}</td>
+              <td style="padding:8px 6px;color:#555">${entry.hora}</td>
+              <td style="padding:8px 6px">${entry.anterior.toLocaleString()}</td>
+              <td style="padding:8px 6px;font-weight:500">${entry.novo.toLocaleString()}</td>
+              <td style="padding:8px 6px"><span style="color:${cor}">${sinal}${diff.toLocaleString()}</span></td>
+            </tr>
+          `;
+        }).join('')}
+      </tbody>
+    </table>
+  `;
+}
+
+window.abrirHistoricoDominio = abrirHistoricoDominio;

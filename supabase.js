@@ -152,5 +152,39 @@ const SupabaseStorage = (() => {
     if (error) console.error('Error deleting monitorada:', error);
   }
 
-  return { loadFunnels, syncFunnels, migrarLocalStorage, loadMonitoradas, saveMonitorada, deleteMonitorada };
+  // ── Domínios biblioteca ───────────────────────────────────────────────
+
+  async function loadDominiosBiblioteca() {
+    const { data, error } = await db.from('dominios_biblioteca').select('dominio,ads_ativos,historico');
+    if (error) { console.error('Error loading dominios_biblioteca:', error); return {}; }
+    const map = {};
+    (data || []).forEach(r => { map[r.dominio] = { adsAtivos: r.ads_ativos || 0, historico: r.historico || [] }; });
+    return map;
+  }
+
+  async function salvarAdsAtivos(dominio, novoValor) {
+    const { data } = await db.from('dominios_biblioteca').select('ads_ativos,historico').eq('dominio', dominio).single();
+    const valorAnterior = data?.ads_ativos ?? 0;
+    if (valorAnterior === novoValor) return;
+    const historico = data?.historico || [];
+    historico.push({
+      data: new Date().toISOString().slice(0, 10),
+      hora: new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }),
+      anterior: valorAnterior,
+      novo: novoValor,
+    });
+    const { error } = await db.from('dominios_biblioteca').upsert(
+      { dominio, ads_ativos: novoValor, historico, updated_at: new Date().toISOString() },
+      { onConflict: 'dominio' }
+    );
+    if (error) console.error('Error saving ads_ativos:', error);
+  }
+
+  async function getHistoricoDominio(dominio) {
+    const { data, error } = await db.from('dominios_biblioteca').select('historico,ads_ativos').eq('dominio', dominio).single();
+    if (error) return { historico: [], adsAtivos: 0 };
+    return { historico: data?.historico || [], adsAtivos: data?.ads_ativos || 0 };
+  }
+
+  return { loadFunnels, syncFunnels, migrarLocalStorage, loadMonitoradas, saveMonitorada, deleteMonitorada, loadDominiosBiblioteca, salvarAdsAtivos, getHistoricoDominio };
 })();

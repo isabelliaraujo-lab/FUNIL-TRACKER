@@ -15,19 +15,40 @@ const Analise = (() => {
   const esc      = Storage.escHtml;
   const fmtViews = v => Parser.formatViews(v);
 
-  // ── Ads na biblioteca (localStorage) ─────────────────────────────────
+  // ── Ads na biblioteca (Supabase + localStorage fallback) ─────────────
+
+  let _dominiosBibliotecaCache = null;
+
+  async function _ensureDominiosCache() {
+    if (!_dominiosBibliotecaCache) {
+      _dominiosBibliotecaCache = await SupabaseStorage.loadDominiosBiblioteca();
+    }
+    return _dominiosBibliotecaCache;
+  }
 
   function getAdsLibraryCounts() {
+    if (_dominiosBibliotecaCache) {
+      const map = {};
+      Object.entries(_dominiosBibliotecaCache).forEach(([dom, v]) => {
+        if (v.adsAtivos > 0) map[dom] = v.adsAtivos;
+      });
+      return map;
+    }
     try { return JSON.parse(localStorage.getItem('funil-tracker-ads-library-counts') || '{}'); }
     catch { return {}; }
   }
 
   function saveAdsLibraryCount(domain, val) {
-    const d = getAdsLibraryCounts();
     const n = parseInt(val, 10);
-    if (!isNaN(n) && n > 0) d[domain] = n;
-    else delete d[domain];
-    localStorage.setItem('funil-tracker-ads-library-counts', JSON.stringify(d));
+    const safeVal = !isNaN(n) && n > 0 ? n : 0;
+
+    // Atualizar cache local imediatamente
+    if (!_dominiosBibliotecaCache) _dominiosBibliotecaCache = {};
+    if (!_dominiosBibliotecaCache[domain]) _dominiosBibliotecaCache[domain] = { adsAtivos: 0, historico: [] };
+    _dominiosBibliotecaCache[domain].adsAtivos = safeVal;
+
+    // Persistir no Supabase (async, sem bloquear UI)
+    SupabaseStorage.salvarAdsAtivos(domain, safeVal).catch(console.error);
   }
 
   // ── Helpers de domínio ────────────────────────────────────────────────
@@ -546,6 +567,7 @@ const Analise = (() => {
             <span style="font-size:10px;color:var(--text-muted);white-space:nowrap">Ads ativos:</span>
             <input type="number" min="0" class="dom-lib-input" data-dom="${esc(dom)}" value="${esc(String(libCount))}" placeholder="—" style="width:56px;padding:2px 5px;font-size:11px;border:1px solid var(--border);border-radius:4px;background:var(--bg);color:var(--text)">
             <a href="${esc(fbLibUrl)}" target="_blank" rel="noopener" title="Buscar na Biblioteca de Anúncios" style="text-decoration:none;line-height:1;font-size:14px">🔍</a>
+            <span style="cursor:pointer;font-size:14px;line-height:1" onclick="abrirHistoricoDominio('${esc(dom)}')" title="Ver histórico de Ads ativos">📋</span>
           </div>
         </div>
       </div>`;
@@ -840,6 +862,9 @@ const Analise = (() => {
 
   function init(getFunnels) {
     _getFunnels = getFunnels;
+
+    // Pré-carregar dados do Supabase para ter ads_ativos disponíveis no primeiro render
+    _ensureDominiosCache().then(() => refresh()).catch(console.error);
 
     document.getElementById('search-dom-anuncio')
       .addEventListener('input', () => { _pgDomAnuncio = 1; searchDomAnuncio(); });
