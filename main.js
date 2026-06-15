@@ -610,8 +610,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 window.abrirDetalhe = abrirDetalhe;
 
 function abrirHistoricoViews(id) {
-  const funis = getFunnels();
-  const funil = funis.find(f => f.id === id);
+  const funil = funnels.find(f => f.id === id);
   if (!funil) return;
 
   document.getElementById('views-historico-conta').textContent = funil.conta || '—';
