@@ -35,6 +35,7 @@ const SupabaseStorage = (() => {
       moeda:            f.moeda            || 'BRL',
       hora:             f.hora             || null,
       anuncios:         Array.isArray(f.anuncios) ? f.anuncios : [],
+      views_historico:  Array.isArray(f.viewsHistorico) ? f.viewsHistorico : [],
     };
   }
 
@@ -62,6 +63,7 @@ const SupabaseStorage = (() => {
       moeda:          r.moeda || 'BRL',
       hora:           r.hora,
       anuncios:       r.anuncios || [],
+      viewsHistorico: r.views_historico || [],
     };
   }
 

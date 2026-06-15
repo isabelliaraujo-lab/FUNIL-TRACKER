@@ -89,8 +89,11 @@ const Tabela = (() => {
     return dash();
   }
 
-  function viewsTag(views) {
+  function viewsTag(views, id) {
     if (views == null) return dash();
+    if (id) {
+      return `<span class="tag tag-views" style="cursor:pointer" onclick="abrirHistoricoViews('${esc(id)}')" title="Ver histórico">${esc(Parser.formatViews(views))}</span>`;
+    }
     return `<span class="tag tag-views">${esc(Parser.formatViews(views))}</span>`;
   }
 
@@ -293,7 +296,7 @@ const Tabela = (() => {
             : esc(truncate(f.produto, 18))}
         </td>
         <td>${urlAnuncioCell}</td>
-        <td>${viewsTag(f.views)}</td>
+        <td>${viewsTag(f.views, f.id)}</td>
         <td>${famosoTag(f.famoso)}</td>
         <td>${domAnuncioCell}</td>
         <td>${domFinalCell(f, domCounts)}</td>
@@ -616,11 +619,33 @@ const Tabela = (() => {
       const domFinalFull = val('e-domFinalFull');
       const splitVal     = document.getElementById('e-split').value === 'true';
 
-      const anuncios = [1, 2, 3].map(i => ({
+      const anunciosRaw = [1, 2, 3].map(i => ({
         url:    (document.getElementById(`e-url-${i}`)?.value || '').trim(),
         views:  document.getElementById(`e-views-${i}`)?.value ? parseInt(document.getElementById(`e-views-${i}`).value, 10) : null,
         famoso: document.getElementById(`e-famoso-${i}`)?.value || null,
-      })).filter(a => a.url);
+      }));
+
+      // Registrar histórico de views por anúncio
+      const hoje = new Date().toISOString().slice(0, 10);
+      const anunciosAnteriores = Array.isArray(f.anuncios) && f.anuncios.length > 0
+        ? f.anuncios
+        : (f.urlAnuncio ? [{ url: f.urlAnuncio, views: f.views, famoso: f.famoso }] : []);
+
+      const anuncios = anunciosRaw.filter(a => a.url).map((a, i) => {
+        const anterior = anunciosAnteriores[i] || {};
+        const viewsNovo = a.views;
+        const viewsAnterior = anterior.views != null ? anterior.views : null;
+        let historico = Array.isArray(anterior.viewsHistorico) ? [...anterior.viewsHistorico] : [];
+
+        if (viewsNovo != null && viewsNovo !== viewsAnterior) {
+          if (historico.length === 0 && viewsAnterior != null) {
+            historico.push({ data: f.data || hoje, views: viewsAnterior });
+          }
+          historico.push({ data: hoje, views: viewsNovo });
+        }
+
+        return { ...a, viewsHistorico: historico };
+      });
 
       const urlAn = anuncios.length > 0 ? anuncios[0].url : '';
 
@@ -635,16 +660,17 @@ const Tabela = (() => {
       }
 
       Object.assign(f, {
-        data:           val('e-data'),
-        hora:           val('e-hora') || null,
-        conta:          val('e-conta'),
-        nicho:          val('e-nicho'),
-        produto:        Storage.normalizeProduto(val('e-produto')),
+        data:            val('e-data'),
+        hora:            val('e-hora') || null,
+        conta:           val('e-conta'),
+        nicho:           val('e-nicho'),
+        produto:         Storage.normalizeProduto(val('e-produto')),
         anuncios,
-        urlAnuncio:     urlAn,
-        urlAnuncioFull: urlAn,
-        views:          anuncios.length > 0 ? anuncios[0].views : null,
-        famoso:         anuncios.length > 0 ? anuncios[0].famoso : null,
+        urlAnuncio:      urlAn,
+        urlAnuncioFull:  urlAn,
+        views:           anuncios.length > 0 ? anuncios[0].views : null,
+        viewsHistorico:  anuncios.length > 0 ? (anuncios[0].viewsHistorico || []) : (f.viewsHistorico || []),
+        famoso:          anuncios.length > 0 ? anuncios[0].famoso : null,
         domAnuncio,
         domAnuncioFull: val('e-domAnuncioFull') || (domAnuncio ? 'https://' + domAnuncio.toLowerCase() : ''),
         domFinal,

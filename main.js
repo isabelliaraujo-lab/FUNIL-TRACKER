@@ -608,3 +608,61 @@ document.addEventListener('DOMContentLoaded', async () => {
 });
 
 window.abrirDetalhe = abrirDetalhe;
+
+function abrirHistoricoViews(id) {
+  const funis = getFunnels();
+  const funil = funis.find(f => f.id === id);
+  if (!funil) return;
+
+  document.getElementById('views-historico-conta').textContent = funil.conta || '—';
+
+  const historico = funil.viewsHistorico || [];
+
+  if (!historico.length) {
+    document.getElementById('views-historico-lista').innerHTML =
+      '<div style="color:#555;font-size:13px">Nenhum histórico registrado ainda.</div>';
+  } else {
+    const ordenado = [...historico].sort((a, b) => new Date(b.data) - new Date(a.data));
+
+    document.getElementById('views-historico-lista').innerHTML = `
+      <table style="width:100%;border-collapse:collapse;font-size:13px">
+        <thead>
+          <tr style="border-bottom:1px solid #2a2a2a">
+            <th style="text-align:left;padding:8px 6px;color:#555;font-size:11px;font-weight:600;text-transform:uppercase">Data</th>
+            <th style="text-align:left;padding:8px 6px;color:#555;font-size:11px;font-weight:600;text-transform:uppercase">Views</th>
+            <th style="text-align:left;padding:8px 6px;color:#555;font-size:11px;font-weight:600;text-transform:uppercase">Variação</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${ordenado.map((entry, i) => {
+            const anterior = ordenado[i + 1];
+            let variacao = '—';
+            if (anterior) {
+              const diff = entry.views - anterior.views;
+              const pct = ((diff / anterior.views) * 100).toFixed(1);
+              const cor = diff > 0 ? '#00c47a' : diff < 0 ? '#ff4d4d' : '#555';
+              const sinal = diff > 0 ? '+' : '';
+              variacao = `<span style="color:${cor}">${sinal}${Parser.formatViews(diff)} (${sinal}${pct}%)</span>`;
+            }
+            return `
+              <tr style="border-bottom:1px solid #1a1a1a">
+                <td style="padding:8px 6px;color:#00d4ff">${entry.data}</td>
+                <td style="padding:8px 6px;font-weight:500">${Parser.formatViews(entry.views)}</td>
+                <td style="padding:8px 6px">${variacao}</td>
+              </tr>
+            `;
+          }).join('')}
+        </tbody>
+      </table>
+    `;
+  }
+
+  document.getElementById('modal-views-historico').hidden = false;
+}
+
+function fecharHistoricoViews() {
+  document.getElementById('modal-views-historico').hidden = true;
+}
+
+window.abrirHistoricoViews = abrirHistoricoViews;
+window.fecharHistoricoViews = fecharHistoricoViews;
