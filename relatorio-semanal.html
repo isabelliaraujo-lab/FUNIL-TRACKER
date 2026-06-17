@@ -549,7 +549,7 @@ document.querySelectorAll('.nicho-btn').forEach(btn=>{
     } else {
       btn.classList.add('active');
       activeNichos.push(n);
-      if(!nichoData[n]) nichoData[n]={funis:'',nichoAlta:'',resumo:'',ads:[],headline:'',vsls:[],templates:[],obs:''};
+      if(!nichoData[n]) nichoData[n]={funis:'',nichoAlta:'',resumo:'',ads:[],funisDestaque:[],vsls:[],templates:[],obs:''};
     }
     renderNichoSections();
   });
@@ -591,13 +591,10 @@ function renderNichoSections(){
       <div class="section-sub" style="margin-top:18px">Ads em destaque</div>
       <div class="ad-list" id="ads-${n}"></div>
       <button class="btn-add-ad" onclick="addAd('${n}')">+ Adicionar ad</button>
-      <div class="section-sub" style="margin-top:18px">Funil em destaque</div>
-      <div class="field-group" style="margin-bottom:10px">
-        <label class="field-label">Headline campeã</label>
-        <textarea rows="2" placeholder="Ex: Yale Doctor Reveals…"
-          onchange="setNichoField('${n}','headline',this.value)">${esc(d.headline)}</textarea>
-      </div>
-      <div class="section-sub">VSLs</div>
+      <div class="section-sub" style="margin-top:18px">Funis em destaque</div>
+      <div class="funis-destaque-list" id="funis-destaque-${n}"></div>
+      <button class="btn-add-ad" style="margin-top:8px" onclick="addFunilDestaque('${n}')">+ Adicionar funil em destaque</button>
+      <div class="section-sub" style="margin-top:18px">VSLs</div>
       <div class="link-list" id="vsls-${n}"></div>
       <button class="btn-add-link" onclick="addLink('${n}','vsls')">+ Adicionar VSL</button>
       <div class="section-sub" style="margin-top:12px">Templates</div>
@@ -609,6 +606,7 @@ function renderNichoSections(){
     `;
     container.appendChild(section);
     renderAds(n);
+    renderFunisDestaque(n);
     renderLinks(n,'vsls');
     renderLinks(n,'templates');
   });
@@ -644,7 +642,11 @@ function renderAds(nicho){
         </div>
       </div>
       <div class="ad-flags">
-        <button class="flag-btn ${ad.swipe?'on':''}" onclick="toggleAdFlag('${nicho}',${i},'swipe')">${ad.swipe?'✓ ':''} No Swipe</button>
+        <select class="flag-btn" style="background:var(--surface);color:var(--text);border:1px solid var(--border);border-radius:6px;padding:4px 8px;font-size:11px;cursor:pointer" onchange="setAdField('${nicho}',${i},'funilDestaqueId',this.value)">
+          <option value="">Vincular funil em destaque…</option>
+          ${(nichoData[nicho].funisDestaque||[]).map(fd=>`<option value="${esc(fd.id)}" ${ad.funilDestaqueId===fd.id?'selected':''}>${esc(fd.domAnuncio||'Funil sem domínio')}</option>`).join('')}
+          ${!(nichoData[nicho].funisDestaque||[]).length?'<option disabled>Nenhum funil cadastrado</option>':''}
+        </select>
         <button class="flag-btn lateral ${ad.lateral?'on':''}" onclick="toggleAdFlag('${nicho}',${i},'lateral')">${ad.lateral?'✓ ':''} Lateralizado</button>
         <button class="flag-btn famoso ${ad.famoso?'on':''}" onclick="toggleAdFlag('${nicho}',${i},'famoso')">${ad.famoso?'✓ ':''} Com famoso</button>
       </div>
@@ -669,6 +671,161 @@ function renderLinks(nicho,type){
       <button class="btn-remove-link" onclick="removeLink('${nicho}','${type}',${i})">✕</button>
     </div>
   `).join('');
+}
+
+// Funis em destaque
+function addFunilDestaque(nicho){
+  const id='fd-'+Math.random().toString(36).slice(2,10);
+  if(!nichoData[nicho].funisDestaque) nichoData[nicho].funisDestaque=[];
+  nichoData[nicho].funisDestaque.push({id,domAnuncio:'',urlFinal:'',cdn:'',headline:''});
+  renderFunisDestaque(nicho);
+}
+
+function removeFunilDestaque(nicho,id){
+  nichoData[nicho].funisDestaque=nichoData[nicho].funisDestaque.filter(f=>f.id!==id);
+  renderFunisDestaque(nicho);
+  renderAds(nicho); // refresh ads so selector updates
+}
+
+function setFunilDestaqueField(nicho,id,field,value){
+  const fd=nichoData[nicho].funisDestaque.find(f=>f.id===id);
+  if(fd) fd[field]=value;
+  if(field==='domAnuncio') renderAds(nicho); // refresh ads selector
+}
+
+async function carregarHistoricoDominio(dominio,containerEl){
+  if(!dominio.trim()){containerEl.innerHTML='';return;}
+  containerEl.innerHTML='<div style="font-size:11px;color:#555">Buscando...</div>';
+  try{
+    const cache=await _sb.from('dominios_biblioteca').select('dominio,ads_ativos,historico').eq('dominio',dominio.toUpperCase()).single();
+    const dados=cache.data;
+    if(!dados||!dados.historico||!dados.historico.length){
+      containerEl.innerHTML='<div style="font-size:11px;color:#555">Nenhum histórico registrado para este domínio.</div>';
+      return;
+    }
+    const ordenado=[...dados.historico].sort((a,b)=>new Date(b.data)-new Date(a.data));
+    containerEl.innerHTML=`
+      <div style="font-size:10px;color:#555;margin-bottom:4px">Ads ativos atual: <strong style="color:#00d4ff">${dados.ads_ativos||0}</strong></div>
+      <table style="width:100%;border-collapse:collapse;font-size:11px">
+        <tr style="border-bottom:1px solid #2a2a2a">
+          <th style="text-align:left;padding:4px 6px;color:#555;font-weight:600">Data</th>
+          <th style="text-align:left;padding:4px 6px;color:#555;font-weight:600">Ant.</th>
+          <th style="text-align:left;padding:4px 6px;color:#555;font-weight:600">Novo</th>
+          <th style="text-align:left;padding:4px 6px;color:#555;font-weight:600">Var.</th>
+        </tr>
+        ${ordenado.slice(0,5).map(entry=>{
+          const diff=entry.novo-entry.anterior;
+          const cor=diff>0?'#00c47a':diff<0?'#ff4d4d':'#555';
+          const sinal=diff>0?'+':'';
+          return `<tr style="border-bottom:1px solid #1a1a1a">
+            <td style="padding:4px 6px;color:#00d4ff">${entry.data}</td>
+            <td style="padding:4px 6px">${entry.anterior}</td>
+            <td style="padding:4px 6px;font-weight:600">${entry.novo}</td>
+            <td style="padding:4px 6px;color:${cor}">${sinal}${diff}</td>
+          </tr>`;
+        }).join('')}
+      </table>`;
+  }catch(e){
+    containerEl.innerHTML='<div style="font-size:11px;color:#555">Erro ao buscar histórico.</div>';
+  }
+}
+
+function renderFunisDestaque(nicho){
+  const container=document.getElementById(`funis-destaque-${nicho}`);
+  if(!container)return;
+  const lista=nichoData[nicho].funisDestaque||[];
+  container.innerHTML=lista.map(fd=>`
+    <div class="ad-item" style="margin-bottom:12px" id="fd-item-${fd.id}">
+      <div class="ad-item-header">
+        <span class="ad-num">Funil</span>
+        <button class="btn-remove-ad" onclick="removeFunilDestaque('${nicho}','${fd.id}')">✕</button>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:8px">
+        <div class="field-group">
+          <label class="field-label">Domínio do anúncio</label>
+          <input type="text" placeholder="Ex: VIDEO.VIVIDBODYBOOST.COM"
+            value="${esc(fd.domAnuncio)}"
+            onchange="setFunilDestaqueField('${nicho}','${fd.id}','domAnuncio',this.value)"
+            onblur="carregarHistoricoDominio(this.value,document.getElementById('hist-dom-${fd.id}'))"/>
+          <div id="hist-dom-${fd.id}" style="margin-top:6px"></div>
+        </div>
+        <div class="field-group">
+          <label class="field-label">URL final</label>
+          <input type="url" placeholder="https://…"
+            value="${esc(fd.urlFinal)}"
+            onchange="setFunilDestaqueField('${nicho}','${fd.id}','urlFinal',this.value)"/>
+        </div>
+      </div>
+      <div class="field-group" style="margin-bottom:8px">
+        <label class="field-label">CDN da VSL</label>
+        <input type="url" placeholder="https://….m3u8"
+          value="${esc(fd.cdn)}"
+          onchange="setFunilDestaqueField('${nicho}','${fd.id}','cdn',this.value);renderVslThumbnail('${fd.id}',this.value)"/>
+        <div id="vsl-thumb-${fd.id}" style="margin-top:8px">
+          ${fd.cdn?`<div id="vsl-container-${fd.id}" data-vsl-url="${esc(fd.cdn)}" style="width:160px;height:90px;background:#000;border-radius:8px;overflow:hidden;position:relative"><canvas style="width:100%;height:100%;display:none"></canvas><div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:#ffffff66;font-size:10px">carregando...</div></div>`:''}
+        </div>
+      </div>
+      <div class="field-group">
+        <label class="field-label">Headline campeã</label>
+        <input type="text" placeholder="Ex: Yale Doctor Reveals…"
+          value="${esc(fd.headline)}"
+          onchange="setFunilDestaqueField('${nicho}','${fd.id}','headline',this.value)"/>
+      </div>
+    </div>
+  `).join('');
+
+  // Inicializar thumbnails VSL dos funis que já têm CDN
+  lista.forEach(fd=>{
+    if(fd.cdn){
+      const c=document.getElementById(`vsl-container-${fd.id}`);
+      if(c&&!c.dataset.vslLoaded){
+        c.dataset.vslLoaded='1';
+        capturarFrameRelatorio(fd.cdn,c);
+      }
+    }
+  });
+}
+
+function renderVslThumbnail(fdId,url){
+  const wrap=document.getElementById(`vsl-thumb-${fdId}`);
+  if(!wrap)return;
+  if(!url){wrap.innerHTML='';return;}
+  wrap.innerHTML=`<div id="vsl-container-${fdId}" data-vsl-url="${esc(url)}" style="width:160px;height:90px;background:#000;border-radius:8px;overflow:hidden;position:relative"><canvas style="width:100%;height:100%;display:none"></canvas><div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:#ffffff66;font-size:10px">carregando...</div></div>`;
+  const c=document.getElementById(`vsl-container-${fdId}`);
+  if(c) capturarFrameRelatorio(url,c);
+}
+
+function capturarFrameRelatorio(url,container){
+  if(!window.Hls||!Hls.isSupported())return;
+  const canvas=container.querySelector('canvas');
+  const loading=container.querySelector('div');
+  if(!canvas)return;
+  const video=document.createElement('video');
+  video.crossOrigin='anonymous';
+  video.muted=true;
+  video.style.display='none';
+  document.body.appendChild(video);
+  const hls=new Hls({enableWorker:false});
+  hls.loadSource(url);
+  hls.attachMedia(video);
+  let done=false;
+  function capture(){
+    if(done)return;done=true;
+    try{
+      canvas.width=video.videoWidth||320;
+      canvas.height=video.videoHeight||180;
+      canvas.getContext('2d').drawImage(video,0,0,canvas.width,canvas.height);
+      canvas.style.display='block';
+      if(loading)loading.style.display='none';
+    }catch{if(loading)loading.textContent='CORS';}
+    cleanup();
+  }
+  hls.on(Hls.Events.MANIFEST_PARSED,()=>{video.currentTime=1;video.play().catch(()=>{});});
+  video.addEventListener('seeked',capture);
+  video.addEventListener('loadeddata',()=>setTimeout(capture,300));
+  const t=setTimeout(()=>{if(loading)loading.textContent='—';cleanup();},10000);
+  function cleanup(){clearTimeout(t);try{hls.destroy();}catch{}video.remove();}
+  hls.on(Hls.Events.ERROR,(_,d)=>{if(d.fatal){if(loading)loading.textContent='—';cleanup();}});
 }
 
 // Generate weekly
@@ -730,7 +887,7 @@ function generateWeekly(){
             <div class="report-ad-body">
               ${ad.context?`<div class="report-ad-context">${esc(ad.context)}</div>`:''}
               <div class="report-ad-flags">
-                ${ad.swipe?'<span class="report-flag swipe">✓ No Swipe</span>':''}
+                ${ad.funilDestaqueId&&(d.funisDestaque||[]).find(fd=>fd.id===ad.funilDestaqueId)?`<span class="report-flag" style="background:#1a2a1a;color:#00c47a;border:1px solid #00c47a33">🔗 ${esc((d.funisDestaque||[]).find(fd=>fd.id===ad.funilDestaqueId)?.domAnuncio||'Funil vinculado')}</span>`:''}
                 ${ad.lateral?'<span class="report-flag lateral">🔄 Lateralizado</span>':''}
                 ${ad.famoso?'<span class="report-flag famoso">⭐ Com famoso</span>':''}
               </div>
@@ -738,6 +895,20 @@ function generateWeekly(){
             </div>
           </div>
         `;
+      });
+    }
+
+    // Funis em destaque
+    const funisDestaque=(d.funisDestaque||[]).filter(fd=>fd.domAnuncio||fd.urlFinal||fd.headline);
+    if(funisDestaque.length){
+      html+=`<div class="report-section-label" style="margin-top:22px">Funis em destaque</div>`;
+      funisDestaque.forEach((fd,i)=>{
+        html+=`<div class="report-funil" style="margin-bottom:14px">`;
+        if(fd.domAnuncio) html+=`<div class="report-funil-label">Domínio do anúncio</div><div style="font-size:13px;color:var(--accent);font-weight:600;margin-bottom:8px">${esc(fd.domAnuncio)}</div>`;
+        if(fd.headline) html+=`<div class="report-funil-label">Headline campeã</div><div class="report-headline">"${esc(fd.headline)}"</div>`;
+        if(fd.urlFinal) html+=`<div class="report-link-row"><span class="report-link-label">URL Final</span><a href="${esc(fd.urlFinal)}" class="report-link" target="_blank">${esc(fd.urlFinal)}</a></div>`;
+        if(fd.cdn) html+=`<div class="report-link-row"><span class="report-link-label">CDN VSL</span><a href="${esc(fd.cdn)}" class="report-link" target="_blank">${esc(fd.cdn)}</a></div>`;
+        html+=`</div>`;
       });
     }
 
