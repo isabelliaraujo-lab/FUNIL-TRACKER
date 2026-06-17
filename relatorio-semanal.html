@@ -594,12 +594,6 @@ function renderNichoSections(){
       <div class="section-sub" style="margin-top:18px">Funis em destaque</div>
       <div class="funis-destaque-list" id="funis-destaque-${n}"></div>
       <button class="btn-add-ad" style="margin-top:8px" onclick="addFunilDestaque('${n}')">+ Adicionar funil em destaque</button>
-      <div class="section-sub" style="margin-top:18px">VSLs</div>
-      <div class="link-list" id="vsls-${n}"></div>
-      <button class="btn-add-link" onclick="addLink('${n}','vsls')">+ Adicionar VSL</button>
-      <div class="section-sub" style="margin-top:12px">Templates</div>
-      <div class="link-list" id="templates-${n}"></div>
-      <button class="btn-add-link" onclick="addLink('${n}','templates')">+ Adicionar template</button>
       <div class="section-sub" style="margin-top:18px">Observações gerais</div>
       <textarea placeholder="Qualquer insight adicional…"
         onchange="setNichoField('${n}','obs',this.value)">${esc(d.obs)}</textarea>
@@ -607,8 +601,6 @@ function renderNichoSections(){
     container.appendChild(section);
     renderAds(n);
     renderFunisDestaque(n);
-    renderLinks(n,'vsls');
-    renderLinks(n,'templates');
   });
 }
 
@@ -852,9 +844,6 @@ function generateWeekly(){
     const d=nichoData[n];
     const color=NICHO_COLORS[n];
     const hasAds=d.ads.length>0;
-    const hasVsls=d.vsls.filter(v=>v.url).length>0;
-    const hasTemplates=d.templates.filter(t=>t.url).length>0;
-    const hasFunil=d.headline||hasVsls||hasTemplates;
 
     html+=`<div class="report-nicho">`;
     html+=`
@@ -912,19 +901,6 @@ function generateWeekly(){
       });
     }
 
-    // Funil
-    if(hasFunil){
-      html+=`<div class="report-section-label" style="margin-top:22px">Funil em destaque</div>`;
-      html+=`<div class="report-funil">`;
-      if(d.headline) html+=`<div class="report-funil-label">Headline campeã</div><div class="report-headline">"${esc(d.headline)}"</div>`;
-      d.vsls.filter(v=>v.url).forEach(v=>{
-        html+=`<div class="report-link-row"><span class="report-link-label">${esc(v.label||'VSL')}</span><a href="${esc(v.url)}" class="report-link" target="_blank">${esc(v.url)}</a></div>`;
-      });
-      d.templates.filter(t=>t.url).forEach(t=>{
-        html+=`<div class="report-link-row"><span class="report-link-label">${esc(t.label||'Template')}</span><a href="${esc(t.url)}" class="report-link" target="_blank">${esc(t.url)}</a></div>`;
-      });
-      html+=`</div>`;
-    }
 
     if(d.obs) html+=`<div class="report-section-label" style="margin-top:18px">Observações</div><div class="report-obs">${esc(d.obs)}</div>`;
     html+=`</div>`;
