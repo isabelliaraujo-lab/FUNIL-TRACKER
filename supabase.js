@@ -36,6 +36,7 @@ const SupabaseStorage = (() => {
       hora:             f.hora             || null,
       anuncios:         Array.isArray(f.anuncios) ? f.anuncios : [],
       views_historico:  Array.isArray(f.viewsHistorico) ? f.viewsHistorico : [],
+      tag_lateral:      f.tagLateral || '',
     };
   }
 
@@ -64,6 +65,7 @@ const SupabaseStorage = (() => {
       hora:           r.hora,
       anuncios:       r.anuncios || [],
       viewsHistorico: r.views_historico || [],
+      tagLateral:     r.tag_lateral || '',
     };
   }
 

@@ -45,6 +45,7 @@ const Criativos = (() => {
     { key: 'views',      label: 'Views',                    default: true  },
     { key: 'contas',     label: 'Contas c/ mesmo criativo', default: false },
     { key: 'destaque',   label: 'Destaque',                 default: false },
+    { key: 'tagLateral', label: 'Tag lateral',              default: true  },
     { key: 'urlAnuncio', label: 'Link do anúncio',          default: true  },
   ];
 
@@ -427,6 +428,7 @@ const Criativos = (() => {
               ${_cols['views']      !== false ? '<th style="text-align:right">Views</th>'        : ''}
               ${_cols['contas']     !== false ? '<th style="text-align:center">Lateral.</th>'    : ''}
               ${_cols['destaque']   !== false ? '<th style="text-align:center">⭐</th>'          : ''}
+              ${_cols['tagLateral'] !== false ? '<th>Tag lateral</th>'                          : ''}
               ${_cols['urlAnuncio'] !== false ? '<th style="text-align:center">Link</th>'        : ''}
               <th style="width:52px"></th>
             </tr>
@@ -603,6 +605,15 @@ const Criativos = (() => {
             ${ad.destaque ? '⭐' : '☆'}
           </button>
         </td>` : ''}
+        ${show('tagLateral') ? (() => {
+          const funilId = (window._funnelsGlobal || []).find(f => f.urlAnuncio && f.urlAnuncio === ad.urlAnuncio)?.id;
+          const funil = funilId ? (window._funnelsGlobal || []).find(f => f.id === funilId) : null;
+          const tag = funil?.tagLateral || '';
+          return `<td>${tag
+            ? `<span class="tag-lateral" onclick="editarTagLateral('${funilId}')" title="Clique para editar">${esc(tag)}</span>`
+            : (funilId ? `<button class="btn-add-lateral" onclick="editarTagLateral('${funilId}')">+</button>` : '<span style="color:var(--text-muted)">—</span>')
+          }</td>`;
+        })() : ''}
         ${show('urlAnuncio') ? `<td data-field="urlAnuncio" style="text-align:center">
           ${ad.urlAnuncio
             ? `<a href="${esc(ad.urlAnuncio)}" target="_blank" rel="noopener"

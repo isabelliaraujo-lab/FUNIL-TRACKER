@@ -1577,6 +1577,34 @@ select.gf-input {
   flex-shrink: 0;
 }
 
+.tag-lateral {
+  display: inline-block;
+  font-size: 11px;
+  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: 20px;
+  background: #1a1040;
+  color: #a78bfa;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.tag-lateral:hover { background: #2a1a60; }
+
+.btn-add-lateral {
+  background: transparent;
+  border: 1px dashed #2a2a2a;
+  border-radius: 20px;
+  color: #555;
+  font-size: 12px;
+  padding: 2px 8px;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.btn-add-lateral:hover {
+  border-color: #a78bfa;
+  color: #a78bfa;
+}
+
 /* ── Modal histórico de domínio / views ─────────────────────────────── */
 
 #dominio-historico-lista table,

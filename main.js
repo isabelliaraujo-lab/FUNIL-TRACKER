@@ -752,3 +752,21 @@ async function abrirHistoricoDominio(dominio) {
 }
 
 window.abrirHistoricoDominio = abrirHistoricoDominio;
+
+async function editarTagLateral(id) {
+  if (!window._funnelsGlobal || !window._saveFunnelsGlobal) return;
+  const funil = window._funnelsGlobal.find(f => f.id === id);
+  if (!funil) return;
+
+  const atual = funil.tagLateral || '';
+  const novo = window.prompt('Tag de lateralização (ex: VSL-01, HOOK-LEAN).\nDeixe vazio para remover:', atual);
+  if (novo === null) return;
+
+  const updated = window._funnelsGlobal.map(f =>
+    f.id === id ? { ...f, tagLateral: novo.trim() } : f
+  );
+  window._saveFunnelsGlobal(updated);
+  if (!document.getElementById('tab-criativos')?.hidden) Criativos.refresh();
+}
+
+window.editarTagLateral = editarTagLateral;
