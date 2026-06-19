@@ -307,6 +307,24 @@ const SUPABASE_URL = 'https://dworzfcetqllydpnzsbi.supabase.co';
 const SUPABASE_KEY = 'sb_publishable_SSDXOOiqFFL-VvMwJLSK6A_YLHhS6zP';
 const _sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
+// Carregar funis do Supabase para uso em _renderContasEl
+(async () => {
+  try {
+    const { data } = await _sb.from('funis').select('id,conta,dom_anuncio,produto,views');
+    window._funnelsGlobal = (data || []).map(r => ({
+      id: r.id,
+      conta: r.conta,
+      domAnuncio: r.dom_anuncio,
+      produto: r.produto,
+      views: r.views,
+    }));
+    console.log('[relatorio] Funis carregados:', window._funnelsGlobal.length);
+  } catch(e) {
+    console.error('[relatorio] Erro ao carregar funis:', e);
+    window._funnelsGlobal = [];
+  }
+})();
+
 function esc(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;')}
 function fmtDate(d){if(!d)return'';return new Date(d+'T12:00:00').toLocaleDateString('pt-BR',{day:'2-digit',month:'2-digit',year:'2-digit'})}
 function getLocalDate(){const d=new Date();const pad=n=>String(n).padStart(2,'0');return`${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`}
@@ -717,7 +735,15 @@ function _renderHistoricoEl(containerEl, dados){
 
 function _renderContasEl(containerEl, dominio){
   const funis=window._funnelsGlobal||[];
-  const matched=funis.filter(f=>(f.domAnuncio||'').toUpperCase()===dominio.toUpperCase());
+  const domBusca=dominio.toUpperCase().trim();
+  console.log('[contas] Buscando para domínio:', domBusca);
+  console.log('[contas] Total de funis disponíveis:', funis.length);
+  console.log('[contas] Funis com domAnuncio:', funis.filter(f=>f.domAnuncio).length);
+  const matched=funis.filter(f=>{
+    const domFunil=(f.domAnuncio||'').toUpperCase().trim();
+    return domFunil===domBusca||domFunil.includes(domBusca)||domBusca.includes(domFunil);
+  });
+  console.log('[contas] Matches encontrados:', matched.length);
   if(!matched.length){
     containerEl.innerHTML='<div style="font-size:11px;color:#555;margin-top:8px">Nenhuma conta cadastrada com este domínio.</div>';
     return;
