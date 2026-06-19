@@ -893,10 +893,13 @@ function generateWeekly(){
       html+=`<div class="report-section-label" style="margin-top:22px">Funis em destaque</div>`;
       funisDestaque.forEach((fd,i)=>{
         html+=`<div class="report-funil" style="margin-bottom:14px">`;
-        if(fd.domAnuncio) html+=`<div class="report-funil-label">Domínio do anúncio</div><div style="font-size:13px;color:var(--accent);font-weight:600;margin-bottom:8px">${esc(fd.domAnuncio)}</div>`;
+        if(fd.domAnuncio){
+          html+=`<div class="report-funil-label">Domínio do anúncio</div><div style="font-size:13px;color:var(--accent);font-weight:600;margin-bottom:4px">${esc(fd.domAnuncio)}</div>`;
+          html+=`<div data-historico-dominio="${esc(fd.domAnuncio)}" class="funil-historico-container"><div style="font-size:11px;color:#555">Carregando histórico...</div></div>`;
+        }
+        if(fd.cdn) html+=`<div style="margin:10px 0"><div data-vsl-url="${esc(fd.cdn)}" style="width:160px;height:90px;background:#000;border-radius:8px;overflow:hidden;position:relative"><canvas style="width:100%;height:100%;display:none"></canvas><div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:#ffffff66;font-size:10px">carregando...</div></div></div>`;
         if(fd.headline) html+=`<div class="report-funil-label">Headline campeã</div><div class="report-headline">"${esc(fd.headline)}"</div>`;
         if(fd.urlFinal) html+=`<div class="report-link-row"><span class="report-link-label">URL Final</span><a href="${esc(fd.urlFinal)}" class="report-link" target="_blank">${esc(fd.urlFinal)}</a></div>`;
-        if(fd.cdn) html+=`<div class="report-link-row"><span class="report-link-label">CDN VSL</span><a href="${esc(fd.cdn)}" class="report-link" target="_blank">${esc(fd.cdn)}</a></div>`;
         html+=`</div>`;
       });
     }
@@ -910,6 +913,62 @@ function generateWeekly(){
   document.getElementById('report-semanal-form').style.display='none';
   document.getElementById('report-semanal-output').style.display='block';
   window.scrollTo(0,0);
+
+  setTimeout(async()=>{
+    injetarThumbnailsCDN();
+    await injetarHistoricosDominios();
+  },100);
+}
+
+function injetarThumbnailsCDN(){
+  document.querySelectorAll('[data-vsl-url]').forEach(container=>{
+    if(container.dataset.vslLoaded) return;
+    container.dataset.vslLoaded='1';
+    const url=container.dataset.vslUrl;
+    if(url) capturarFrameRelatorio(url,container);
+  });
+}
+
+async function injetarHistoricosDominios(){
+  const containers=document.querySelectorAll('[data-historico-dominio]');
+  if(!containers.length) return;
+
+  const {data}=await _sb.from('dominios_biblioteca').select('dominio,ads_ativos,historico');
+  const cache={};
+  (data||[]).forEach(r=>{cache[r.dominio]={adsAtivos:r.ads_ativos||0,historico:r.historico||[]};});
+
+  containers.forEach(container=>{
+    const dominio=container.dataset.historicoDominio;
+    const dados=cache[dominio.toUpperCase()]||cache[dominio]||null;
+
+    if(!dados||!dados.historico||!dados.historico.length){
+      container.innerHTML='<div style="font-size:11px;color:#555;margin-top:6px">Nenhum histórico registrado.</div>';
+      return;
+    }
+
+    const ordenado=[...dados.historico].sort((a,b)=>new Date(b.data)-new Date(a.data));
+    container.innerHTML=`
+      <div style="font-size:10px;color:#555;margin:6px 0 4px">Ads ativos atual: <strong style="color:#00d4ff">${dados.adsAtivos||0}</strong></div>
+      <table style="width:100%;border-collapse:collapse;font-size:11px">
+        <tr style="border-bottom:1px solid #2a2a2a">
+          <th style="text-align:left;padding:4px 6px;color:#555;font-weight:600">Data</th>
+          <th style="text-align:left;padding:4px 6px;color:#555;font-weight:600">Ant.</th>
+          <th style="text-align:left;padding:4px 6px;color:#555;font-weight:600">Novo</th>
+          <th style="text-align:left;padding:4px 6px;color:#555;font-weight:600">Var.</th>
+        </tr>
+        ${ordenado.slice(0,5).map(entry=>{
+          const diff=entry.novo-entry.anterior;
+          const cor=diff>0?'#00c47a':diff<0?'#ff4d4d':'#555';
+          const sinal=diff>0?'+':'';
+          return `<tr style="border-bottom:1px solid #1a1a1a">
+            <td style="padding:4px 6px;color:#00d4ff">${entry.data}</td>
+            <td style="padding:4px 6px">${entry.anterior}</td>
+            <td style="padding:4px 6px;font-weight:600">${entry.novo}</td>
+            <td style="padding:4px 6px;color:${cor}">${sinal}${diff}</td>
+          </tr>`;
+        }).join('')}
+      </table>`;
+  });
 }
 
 function backToWeeklyForm(){
