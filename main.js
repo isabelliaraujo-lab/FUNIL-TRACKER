@@ -770,3 +770,49 @@ async function editarTagLateral(id) {
 }
 
 window.editarTagLateral = editarTagLateral;
+
+function abrirFunisDodominio(dominio) {
+  const funis = GlobalFilters.filter(funnels).filter(f =>
+    (f.domAnuncio || '').toUpperCase() === dominio.toUpperCase()
+  );
+
+  if (!funis.length) {
+    alert('Nenhum funil cadastrado com este domínio no período filtrado.');
+    return;
+  }
+
+  const esc = Storage.escHtml;
+  const overlay = document.createElement('div');
+  overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:999;display:flex;align-items:center;justify-content:center;padding:20px';
+  overlay.innerHTML = `
+    <div style="background:var(--bg);border:1px solid var(--border);border-radius:14px;padding:24px;max-width:640px;width:100%;max-height:80vh;overflow-y:auto">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">
+        <div>
+          <div style="font-size:14px;font-weight:700;color:#f0f0f0">${esc(dominio)}</div>
+          <div style="font-size:11px;color:#555;margin-top:2px">${funis.length} funil(s) cadastrado(s)</div>
+        </div>
+        <button class="btn btn-secondary" onclick="this.closest('[style*=fixed]').remove()">✕</button>
+      </div>
+      <div>
+        ${funis.map(f => `
+          <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 0;border-bottom:1px solid var(--border);gap:8px">
+            <div style="flex:1;min-width:0">
+              <div style="font-size:12px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(f.conta || '—')}</div>
+              <div style="font-size:11px;color:#555;margin-top:2px">
+                ${esc(f.nicho || '')}${f.produto ? ' · ' + esc(f.produto) : ''}${f.data ? ' · ' + esc(f.data) : ''}${f.views ? ' · ' + Parser.formatViews(f.views) + ' views' : ''}
+              </div>
+            </div>
+            <button class="btn btn-sm btn-secondary"
+              onclick="abrirDetalhe('${f.id}');this.closest('[style*=fixed]').remove()"
+              title="Ver detalhes">👁</button>
+          </div>
+        `).join('')}
+      </div>
+      <button class="btn btn-secondary" style="width:100%;margin-top:16px" onclick="this.closest('[style*=fixed]').remove()">Fechar</button>
+    </div>`;
+
+  overlay.addEventListener('click', e => { if (e.target === overlay) overlay.remove(); });
+  document.body.appendChild(overlay);
+}
+
+window.abrirFunisDodominio = abrirFunisDodominio;

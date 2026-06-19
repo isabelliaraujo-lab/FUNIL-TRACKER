@@ -559,7 +559,7 @@ const Analise = (() => {
         <span class="rank-pos ${i < 3 ? 'top' : ''}">#${i + 1}</span>
         <div style="flex:1;min-width:0;overflow:hidden">
           <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-bottom:2px">
-            <a href="${esc(domUrl)}" target="_blank" rel="noopener" style="font-weight:600;font-size:12px;color:var(--accent);text-decoration:none;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:130px;display:inline-block" title="${esc(dom)}">${esc(dom)}</a>
+            <span class="dom-anuncio-link" onclick="abrirFunisDodominio('${esc(dom)}')" style="font-weight:600;font-size:12px;color:var(--accent);cursor:pointer;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:130px;display:inline-block" title="${esc(dom)}">${esc(dom)}</span>
             <span style="font-size:10px;color:var(--text-muted);flex-shrink:0">${d.count} funis</span>
           </div>
           ${prodTags ? `<div style="display:flex;flex-wrap:wrap;gap:3px;margin-bottom:4px">${prodTags}</div>` : ''}
