@@ -686,41 +686,82 @@ function setFunilDestaqueField(nicho,id,field,value){
   if(field==='domAnuncio') renderAds(nicho); // refresh ads selector
 }
 
-async function carregarHistoricoDominio(dominio,containerEl){
-  if(!dominio.trim()){containerEl.innerHTML='';return;}
-  containerEl.innerHTML='<div style="font-size:11px;color:#555">Buscando...</div>';
-  try{
-    const cache=await _sb.from('dominios_biblioteca').select('dominio,ads_ativos,historico').eq('dominio',dominio.toUpperCase()).single();
-    const dados=cache.data;
-    if(!dados||!dados.historico||!dados.historico.length){
-      containerEl.innerHTML='<div style="font-size:11px;color:#555">Nenhum histórico registrado para este domínio.</div>';
-      return;
-    }
-    const ordenado=[...dados.historico].sort((a,b)=>new Date(b.data)-new Date(a.data));
-    containerEl.innerHTML=`
-      <div style="font-size:10px;color:#555;margin-bottom:4px">Ads ativos atual: <strong style="color:#00d4ff">${dados.ads_ativos||0}</strong></div>
-      <table style="width:100%;border-collapse:collapse;font-size:11px">
-        <tr style="border-bottom:1px solid #2a2a2a">
-          <th style="text-align:left;padding:4px 6px;color:#555;font-weight:600">Data</th>
-          <th style="text-align:left;padding:4px 6px;color:#555;font-weight:600">Ant.</th>
-          <th style="text-align:left;padding:4px 6px;color:#555;font-weight:600">Novo</th>
-          <th style="text-align:left;padding:4px 6px;color:#555;font-weight:600">Var.</th>
-        </tr>
-        ${ordenado.slice(0,5).map(entry=>{
-          const diff=entry.novo-entry.anterior;
-          const cor=diff>0?'#00c47a':diff<0?'#ff4d4d':'#555';
-          const sinal=diff>0?'+':'';
-          return `<tr style="border-bottom:1px solid #1a1a1a">
-            <td style="padding:4px 6px;color:#00d4ff">${entry.data}</td>
-            <td style="padding:4px 6px">${entry.anterior}</td>
-            <td style="padding:4px 6px;font-weight:600">${entry.novo}</td>
-            <td style="padding:4px 6px;color:${cor}">${sinal}${diff}</td>
-          </tr>`;
-        }).join('')}
-      </table>`;
-  }catch(e){
-    containerEl.innerHTML='<div style="font-size:11px;color:#555">Erro ao buscar histórico.</div>';
+function _renderHistoricoEl(containerEl, dados){
+  if(!dados||!dados.historico||!dados.historico.length){
+    containerEl.innerHTML='<div style="font-size:11px;color:#555">Nenhum histórico registrado para este domínio.</div>';
+    return;
   }
+  const ordenado=[...dados.historico].sort((a,b)=>new Date(b.data)-new Date(a.data));
+  containerEl.innerHTML=`
+    <div style="font-size:10px;color:#555;margin-bottom:4px">Ads ativos atual: <strong style="color:#00d4ff">${dados.ads_ativos||dados.adsAtivos||0}</strong></div>
+    <table style="width:100%;border-collapse:collapse;font-size:11px">
+      <tr style="border-bottom:1px solid #2a2a2a">
+        <th style="text-align:left;padding:4px 6px;color:#555;font-weight:600">Data</th>
+        <th style="text-align:left;padding:4px 6px;color:#555;font-weight:600">Ant.</th>
+        <th style="text-align:left;padding:4px 6px;color:#555;font-weight:600">Novo</th>
+        <th style="text-align:left;padding:4px 6px;color:#555;font-weight:600">Var.</th>
+      </tr>
+      ${ordenado.slice(0,5).map(entry=>{
+        const diff=entry.novo-entry.anterior;
+        const cor=diff>0?'#00c47a':diff<0?'#ff4d4d':'#555';
+        const sinal=diff>0?'+':'';
+        return `<tr style="border-bottom:1px solid #1a1a1a">
+          <td style="padding:4px 6px;color:#00d4ff">${entry.data}</td>
+          <td style="padding:4px 6px">${entry.anterior}</td>
+          <td style="padding:4px 6px;font-weight:600">${entry.novo}</td>
+          <td style="padding:4px 6px;color:${cor}">${sinal}${diff}</td>
+        </tr>`;
+      }).join('')}
+    </table>`;
+}
+
+function _renderContasEl(containerEl, dominio){
+  const funis=window._funnelsGlobal||[];
+  const matched=funis.filter(f=>(f.domAnuncio||'').toUpperCase()===dominio.toUpperCase());
+  if(!matched.length){
+    containerEl.innerHTML='<div style="font-size:11px;color:#555;margin-top:8px">Nenhuma conta cadastrada com este domínio.</div>';
+    return;
+  }
+  const contas={};
+  matched.forEach(f=>{
+    const k=f.conta||'(sem conta)';
+    if(!contas[k]) contas[k]={produtos:new Set(),funis:0,views:0};
+    contas[k].funis++;
+    contas[k].views+=f.views||0;
+    if(f.produto) contas[k].produtos.add(f.produto);
+  });
+  const fmtV=v=>{if(!v)return'';if(v>=1e6)return(v/1e6).toFixed(1)+'M';if(v>=1e3)return(v/1e3).toFixed(1)+'k';return String(v);};
+  containerEl.innerHTML=`
+    <div style="font-size:10px;color:#555;text-transform:uppercase;letter-spacing:.8px;margin:10px 0 6px">${Object.keys(contas).length} conta(s) usando este domínio</div>
+    ${Object.entries(contas).map(([conta,d])=>`
+      <div style="display:flex;align-items:flex-start;justify-content:space-between;padding:6px 0;border-bottom:1px solid #1a1a1a;gap:8px">
+        <div style="flex:1;min-width:0">
+          <div style="font-size:12px;font-weight:500;color:#f0f0f0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${conta}</div>
+          <div style="font-size:11px;color:#555;margin-top:2px">${[...d.produtos].slice(0,3).join(', ')||'—'}</div>
+        </div>
+        <div style="text-align:right;flex-shrink:0">
+          <div style="font-size:11px;color:#555">${d.funis} funil(s)</div>
+          ${d.views>0?`<div style="font-size:11px;color:#a78bfa">${fmtV(d.views)}</div>`:''}
+        </div>
+      </div>`).join('')}`;
+}
+
+async function carregarDadosDominio(dominio,containerHistorico,containerContas){
+  if(!dominio.trim()){containerHistorico.innerHTML='';if(containerContas)containerContas.innerHTML='';return;}
+  containerHistorico.innerHTML='<div style="font-size:11px;color:#555">Buscando...</div>';
+  if(containerContas) containerContas.innerHTML='';
+  try{
+    const res=await _sb.from('dominios_biblioteca').select('dominio,ads_ativos,historico').eq('dominio',dominio.toUpperCase()).single();
+    _renderHistoricoEl(containerHistorico,res.data);
+  }catch(e){
+    containerHistorico.innerHTML='<div style="font-size:11px;color:#555">Nenhum histórico registrado.</div>';
+  }
+  if(containerContas) _renderContasEl(containerContas,dominio);
+}
+
+// Manter compatibilidade com chamadas antigas sem containerContas
+async function carregarHistoricoDominio(dominio,containerEl){
+  return carregarDadosDominio(dominio,containerEl,null);
 }
 
 function renderFunisDestaque(nicho){
@@ -745,8 +786,9 @@ function renderFunisDestaque(nicho){
           <input type="text" placeholder="Ex: VIDEO.VIVIDBODYBOOST.COM"
             value="${esc(fd.domAnuncio)}"
             onchange="setFunilDestaqueField('${nicho}','${fd.id}','domAnuncio',this.value)"
-            onblur="carregarHistoricoDominio(this.value,document.getElementById('hist-dom-${fd.id}'))"/>
+            onblur="carregarDadosDominio(this.value,document.getElementById('hist-dom-${fd.id}'),document.getElementById('contas-dom-${fd.id}'))"/>
           <div id="hist-dom-${fd.id}" style="margin-top:6px"></div>
+          <div id="contas-dom-${fd.id}" style="margin-top:4px"></div>
         </div>
         <div class="field-group">
           <label class="field-label">URL final</label>
@@ -946,6 +988,7 @@ function generateWeekly(){
         if(fd.domAnuncio){
           html+=`<div class="report-funil-label">Domínio do anúncio</div><div style="font-size:13px;color:var(--accent);font-weight:600;margin-bottom:4px">${esc(fd.domAnuncio)}</div>`;
           html+=`<div data-historico-dominio="${esc(fd.domAnuncio)}" class="funil-historico-container"><div style="font-size:11px;color:#555">Carregando histórico...</div></div>`;
+          html+=`<div data-contas-dominio="${esc(fd.domAnuncio)}" class="funil-contas-container"><div style="font-size:11px;color:#555">Carregando contas...</div></div>`;
         }
         if(fd.cdn) html+=`<div style="margin:10px 0"><div data-vsl-url="${esc(fd.cdn)}" style="width:160px;height:90px;background:#000;border-radius:8px;overflow:hidden;position:relative"><canvas style="width:100%;height:100%;display:none"></canvas><div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:#ffffff66;font-size:10px">carregando...</div></div></div>`;
         if(fd.headline) html+=`<div class="report-funil-label">Headline campeã</div><div class="report-headline">"${esc(fd.headline)}"</div>`;
@@ -990,34 +1033,11 @@ async function injetarHistoricosDominios(){
   containers.forEach(container=>{
     const dominio=container.dataset.historicoDominio;
     const dados=cache[dominio.toUpperCase()]||cache[dominio]||null;
+    _renderHistoricoEl(container,dados);
+  });
 
-    if(!dados||!dados.historico||!dados.historico.length){
-      container.innerHTML='<div style="font-size:11px;color:#555;margin-top:6px">Nenhum histórico registrado.</div>';
-      return;
-    }
-
-    const ordenado=[...dados.historico].sort((a,b)=>new Date(b.data)-new Date(a.data));
-    container.innerHTML=`
-      <div style="font-size:10px;color:#555;margin:6px 0 4px">Ads ativos atual: <strong style="color:#00d4ff">${dados.adsAtivos||0}</strong></div>
-      <table style="width:100%;border-collapse:collapse;font-size:11px">
-        <tr style="border-bottom:1px solid #2a2a2a">
-          <th style="text-align:left;padding:4px 6px;color:#555;font-weight:600">Data</th>
-          <th style="text-align:left;padding:4px 6px;color:#555;font-weight:600">Ant.</th>
-          <th style="text-align:left;padding:4px 6px;color:#555;font-weight:600">Novo</th>
-          <th style="text-align:left;padding:4px 6px;color:#555;font-weight:600">Var.</th>
-        </tr>
-        ${ordenado.slice(0,5).map(entry=>{
-          const diff=entry.novo-entry.anterior;
-          const cor=diff>0?'#00c47a':diff<0?'#ff4d4d':'#555';
-          const sinal=diff>0?'+':'';
-          return `<tr style="border-bottom:1px solid #1a1a1a">
-            <td style="padding:4px 6px;color:#00d4ff">${entry.data}</td>
-            <td style="padding:4px 6px">${entry.anterior}</td>
-            <td style="padding:4px 6px;font-weight:600">${entry.novo}</td>
-            <td style="padding:4px 6px;color:${cor}">${sinal}${diff}</td>
-          </tr>`;
-        }).join('')}
-      </table>`;
+  document.querySelectorAll('[data-contas-dominio]').forEach(container=>{
+    _renderContasEl(container,container.dataset.contasDominio);
   });
 }
 
