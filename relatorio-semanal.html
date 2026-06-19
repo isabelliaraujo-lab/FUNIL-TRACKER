@@ -295,6 +295,7 @@ select option{background:#1a1a24}
   </div>
 </div>
 
+<script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script>
 // ── UTILS ─────────────────────────────────────────────────────────────────
@@ -794,10 +795,43 @@ function renderVslThumbnail(fdId,url){
 }
 
 function capturarFrameRelatorio(url,container){
-  if(!window.Hls||!Hls.isSupported())return;
+  console.log('[VSL] Tentando capturar frame:', url);
+
+  if(!window.Hls){
+    console.error('[VSL] HLS não carregado');
+    const d=container.querySelector('div');
+    if(d) d.textContent='HLS não disponível';
+    return;
+  }
+
+  if(!Hls.isSupported()){
+    console.warn('[VSL] HLS não suportado — tentando video nativo');
+    const canvas=container.querySelector('canvas');
+    const loading=container.querySelector('div');
+    const video=document.createElement('video');
+    video.src=url;
+    video.crossOrigin='anonymous';
+    video.muted=true;
+    video.currentTime=1;
+    video.addEventListener('loadeddata',()=>{
+      try{
+        canvas.width=video.videoWidth||320;
+        canvas.height=video.videoHeight||180;
+        canvas.getContext('2d').drawImage(video,0,0,canvas.width,canvas.height);
+        canvas.style.display='block';
+        if(loading) loading.style.display='none';
+        console.log('[VSL] Frame capturado via video nativo');
+      }catch(e){console.error('[VSL] Erro ao capturar via nativo:',e);}
+      video.remove();
+    });
+    document.body.appendChild(video);
+    return;
+  }
+
+  console.log('[VSL] HLS suportado, iniciando...');
   const canvas=container.querySelector('canvas');
   const loading=container.querySelector('div');
-  if(!canvas)return;
+  if(!canvas){console.error('[VSL] canvas não encontrado no container');return;}
   const video=document.createElement('video');
   video.crossOrigin='anonymous';
   video.muted=true;
@@ -809,21 +843,30 @@ function capturarFrameRelatorio(url,container){
   let done=false;
   function capture(){
     if(done)return;done=true;
+    console.log('[VSL] Capturando frame, videoWidth:',video.videoWidth,'videoHeight:',video.videoHeight);
     try{
       canvas.width=video.videoWidth||320;
       canvas.height=video.videoHeight||180;
       canvas.getContext('2d').drawImage(video,0,0,canvas.width,canvas.height);
       canvas.style.display='block';
       if(loading)loading.style.display='none';
-    }catch{if(loading)loading.textContent='CORS';}
+      console.log('[VSL] Frame capturado com sucesso');
+    }catch(e){console.error('[VSL] Erro CORS ou drawImage:',e);if(loading)loading.textContent='CORS';}
     cleanup();
   }
-  hls.on(Hls.Events.MANIFEST_PARSED,()=>{video.currentTime=1;video.play().catch(()=>{});});
-  video.addEventListener('seeked',capture);
-  video.addEventListener('loadeddata',()=>setTimeout(capture,300));
-  const t=setTimeout(()=>{if(loading)loading.textContent='—';cleanup();},10000);
+  hls.on(Hls.Events.MANIFEST_PARSED,()=>{
+    console.log('[VSL] Manifest carregado, seeking para 1s');
+    video.currentTime=1;
+    video.play().catch(e=>console.warn('[VSL] play() bloqueado:',e));
+  });
+  video.addEventListener('seeked',()=>{console.log('[VSL] seeked');capture();});
+  video.addEventListener('loadeddata',()=>{console.log('[VSL] loadeddata');setTimeout(capture,300);});
+  const t=setTimeout(()=>{console.warn('[VSL] Timeout — sem frame em 10s');if(loading)loading.textContent='—';cleanup();},10000);
   function cleanup(){clearTimeout(t);try{hls.destroy();}catch{}video.remove();}
-  hls.on(Hls.Events.ERROR,(_,d)=>{if(d.fatal){if(loading)loading.textContent='—';cleanup();}});
+  hls.on(Hls.Events.ERROR,(_,d)=>{
+    console.error('[VSL] Erro HLS:',d.type,d.details,'fatal:',d.fatal);
+    if(d.fatal){if(loading)loading.textContent='erro';cleanup();}
+  });
 }
 
 // Generate weekly
