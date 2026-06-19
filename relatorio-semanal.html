@@ -310,9 +310,10 @@ const _sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 // Carregar funis do Supabase para uso em _renderContasEl
 (async () => {
   try {
-    const { data } = await _sb.from('funis').select('id,conta,dom_anuncio,produto,views');
+    const { data } = await _sb.from('funis').select('id,data,conta,dom_anuncio,produto,views');
     window._funnelsGlobal = (data || []).map(r => ({
       id: r.id,
+      data: r.data,
       conta: r.conta,
       domAnuncio: r.dom_anuncio,
       produto: r.produto,
@@ -733,11 +734,30 @@ function _renderHistoricoEl(containerEl, dados){
     </table>`;
 }
 
+function getFiltroDataRelatorio(){
+  return {
+    de:  document.getElementById('meta-de')?.value  || null,
+    ate: document.getElementById('meta-ate')?.value || null,
+  };
+}
+
+function filtrarFunisNoPeriodo(funis){
+  const {de,ate}=getFiltroDataRelatorio();
+  if(!de&&!ate) return funis;
+  return funis.filter(f=>{
+    if(!f.data) return false;
+    if(de&&f.data<de) return false;
+    if(ate&&f.data>ate) return false;
+    return true;
+  });
+}
+
 function _renderContasEl(containerEl, dominio){
-  const funis=window._funnelsGlobal||[];
+  const todos=window._funnelsGlobal||[];
+  const funis=filtrarFunisNoPeriodo(todos);
   const domBusca=dominio.toUpperCase().trim();
   console.log('[contas] Buscando para domínio:', domBusca);
-  console.log('[contas] Total de funis disponíveis:', funis.length);
+  console.log('[contas] Total de funis disponíveis:', todos.length, '/ no período:', funis.length);
   console.log('[contas] Funis com domAnuncio:', funis.filter(f=>f.domAnuncio).length);
   const matched=funis.filter(f=>{
     const domFunil=(f.domAnuncio||'').toUpperCase().trim();
