@@ -669,7 +669,7 @@ function renderLinks(nicho,type){
 function addFunilDestaque(nicho){
   const id='fd-'+Math.random().toString(36).slice(2,10);
   if(!nichoData[nicho].funisDestaque) nichoData[nicho].funisDestaque=[];
-  nichoData[nicho].funisDestaque.push({id,domAnuncio:'',urlFinal:'',cdn:'',headline:''});
+  nichoData[nicho].funisDestaque.push({id,titulo:'',domAnuncio:'',urlFinal:'',cdn:'',headline:''});
   renderFunisDestaque(nicho);
 }
 
@@ -731,6 +731,12 @@ function renderFunisDestaque(nicho){
       <div class="ad-item-header">
         <span class="ad-num">Funil</span>
         <button class="btn-remove-ad" onclick="removeFunilDestaque('${nicho}','${fd.id}')">✕</button>
+      </div>
+      <div class="field-group" style="margin-bottom:8px">
+        <label class="field-label">Título / Produto</label>
+        <input type="text" placeholder="Ex: LEAN PEAK, STEEL POWER..."
+          value="${esc(fd.titulo||'')}"
+          onchange="setFunilDestaqueField('${nicho}','${fd.id}','titulo',this.value)"/>
       </div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:8px">
         <div class="field-group">
@@ -888,11 +894,12 @@ function generateWeekly(){
     }
 
     // Funis em destaque
-    const funisDestaque=(d.funisDestaque||[]).filter(fd=>fd.domAnuncio||fd.urlFinal||fd.headline);
+    const funisDestaque=(d.funisDestaque||[]).filter(fd=>fd.titulo||fd.domAnuncio||fd.urlFinal||fd.headline);
     if(funisDestaque.length){
       html+=`<div class="report-section-label" style="margin-top:22px">Funis em destaque</div>`;
       funisDestaque.forEach((fd,i)=>{
         html+=`<div class="report-funil" style="margin-bottom:14px">`;
+        if(fd.titulo) html+=`<div style="font-size:15px;font-weight:700;color:#f0f0f0;margin-bottom:12px">${esc(fd.titulo)}</div>`;
         if(fd.domAnuncio){
           html+=`<div class="report-funil-label">Domínio do anúncio</div><div style="font-size:13px;color:var(--accent);font-weight:600;margin-bottom:4px">${esc(fd.domAnuncio)}</div>`;
           html+=`<div data-historico-dominio="${esc(fd.domAnuncio)}" class="funil-historico-container"><div style="font-size:11px;color:#555">Carregando histórico...</div></div>`;
