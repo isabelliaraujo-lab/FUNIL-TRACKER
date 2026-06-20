@@ -285,6 +285,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   if (_migrou) saveFunnels(funnels);
 
   window._funnelsGlobal = funnels;
+  window._saveFunnelsGlobal = saveFunnels;
   prevFunnels = [...funnels];
 
   try {
