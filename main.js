@@ -726,7 +726,6 @@ async function abrirHistoricoDominio(dominio) {
         <tr>
           <th>Data</th>
           <th>Hora</th>
-          <th>Anterior</th>
           <th>Novo</th>
           <th>Variação</th>
         </tr>
@@ -740,7 +739,6 @@ async function abrirHistoricoDominio(dominio) {
             <tr>
               <td>${entry.data}</td>
               <td style="color:#555">${entry.hora}</td>
-              <td>${entry.anterior.toLocaleString()}</td>
               <td style="font-weight:500">${entry.novo.toLocaleString()}</td>
               <td><span style="color:${cor}">${sinal}${diff.toLocaleString()}</span></td>
             </tr>
