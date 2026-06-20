@@ -610,6 +610,12 @@ document.addEventListener('DOMContentLoaded', async () => {
 
 window.abrirDetalhe = abrirDetalhe;
 
+function formatarDataBR(data) {
+  if (!data) return '—';
+  const p = data.split('-');
+  return p.length === 3 ? `${p[2]}/${p[1]}/${p[0]}` : data;
+}
+
 // Chamado pelo módulo Criativos ao salvar uma edição de views inline,
 // para registrar a entrada no histórico do funil correspondente.
 function registrarViewsHistoricoFunil(urlAnuncio, viewsAnterior, viewsNovo) {
@@ -674,7 +680,7 @@ function abrirHistoricoViews(id) {
             }
             return `
               <tr>
-                <td>${entry.data}</td>
+                <td>${formatarDataBR(entry.data)}</td>
                 <td style="font-weight:500">${Parser.formatViews(entry.views)}</td>
                 <td>${variacao}</td>
               </tr>
@@ -737,7 +743,7 @@ async function abrirHistoricoDominio(dominio) {
           const sinal = diff > 0 ? '+' : '';
           return `
             <tr>
-              <td>${entry.data}</td>
+              <td>${formatarDataBR(entry.data)}</td>
               <td style="color:#555">${entry.hora}</td>
               <td style="font-weight:500">${entry.novo.toLocaleString()}</td>
               <td><span style="color:${cor}">${sinal}${diff.toLocaleString()}</span></td>

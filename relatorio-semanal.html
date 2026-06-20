@@ -724,7 +724,7 @@ function _renderHistoricoEl(containerEl, dados){
         const cor=diff>0?'#00c47a':diff<0?'#ff4d4d':'#555';
         const sinal=diff>0?'+':'';
         return `<tr style="border-bottom:1px solid #1a1a1a">
-          <td style="padding:4px 6px;color:#00d4ff">${entry.data}</td>
+          <td style="padding:4px 6px;color:#00d4ff">${(d=>{const p=d.split('-');return p.length===3?p[2]+'/'+p[1]+'/'+p[0]:d;})(entry.data)}</td>
           <td style="padding:4px 6px;font-weight:600">${entry.novo}</td>
           <td style="padding:4px 6px;color:${cor}">${sinal}${diff}</td>
         </tr>`;
