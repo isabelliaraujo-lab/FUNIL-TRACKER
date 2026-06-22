@@ -579,10 +579,17 @@ async function carregarResumoNichos(){
   }
   container.innerHTML='<div style="font-size:12px;color:var(--muted)">Carregando...</div>';
   try{
+    console.log('[resumo] Query período:', de, 'até', ate);
+
+    // Diagnóstico: amostrar datas e nichos reais no banco
+    const {data:sample}=await _sb.from('funis').select('data,nicho').limit(10);
+    console.log('[resumo] Exemplos de datas/nichos no banco:', sample?.map(f=>({data:f.data,nicho:f.nicho})));
+
     let query=_sb.from('funis').select('nicho,data');
     if(de)  query=query.gte('data',de);
     if(ate) query=query.lte('data',ate);
     const {data,error}=await query;
+    console.log('[resumo] Resultado:', data?.length, 'funis no período | erro:', error);
     if(error||!data){container.innerHTML='<div style="font-size:12px;color:var(--danger)">Erro ao carregar funis.</div>';return;}
 
     const contagem={};
