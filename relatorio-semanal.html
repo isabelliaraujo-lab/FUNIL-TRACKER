@@ -781,10 +781,44 @@ function setFunilDominioField(nicho,fdId,di,field,value){
   salvarRascunho();
 }
 
+function setFunilCdnField(nicho,fdId,di,ci,value){
+  const fd=(nichoData[nicho]?.funisDestaque||[]).find(f=>f.id===fdId);
+  if(fd&&fd.dominios[di]) fd.dominios[di].cdns[ci]=value;
+  salvarRascunho();
+}
+
+function adicionarCdn(nicho,fdId,di){
+  const fd=(nichoData[nicho]?.funisDestaque||[]).find(f=>f.id===fdId);
+  if(!fd||!fd.dominios[di]) return;
+  if(!fd.dominios[di].cdns) fd.dominios[di].cdns=[''];
+  fd.dominios[di].cdns.push('');
+  const c=document.getElementById(`cdns-${fdId}-${di}`);
+  if(c) c.innerHTML=renderCdnsContainer(fd.dominios[di].cdns,fdId,nicho,di);
+  salvarRascunho();
+  // re-init existing thumbnails
+  (fd.dominios[di].cdns||[]).forEach((cdn,ci)=>{
+    if(cdn){
+      const el=document.getElementById(`vsl-cont-${fdId}-${di}-${ci}`);
+      if(el&&!el.dataset.vslLoaded){el.dataset.vslLoaded='1';capturarFrameRelatorio(cdn,el);}
+    }
+  });
+}
+
+function removerCdn(nicho,fdId,di,ci){
+  const fd=(nichoData[nicho]?.funisDestaque||[]).find(f=>f.id===fdId);
+  if(!fd||!fd.dominios[di]) return;
+  const cdns=fd.dominios[di].cdns||[];
+  if(cdns.length<=1) return;
+  cdns.splice(ci,1);
+  const c=document.getElementById(`cdns-${fdId}-${di}`);
+  if(c) c.innerHTML=renderCdnsContainer(cdns,fdId,nicho,di);
+  salvarRascunho();
+}
+
 function adicionarDominio(fdId,nicho){
   const fd=(nichoData[nicho]?.funisDestaque||[]).find(f=>f.id===fdId);
   if(!fd) return;
-  fd.dominios.push({domAnuncio:'',cdn:''});
+  fd.dominios.push({domAnuncio:'',cdns:['']});
   const c=document.getElementById('dominios-'+fdId);
   if(c) c.innerHTML=renderDominiosContainer(fd,nicho);
   salvarRascunho();
@@ -808,7 +842,7 @@ async function carregarDadosDominioBloco(input){
 }
 
 function carregarThumbnailBloco(input){
-  const bloco=input.closest('.dominio-bloco');
+  const bloco=input.closest('.cdn-bloco');
   if(!bloco) return;
   const url=input.value.trim();
   if(!url) return;
@@ -817,6 +851,24 @@ function carregarThumbnailBloco(input){
   preview.innerHTML=`<div data-vsl-url="${esc(url)}" style="width:160px;height:90px;background:#000;border-radius:8px;overflow:hidden;position:relative"><canvas style="width:100%;height:100%;display:none"></canvas><div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:#ffffff66;font-size:10px">carregando...</div></div>`;
   const c=preview.querySelector('[data-vsl-url]');
   if(c) capturarFrameRelatorio(url,c);
+}
+
+function renderCdnsContainer(cdns,fdId,nicho,di){
+  const items=cdns.map((cdn,ci)=>`
+    <div class="cdn-bloco" style="margin-bottom:10px">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
+        <span style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em">CDN ${ci+1}</span>
+        <button onclick="removerCdn('${nicho}','${fdId}',${di},${ci})" style="font-size:11px;color:var(--muted);background:transparent;border:none;cursor:pointer;${cdns.length<=1?'display:none':''}">✕</button>
+      </div>
+      <input type="url" placeholder="https://….m3u8"
+        value="${esc(cdn)}"
+        onchange="setFunilCdnField('${nicho}','${fdId}',${di},${ci},this.value)"
+        onblur="carregarThumbnailBloco(this)"/>
+      <div class="cdn-preview-container" style="margin-top:8px">
+        ${cdn?`<div id="vsl-cont-${fdId}-${di}-${ci}" data-vsl-url="${esc(cdn)}" style="width:160px;height:90px;background:#000;border-radius:8px;overflow:hidden;position:relative"><canvas style="width:100%;height:100%;display:none"></canvas><div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:#ffffff66;font-size:10px">carregando...</div></div>`:''}
+      </div>
+    </div>`).join('');
+  return items+`<button onclick="adicionarCdn('${nicho}','${fdId}',${di})" style="font-size:12px;color:var(--muted);border:1px dashed var(--border2);border-radius:8px;padding:5px 12px;background:transparent;cursor:pointer;width:100%;margin-top:4px">+ Adicionar CDN</button>`;
 }
 
 function renderDominiosContainer(fd,nicho){
@@ -837,12 +889,8 @@ function renderDominiosContainer(fd,nicho){
       </div>
       <div class="field-group">
         <label class="field-label">CDN da VSL (opcional)</label>
-        <input type="url" placeholder="https://….m3u8"
-          value="${esc(dom.cdn||'')}"
-          onchange="setFunilDominioField('${nicho}','${fd.id}',${di},'cdn',this.value)"
-          onblur="carregarThumbnailBloco(this)"/>
-        <div class="cdn-preview-container" style="margin-top:8px">
-          ${dom.cdn?`<div id="vsl-cont-${fd.id}-${di}" data-vsl-url="${esc(dom.cdn)}" style="width:160px;height:90px;background:#000;border-radius:8px;overflow:hidden;position:relative"><canvas style="width:100%;height:100%;display:none"></canvas><div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:#ffffff66;font-size:10px">carregando...</div></div>`:''}
+        <div class="cdns-container" id="cdns-${fd.id}-${di}">
+          ${renderCdnsContainer(dom.cdns||[''],fd.id,nicho,di)}
         </div>
       </div>
     </div>`).join('');
@@ -958,6 +1006,9 @@ function renderFunisDestaque(nicho){
   // Migrar formato antigo {domAnuncio, cdn} para {dominios: [...]}
   lista.forEach(fd=>{
     if(!fd.dominios) fd.dominios=[{domAnuncio:fd.domAnuncio||'',cdn:fd.cdn||''}];
+    fd.dominios.forEach(dom=>{
+      if(!dom.cdns) dom.cdns=[dom.cdn||''];
+    });
   });
 
   container.innerHTML=lista.map(fd=>`
@@ -991,16 +1042,18 @@ function renderFunisDestaque(nicho){
     </div>
   `).join('');
 
-  // Inicializar thumbnails VSL para domínios que já têm CDN
+  // Inicializar thumbnails VSL para CDNs que já têm valor
   lista.forEach(fd=>{
     (fd.dominios||[]).forEach((dom,di)=>{
-      if(dom.cdn){
-        const c=document.getElementById(`vsl-cont-${fd.id}-${di}`);
-        if(c&&!c.dataset.vslLoaded){
-          c.dataset.vslLoaded='1';
-          capturarFrameRelatorio(dom.cdn,c);
+      (dom.cdns||[]).forEach((cdn,ci)=>{
+        if(cdn){
+          const c=document.getElementById(`vsl-cont-${fd.id}-${di}-${ci}`);
+          if(c&&!c.dataset.vslLoaded){
+            c.dataset.vslLoaded='1';
+            capturarFrameRelatorio(cdn,c);
+          }
         }
-      }
+      });
     });
   });
 }
@@ -1171,7 +1224,9 @@ function generateWeekly(){
             html+=`<div data-historico-dominio="${esc(dom.domAnuncio)}" class="funil-historico-container"><div style="font-size:11px;color:#555">Carregando histórico...</div></div>`;
             html+=`<div data-contas-dominio="${esc(dom.domAnuncio)}" class="funil-contas-container"><div style="font-size:11px;color:#555">Carregando contas...</div></div>`;
           }
-          if(dom.cdn) html+=`<div style="margin:10px 0"><div data-vsl-url="${esc(dom.cdn)}" style="width:160px;height:90px;background:#000;border-radius:8px;overflow:hidden;position:relative"><canvas style="width:100%;height:100%;display:none"></canvas><div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:#ffffff66;font-size:10px">carregando...</div></div></div>`;
+          (dom.cdns||[dom.cdn||'']).filter(Boolean).forEach(cdn=>{
+            html+=`<div style="margin:10px 0"><div data-vsl-url="${esc(cdn)}" style="width:160px;height:90px;background:#000;border-radius:8px;overflow:hidden;position:relative"><canvas style="width:100%;height:100%;display:none"></canvas><div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:#ffffff66;font-size:10px">carregando...</div></div></div>`;
+          });
         });
         if(fd.headline) html+=`<div class="report-funil-label">Headline campeã</div><div class="report-headline">"${esc(fd.headline)}"</div>`;
         if(fd.urlFinal) html+=`<div class="report-link-row"><span class="report-link-label">URL Final</span><a href="${esc(fd.urlFinal)}" class="report-link" target="_blank">${esc(fd.urlFinal)}</a></div>`;
