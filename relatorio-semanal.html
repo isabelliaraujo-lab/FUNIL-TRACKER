@@ -236,19 +236,22 @@ select option{background:#1a1a24}
     <div class="meta-row">
       <div class="field-group">
         <label class="field-label">Semana (de)</label>
-        <input type="date" id="meta-de"/>
+        <input type="date" id="meta-de" onchange="carregarResumoNichos()"/>
       </div>
       <div class="field-group">
         <label class="field-label">Semana (até)</label>
-        <input type="date" id="meta-ate"/>
-      </div>
-      <div class="field-group">
-        <label class="field-label">Total de funis minerados</label>
-        <input type="text" id="meta-total" placeholder="Ex: 54"/>
+        <input type="date" id="meta-ate" onchange="carregarResumoNichos()"/>
       </div>
       <div class="field-group">
         <label class="field-label">Responsável</label>
         <input type="text" id="meta-resp" placeholder="Ex: Isabelli"/>
+      </div>
+    </div>
+
+    <div class="field-group" style="margin-bottom:20px">
+      <label class="field-label">Funis minerados por nicho</label>
+      <div id="resumo-nichos-container" style="margin-top:6px;min-height:32px">
+        <div style="font-size:12px;color:var(--muted)">Selecione o período acima para carregar automaticamente.</div>
       </div>
     </div>
 
@@ -563,6 +566,61 @@ function copyDaily(){
 
 let activeNichos=[];
 let nichoData={};
+let _resumoTotal=0;
+
+async function carregarResumoNichos(){
+  const de=document.getElementById('meta-de')?.value;
+  const ate=document.getElementById('meta-ate')?.value;
+  const container=document.getElementById('resumo-nichos-container');
+  if(!container) return;
+  if(!de&&!ate){
+    container.innerHTML='<div style="font-size:12px;color:var(--muted)">Selecione o período acima para carregar automaticamente.</div>';
+    return;
+  }
+  container.innerHTML='<div style="font-size:12px;color:var(--muted)">Carregando...</div>';
+  try{
+    let query=_sb.from('funis').select('nicho,data');
+    if(de)  query=query.gte('data',de);
+    if(ate) query=query.lte('data',ate);
+    const {data,error}=await query;
+    if(error||!data){container.innerHTML='<div style="font-size:12px;color:var(--danger)">Erro ao carregar funis.</div>';return;}
+
+    const contagem={};
+    data.forEach(f=>{if(f.nicho)contagem[f.nicho]=(contagem[f.nicho]||0)+1;});
+    const ordenado=Object.entries(contagem).sort((a,b)=>b[1]-a[1]);
+    _resumoTotal=Object.values(contagem).reduce((acc,v)=>acc+v,0);
+
+    // Atualizar nichoData com contagens automáticas
+    activeNichos.forEach(n=>{
+      if(nichoData[n]) nichoData[n].funis=String(contagem[n]||0);
+    });
+    renderNichoSections();
+
+    if(!ordenado.length){
+      container.innerHTML='<div style="font-size:12px;color:var(--muted)">Nenhum funil encontrado no período.</div>';
+      return;
+    }
+    const maxVal=ordenado[0][1];
+    container.innerHTML=`
+      <div style="font-size:11px;color:var(--muted);margin-bottom:8px">
+        Total: <strong style="color:var(--accent)">${_resumoTotal} funis</strong> no período
+      </div>
+      <div style="display:flex;flex-direction:column;gap:5px">
+        ${ordenado.map(([nicho,count],i)=>`
+          <div style="display:flex;align-items:center;gap:8px">
+            <span style="font-size:10px;font-weight:700;letter-spacing:.06em;padding:2px 7px;border-radius:4px;min-width:34px;text-align:center;background:${NICHO_COLORS[nicho]||'#333'};color:#fff">${nicho}</span>
+            <div style="flex:1;background:var(--bg3);border-radius:4px;height:6px;overflow:hidden">
+              <div style="width:${Math.round((count/maxVal)*100)}%;height:100%;background:${i===0?'var(--accent)':'var(--accent2)'};border-radius:4px;transition:width .3s"></div>
+            </div>
+            <span style="font-size:12px;font-weight:600;color:var(--text);min-width:22px;text-align:right">${count}</span>
+          </div>
+        `).join('')}
+      </div>`;
+  }catch(e){
+    container.innerHTML='<div style="font-size:12px;color:var(--danger)">Erro ao carregar.</div>';
+    console.error('carregarResumoNichos:',e);
+  }
+}
 
 document.querySelectorAll('.nicho-btn').forEach(btn=>{
   btn.addEventListener('click',()=>{
@@ -594,18 +652,12 @@ function renderNichoSections(){
         <h3>${NICHO_NAMES[n]}</h3>
       </div>
       <div class="section-sub">Resumo</div>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px">
-        <div class="field-group">
-          <label class="field-label">Qtd de funis minerados</label>
-          <input type="text" placeholder="Ex: 18" value="${esc(d.funis)}"
-            onchange="setNichoField('${n}','funis',this.value)"/>
-        </div>
-        <div class="field-group">
-          <label class="field-label">📈 Nicho em Alta (semana)</label>
-          <input type="text" placeholder="Ex: WL foi o mais quente"
-            value="${esc(d.nichoAlta)}"
-            onchange="setNichoField('${n}','nichoAlta',this.value)"/>
-        </div>
+      ${d.funis ? `<div style="font-size:11px;color:var(--muted);margin-bottom:8px">🔍 <strong style="color:var(--accent)">${esc(d.funis)}</strong> funis minerados no período</div>` : ''}
+      <div class="field-group" style="margin-bottom:10px">
+        <label class="field-label">📈 Nicho em Alta (semana)</label>
+        <input type="text" placeholder="Ex: WL foi o mais quente"
+          value="${esc(d.nichoAlta)}"
+          onchange="setNichoField('${n}','nichoAlta',this.value)"/>
       </div>
       <div class="field-group" style="margin-bottom:4px">
         <label class="field-label">Texto do resumo</label>
@@ -966,7 +1018,7 @@ function capturarFrameRelatorio(url,container){
 function generateWeekly(){
   const de=document.getElementById('meta-de').value;
   const ate=document.getElementById('meta-ate').value;
-  const total=document.getElementById('meta-total').value;
+  const total=_resumoTotal||'';
   const resp=document.getElementById('meta-resp').value;
 
   let html=`
@@ -1245,10 +1297,9 @@ function copiarLinkHistorico(){
 
 function coletarDadosRelatorio(){
   return {
-    metaDe:    document.getElementById('meta-de')?.value   || '',
-    metaAte:   document.getElementById('meta-ate')?.value  || '',
-    metaTotal: document.getElementById('meta-total')?.value|| '',
-    metaResp:  document.getElementById('meta-resp')?.value || '',
+    metaDe:    document.getElementById('meta-de')?.value  || '',
+    metaAte:   document.getElementById('meta-ate')?.value || '',
+    metaResp:  document.getElementById('meta-resp')?.value|| '',
     activeNichos: [...activeNichos],
     nichoData:    JSON.parse(JSON.stringify(nichoData)),
   };
@@ -1268,10 +1319,9 @@ function salvarRascunho(){
 }
 
 function preencherFormulario(dados){
-  if(dados.metaDe)    document.getElementById('meta-de').value    =dados.metaDe;
-  if(dados.metaAte)   document.getElementById('meta-ate').value   =dados.metaAte;
-  if(dados.metaTotal) document.getElementById('meta-total').value =dados.metaTotal;
-  if(dados.metaResp)  document.getElementById('meta-resp').value  =dados.metaResp;
+  if(dados.metaDe)   document.getElementById('meta-de').value   =dados.metaDe;
+  if(dados.metaAte)  document.getElementById('meta-ate').value  =dados.metaAte;
+  if(dados.metaResp) document.getElementById('meta-resp').value =dados.metaResp;
 
   nichoData    = dados.nichoData    || {};
   activeNichos = dados.activeNichos || [];
@@ -1280,6 +1330,7 @@ function preencherFormulario(dados){
     btn.classList.toggle('active', activeNichos.includes(btn.dataset.nicho));
   });
   renderNichoSections();
+  if(dados.metaDe||dados.metaAte) carregarResumoNichos();
 }
 
 async function restaurarRascunho(){
@@ -1302,7 +1353,7 @@ function limparRascunho(){
 }
 
 // Listeners nos campos estáticos do painel semanal
-['meta-de','meta-ate','meta-total','meta-resp'].forEach(id=>{
+['meta-de','meta-ate','meta-resp'].forEach(id=>{
   const el=document.getElementById(id);
   if(el){
     el.addEventListener('input',  ()=>salvarRascunho());
