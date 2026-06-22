@@ -305,6 +305,9 @@ select option{background:#1a1a24}
 <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script>
+console.log('Script relatorio-semanal carregado');
+console.log('window.supabase:', typeof window.supabase);
+
 // ── UTILS ─────────────────────────────────────────────────────────────────
 const NICHO_COLORS={WL:'#378ADD',ML:'#7F77DD',DB:'#639922',PT:'#BA7517',DA:'#1D9E75',ED:'#E24B4A',NP:'#D85A30',VL:'#D4537E',RJ:'#888780'};
 const NICHO_NAMES={WL:'Weight Loss',ML:'Memória',DB:'Diabetes',PT:'Próstata',DA:'Dores',ED:'Disfunção Erétil',NP:'Nerve Pain',VL:'Visão',RJ:'Rejuvenescimento'};
@@ -318,6 +321,7 @@ try {
 } catch(e) {
   console.error('[relatorio] Falha ao inicializar Supabase:', e);
 }
+console.log('_sb:', typeof _sb);
 
 // Carregar funis do Supabase para uso em _renderContasEl
 (async () => {
@@ -633,6 +637,7 @@ window.carregarResumoNichos = async function carregarResumoNichos(){
     console.error('carregarResumoNichos:',e);
   }
 }
+console.log('carregarResumoNichos definida:', typeof window.carregarResumoNichos);
 
 document.querySelectorAll('.nicho-btn').forEach(btn=>{
   btn.addEventListener('click',()=>{
