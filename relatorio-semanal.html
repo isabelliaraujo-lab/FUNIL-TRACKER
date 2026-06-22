@@ -227,6 +227,10 @@ select option{background:#1a1a24}
       <div class="eyebrow">⚡ Funil Tracker</div>
       <h1>Relatório<br><em style="font-style:italic;color:var(--muted)">Semanal</em></h1>
       <p>Preencha os dados da semana por nicho. O relatório é gerado automaticamente.</p>
+      <div style="display:flex;align-items:center;gap:12px;margin-top:12px">
+        <span id="status-rascunho" style="font-size:11px;color:var(--muted)"></span>
+        <button class="btn btn-sm btn-secondary" onclick="limparRascunho()" style="font-size:11px;padding:4px 10px;border-radius:6px;border:0.5px solid var(--border2);background:var(--bg3);color:var(--muted);cursor:pointer">Limpar rascunho</button>
+      </div>
     </div>
 
     <div class="meta-row">
@@ -624,13 +628,13 @@ function renderNichoSections(){
   });
 }
 
-function setNichoField(nicho,field,value){nichoData[nicho][field]=value}
+function setNichoField(nicho,field,value){nichoData[nicho][field]=value;salvarRascunho()}
 
 // Ads
-function addAd(nicho){nichoData[nicho].ads.push({link:'',context:'',swipe:false,lateral:false,famoso:false});renderAds(nicho)}
-function removeAd(nicho,idx){nichoData[nicho].ads.splice(idx,1);renderAds(nicho)}
-function setAdField(nicho,idx,field,value){nichoData[nicho].ads[idx][field]=value}
-function toggleAdFlag(nicho,idx,flag){nichoData[nicho].ads[idx][flag]=!nichoData[nicho].ads[idx][flag];renderAds(nicho)}
+function addAd(nicho){nichoData[nicho].ads.push({link:'',context:'',swipe:false,lateral:false,famoso:false});renderAds(nicho);salvarRascunho()}
+function removeAd(nicho,idx){nichoData[nicho].ads.splice(idx,1);renderAds(nicho);salvarRascunho()}
+function setAdField(nicho,idx,field,value){nichoData[nicho].ads[idx][field]=value;salvarRascunho()}
+function toggleAdFlag(nicho,idx,flag){nichoData[nicho].ads[idx][flag]=!nichoData[nicho].ads[idx][flag];renderAds(nicho);salvarRascunho()}
 
 function renderAds(nicho){
   const container=document.getElementById(`ads-${nicho}`);
@@ -669,7 +673,7 @@ function renderAds(nicho){
 // Links
 function addLink(nicho,type){nichoData[nicho][type].push({url:'',label:''});renderLinks(nicho,type)}
 function removeLink(nicho,type,idx){nichoData[nicho][type].splice(idx,1);renderLinks(nicho,type)}
-function setLinkField(nicho,type,idx,field,value){nichoData[nicho][type][idx][field]=value}
+function setLinkField(nicho,type,idx,field,value){nichoData[nicho][type][idx][field]=value;salvarRascunho()}
 
 function renderLinks(nicho,type){
   const container=document.getElementById(`${type}-${nicho}`);
@@ -691,18 +695,21 @@ function addFunilDestaque(nicho){
   if(!nichoData[nicho].funisDestaque) nichoData[nicho].funisDestaque=[];
   nichoData[nicho].funisDestaque.push({id,titulo:'',domAnuncio:'',urlFinal:'',cdn:'',headline:''});
   renderFunisDestaque(nicho);
+  salvarRascunho();
 }
 
 function removeFunilDestaque(nicho,id){
   nichoData[nicho].funisDestaque=nichoData[nicho].funisDestaque.filter(f=>f.id!==id);
   renderFunisDestaque(nicho);
   renderAds(nicho); // refresh ads so selector updates
+  salvarRascunho();
 }
 
 function setFunilDestaqueField(nicho,id,field,value){
   const fd=nichoData[nicho].funisDestaque.find(f=>f.id===id);
   if(fd) fd[field]=value;
   if(field==='domAnuncio') renderAds(nicho); // refresh ads selector
+  salvarRascunho();
 }
 
 function _renderHistoricoEl(containerEl, dados){
@@ -1231,6 +1238,80 @@ function copiarLinkHistorico(){
     setTimeout(()=>btn.textContent=orig,2000);
   });
 }
+
+// ══════════════════════════════════════════════════════════════════════════
+// RASCUNHO (localStorage)
+// ══════════════════════════════════════════════════════════════════════════
+
+function coletarDadosRelatorio(){
+  return {
+    metaDe:    document.getElementById('meta-de')?.value   || '',
+    metaAte:   document.getElementById('meta-ate')?.value  || '',
+    metaTotal: document.getElementById('meta-total')?.value|| '',
+    metaResp:  document.getElementById('meta-resp')?.value || '',
+    activeNichos: [...activeNichos],
+    nichoData:    JSON.parse(JSON.stringify(nichoData)),
+  };
+}
+
+let _rascunhoTimer=null;
+function salvarRascunho(){
+  clearTimeout(_rascunhoTimer);
+  _rascunhoTimer=setTimeout(()=>{
+    try{
+      const dados=coletarDadosRelatorio();
+      localStorage.setItem('relatorio-rascunho',JSON.stringify({dados,savedAt:new Date().toISOString()}));
+      const el=document.getElementById('status-rascunho');
+      if(el){el.textContent='rascunho salvo ✓';setTimeout(()=>el.textContent='',2000);}
+    }catch(e){console.error('Erro ao salvar rascunho:',e);}
+  },600);
+}
+
+function preencherFormulario(dados){
+  if(dados.metaDe)    document.getElementById('meta-de').value    =dados.metaDe;
+  if(dados.metaAte)   document.getElementById('meta-ate').value   =dados.metaAte;
+  if(dados.metaTotal) document.getElementById('meta-total').value =dados.metaTotal;
+  if(dados.metaResp)  document.getElementById('meta-resp').value  =dados.metaResp;
+
+  nichoData    = dados.nichoData    || {};
+  activeNichos = dados.activeNichos || [];
+
+  document.querySelectorAll('.nicho-btn').forEach(btn=>{
+    btn.classList.toggle('active', activeNichos.includes(btn.dataset.nicho));
+  });
+  renderNichoSections();
+}
+
+async function restaurarRascunho(){
+  const raw=localStorage.getItem('relatorio-rascunho');
+  if(!raw) return;
+  try{
+    const {dados,savedAt}=JSON.parse(raw);
+    if(!dados) return;
+    const dataFormatada=new Date(savedAt).toLocaleString('pt-BR');
+    const confirmar=confirm(`Existe um rascunho salvo em ${dataFormatada}.\nDeseja restaurar?`);
+    if(!confirmar) return;
+    preencherFormulario(dados);
+  }catch(e){console.error('Erro ao restaurar rascunho:',e);}
+}
+
+function limparRascunho(){
+  if(!confirm('Limpar o rascunho salvo e começar do zero?')) return;
+  localStorage.removeItem('relatorio-rascunho');
+  location.reload();
+}
+
+// Listeners nos campos estáticos do painel semanal
+['meta-de','meta-ate','meta-total','meta-resp'].forEach(id=>{
+  const el=document.getElementById(id);
+  if(el){
+    el.addEventListener('input',  ()=>salvarRascunho());
+    el.addEventListener('change', ()=>salvarRascunho());
+  }
+});
+
+// Restaurar rascunho ao carregar (antes de checar parâmetros de URL)
+restaurarRascunho();
 
 // Abrir direto pela URL (?id=UUID ou ?historico=1)
 const _urlParams=new URLSearchParams(window.location.search);
