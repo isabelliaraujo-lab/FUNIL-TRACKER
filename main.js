@@ -285,6 +285,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   if (_migrou) saveFunnels(funnels);
 
   window._funnelsGlobal = funnels;
+  window._saveFunnelsGlobal = saveFunnels;
   prevFunnels = [...funnels];
 
   try {
@@ -758,8 +759,14 @@ async function abrirHistoricoDominio(dominio) {
 window.abrirHistoricoDominio = abrirHistoricoDominio;
 
 async function editarTagLateral(id) {
-  if (!window._funnelsGlobal || !window._saveFunnelsGlobal) return;
+  console.log('editarTagLateral chamado com id:', id);
+  console.log('_funnelsGlobal:', window._funnelsGlobal, '_saveFunnelsGlobal:', window._saveFunnelsGlobal);
+  if (!window._funnelsGlobal || !window._saveFunnelsGlobal) {
+    console.error('editarTagLateral: _funnelsGlobal ou _saveFunnelsGlobal não definidos');
+    return;
+  }
   const funil = window._funnelsGlobal.find(f => f.id === id);
+  console.log('funil encontrado:', funil);
   if (!funil) return;
 
   const atual = funil.tagLateral || '';

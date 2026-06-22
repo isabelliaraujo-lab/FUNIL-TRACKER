@@ -227,24 +227,31 @@ select option{background:#1a1a24}
       <div class="eyebrow">⚡ Funil Tracker</div>
       <h1>Relatório<br><em style="font-style:italic;color:var(--muted)">Semanal</em></h1>
       <p>Preencha os dados da semana por nicho. O relatório é gerado automaticamente.</p>
+      <div style="display:flex;align-items:center;gap:12px;margin-top:12px">
+        <span id="status-rascunho" style="font-size:11px;color:var(--muted)"></span>
+        <button class="btn btn-sm btn-secondary" onclick="limparRascunho()" style="font-size:11px;padding:4px 10px;border-radius:6px;border:0.5px solid var(--border2);background:var(--bg3);color:var(--muted);cursor:pointer">Limpar rascunho</button>
+      </div>
     </div>
 
     <div class="meta-row">
       <div class="field-group">
         <label class="field-label">Semana (de)</label>
-        <input type="date" id="meta-de"/>
+        <input type="date" id="meta-de" onchange="carregarResumoNichos()"/>
       </div>
       <div class="field-group">
         <label class="field-label">Semana (até)</label>
-        <input type="date" id="meta-ate"/>
-      </div>
-      <div class="field-group">
-        <label class="field-label">Total de funis minerados</label>
-        <input type="text" id="meta-total" placeholder="Ex: 54"/>
+        <input type="date" id="meta-ate" onchange="carregarResumoNichos()"/>
       </div>
       <div class="field-group">
         <label class="field-label">Responsável</label>
         <input type="text" id="meta-resp" placeholder="Ex: Isabelli"/>
+      </div>
+    </div>
+
+    <div class="field-group" style="margin-bottom:20px">
+      <label class="field-label">Funis minerados por nicho</label>
+      <div id="resumo-nichos-container" style="margin-top:6px;min-height:32px">
+        <div style="font-size:12px;color:var(--muted)">Selecione o período acima para carregar automaticamente.</div>
       </div>
     </div>
 
@@ -298,6 +305,9 @@ select option{background:#1a1a24}
 <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script>
+console.log('Script relatorio-semanal carregado');
+console.log('window.supabase:', typeof window.supabase);
+
 // ── UTILS ─────────────────────────────────────────────────────────────────
 const NICHO_COLORS={WL:'#378ADD',ML:'#7F77DD',DB:'#639922',PT:'#BA7517',DA:'#1D9E75',ED:'#E24B4A',NP:'#D85A30',VL:'#D4537E',RJ:'#888780'};
 const NICHO_NAMES={WL:'Weight Loss',ML:'Memória',DB:'Diabetes',PT:'Próstata',DA:'Dores',ED:'Disfunção Erétil',NP:'Nerve Pain',VL:'Visão',RJ:'Rejuvenescimento'};
@@ -305,7 +315,13 @@ const ALL_NICHOS=['WL','ML','DB','PT','DA','NP','ED','VL','RJ'];
 
 const SUPABASE_URL = 'https://dworzfcetqllydpnzsbi.supabase.co';
 const SUPABASE_KEY = 'sb_publishable_SSDXOOiqFFL-VvMwJLSK6A_YLHhS6zP';
-const _sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+let _sb;
+try {
+  _sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+} catch(e) {
+  console.error('[relatorio] Falha ao inicializar Supabase:', e);
+}
+console.log('_sb:', typeof _sb);
 
 // Carregar funis do Supabase para uso em _renderContasEl
 (async () => {
@@ -559,6 +575,69 @@ function copyDaily(){
 
 let activeNichos=[];
 let nichoData={};
+let _resumoTotal=0;
+
+window.carregarResumoNichos = async function carregarResumoNichos(){
+  const de=document.getElementById('meta-de')?.value;
+  const ate=document.getElementById('meta-ate')?.value;
+  const container=document.getElementById('resumo-nichos-container');
+  if(!container) return;
+  if(!de&&!ate){
+    container.innerHTML='<div style="font-size:12px;color:var(--muted)">Selecione o período acima para carregar automaticamente.</div>';
+    return;
+  }
+  container.innerHTML='<div style="font-size:12px;color:var(--muted)">Carregando...</div>';
+  try{
+    console.log('[resumo] Query período:', de, 'até', ate);
+
+    // Diagnóstico: amostrar datas e nichos reais no banco
+    const {data:sample}=await _sb.from('funis').select('data,nicho').limit(10);
+    console.log('[resumo] Exemplos de datas/nichos no banco:', sample?.map(f=>({data:f.data,nicho:f.nicho})));
+
+    let query=_sb.from('funis').select('nicho,data');
+    if(de)  query=query.gte('data',de);
+    if(ate) query=query.lte('data',ate);
+    const {data,error}=await query;
+    console.log('[resumo] Resultado:', data?.length, 'funis no período | erro:', error);
+    if(error||!data){container.innerHTML='<div style="font-size:12px;color:var(--danger)">Erro ao carregar funis.</div>';return;}
+
+    const contagem={};
+    data.forEach(f=>{if(f.nicho)contagem[f.nicho]=(contagem[f.nicho]||0)+1;});
+    const ordenado=Object.entries(contagem).sort((a,b)=>b[1]-a[1]);
+    _resumoTotal=Object.values(contagem).reduce((acc,v)=>acc+v,0);
+
+    // Atualizar nichoData com contagens automáticas
+    activeNichos.forEach(n=>{
+      if(nichoData[n]) nichoData[n].funis=String(contagem[n]||0);
+    });
+    renderNichoSections();
+
+    if(!ordenado.length){
+      container.innerHTML='<div style="font-size:12px;color:var(--muted)">Nenhum funil encontrado no período.</div>';
+      return;
+    }
+    const maxVal=ordenado[0][1];
+    container.innerHTML=`
+      <div style="font-size:11px;color:var(--muted);margin-bottom:8px">
+        Total: <strong style="color:var(--accent)">${_resumoTotal} funis</strong> no período
+      </div>
+      <div style="display:flex;flex-direction:column;gap:5px">
+        ${ordenado.map(([nicho,count],i)=>`
+          <div style="display:flex;align-items:center;gap:8px">
+            <span style="font-size:10px;font-weight:700;letter-spacing:.06em;padding:2px 7px;border-radius:4px;min-width:34px;text-align:center;background:${NICHO_COLORS[nicho]||'#333'};color:#fff">${nicho}</span>
+            <div style="flex:1;background:var(--bg3);border-radius:4px;height:6px;overflow:hidden">
+              <div style="width:${Math.round((count/maxVal)*100)}%;height:100%;background:${i===0?'var(--accent)':'var(--accent2)'};border-radius:4px;transition:width .3s"></div>
+            </div>
+            <span style="font-size:12px;font-weight:600;color:var(--text);min-width:22px;text-align:right">${count}</span>
+          </div>
+        `).join('')}
+      </div>`;
+  }catch(e){
+    container.innerHTML='<div style="font-size:12px;color:var(--danger)">Erro ao carregar.</div>';
+    console.error('carregarResumoNichos:',e);
+  }
+}
+console.log('carregarResumoNichos definida:', typeof window.carregarResumoNichos);
 
 document.querySelectorAll('.nicho-btn').forEach(btn=>{
   btn.addEventListener('click',()=>{
@@ -590,18 +669,12 @@ function renderNichoSections(){
         <h3>${NICHO_NAMES[n]}</h3>
       </div>
       <div class="section-sub">Resumo</div>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px">
-        <div class="field-group">
-          <label class="field-label">Qtd de funis minerados</label>
-          <input type="text" placeholder="Ex: 18" value="${esc(d.funis)}"
-            onchange="setNichoField('${n}','funis',this.value)"/>
-        </div>
-        <div class="field-group">
-          <label class="field-label">📈 Nicho em Alta (semana)</label>
-          <input type="text" placeholder="Ex: WL foi o mais quente"
-            value="${esc(d.nichoAlta)}"
-            onchange="setNichoField('${n}','nichoAlta',this.value)"/>
-        </div>
+      ${d.funis ? `<div style="font-size:11px;color:var(--muted);margin-bottom:8px">🔍 <strong style="color:var(--accent)">${esc(d.funis)}</strong> funis minerados no período</div>` : ''}
+      <div class="field-group" style="margin-bottom:10px">
+        <label class="field-label">📈 Nicho em Alta (semana)</label>
+        <input type="text" placeholder="Ex: WL foi o mais quente"
+          value="${esc(d.nichoAlta)}"
+          onchange="setNichoField('${n}','nichoAlta',this.value)"/>
       </div>
       <div class="field-group" style="margin-bottom:4px">
         <label class="field-label">Texto do resumo</label>
@@ -624,13 +697,13 @@ function renderNichoSections(){
   });
 }
 
-function setNichoField(nicho,field,value){nichoData[nicho][field]=value}
+function setNichoField(nicho,field,value){nichoData[nicho][field]=value;salvarRascunho()}
 
 // Ads
-function addAd(nicho){nichoData[nicho].ads.push({link:'',context:'',swipe:false,lateral:false,famoso:false});renderAds(nicho)}
-function removeAd(nicho,idx){nichoData[nicho].ads.splice(idx,1);renderAds(nicho)}
-function setAdField(nicho,idx,field,value){nichoData[nicho].ads[idx][field]=value}
-function toggleAdFlag(nicho,idx,flag){nichoData[nicho].ads[idx][flag]=!nichoData[nicho].ads[idx][flag];renderAds(nicho)}
+function addAd(nicho){nichoData[nicho].ads.push({link:'',context:'',swipe:false,lateral:false,famoso:false});renderAds(nicho);salvarRascunho()}
+function removeAd(nicho,idx){nichoData[nicho].ads.splice(idx,1);renderAds(nicho);salvarRascunho()}
+function setAdField(nicho,idx,field,value){nichoData[nicho].ads[idx][field]=value;salvarRascunho()}
+function toggleAdFlag(nicho,idx,flag){nichoData[nicho].ads[idx][flag]=!nichoData[nicho].ads[idx][flag];renderAds(nicho);salvarRascunho()}
 
 function renderAds(nicho){
   const container=document.getElementById(`ads-${nicho}`);
@@ -669,7 +742,7 @@ function renderAds(nicho){
 // Links
 function addLink(nicho,type){nichoData[nicho][type].push({url:'',label:''});renderLinks(nicho,type)}
 function removeLink(nicho,type,idx){nichoData[nicho][type].splice(idx,1);renderLinks(nicho,type)}
-function setLinkField(nicho,type,idx,field,value){nichoData[nicho][type][idx][field]=value}
+function setLinkField(nicho,type,idx,field,value){nichoData[nicho][type][idx][field]=value;salvarRascunho()}
 
 function renderLinks(nicho,type){
   const container=document.getElementById(`${type}-${nicho}`);
@@ -691,18 +764,21 @@ function addFunilDestaque(nicho){
   if(!nichoData[nicho].funisDestaque) nichoData[nicho].funisDestaque=[];
   nichoData[nicho].funisDestaque.push({id,titulo:'',domAnuncio:'',urlFinal:'',cdn:'',headline:''});
   renderFunisDestaque(nicho);
+  salvarRascunho();
 }
 
 function removeFunilDestaque(nicho,id){
   nichoData[nicho].funisDestaque=nichoData[nicho].funisDestaque.filter(f=>f.id!==id);
   renderFunisDestaque(nicho);
   renderAds(nicho); // refresh ads so selector updates
+  salvarRascunho();
 }
 
 function setFunilDestaqueField(nicho,id,field,value){
   const fd=nichoData[nicho].funisDestaque.find(f=>f.id===id);
   if(fd) fd[field]=value;
   if(field==='domAnuncio') renderAds(nicho); // refresh ads selector
+  salvarRascunho();
 }
 
 function _renderHistoricoEl(containerEl, dados){
@@ -959,7 +1035,7 @@ function capturarFrameRelatorio(url,container){
 function generateWeekly(){
   const de=document.getElementById('meta-de').value;
   const ate=document.getElementById('meta-ate').value;
-  const total=document.getElementById('meta-total').value;
+  const total=_resumoTotal||'';
   const resp=document.getElementById('meta-resp').value;
 
   let html=`
@@ -1231,6 +1307,79 @@ function copiarLinkHistorico(){
     setTimeout(()=>btn.textContent=orig,2000);
   });
 }
+
+// ══════════════════════════════════════════════════════════════════════════
+// RASCUNHO (localStorage)
+// ══════════════════════════════════════════════════════════════════════════
+
+function coletarDadosRelatorio(){
+  return {
+    metaDe:    document.getElementById('meta-de')?.value  || '',
+    metaAte:   document.getElementById('meta-ate')?.value || '',
+    metaResp:  document.getElementById('meta-resp')?.value|| '',
+    activeNichos: [...activeNichos],
+    nichoData:    JSON.parse(JSON.stringify(nichoData)),
+  };
+}
+
+let _rascunhoTimer=null;
+function salvarRascunho(){
+  clearTimeout(_rascunhoTimer);
+  _rascunhoTimer=setTimeout(()=>{
+    try{
+      const dados=coletarDadosRelatorio();
+      localStorage.setItem('relatorio-rascunho',JSON.stringify({dados,savedAt:new Date().toISOString()}));
+      const el=document.getElementById('status-rascunho');
+      if(el){el.textContent='rascunho salvo ✓';setTimeout(()=>el.textContent='',2000);}
+    }catch(e){console.error('Erro ao salvar rascunho:',e);}
+  },600);
+}
+
+function preencherFormulario(dados){
+  if(dados.metaDe)   document.getElementById('meta-de').value   =dados.metaDe;
+  if(dados.metaAte)  document.getElementById('meta-ate').value  =dados.metaAte;
+  if(dados.metaResp) document.getElementById('meta-resp').value =dados.metaResp;
+
+  nichoData    = dados.nichoData    || {};
+  activeNichos = dados.activeNichos || [];
+
+  document.querySelectorAll('.nicho-btn').forEach(btn=>{
+    btn.classList.toggle('active', activeNichos.includes(btn.dataset.nicho));
+  });
+  renderNichoSections();
+  if(dados.metaDe||dados.metaAte) carregarResumoNichos();
+}
+
+async function restaurarRascunho(){
+  const raw=localStorage.getItem('relatorio-rascunho');
+  if(!raw) return;
+  try{
+    const {dados,savedAt}=JSON.parse(raw);
+    if(!dados) return;
+    const dataFormatada=new Date(savedAt).toLocaleString('pt-BR');
+    const confirmar=confirm(`Existe um rascunho salvo em ${dataFormatada}.\nDeseja restaurar?`);
+    if(!confirmar) return;
+    preencherFormulario(dados);
+  }catch(e){console.error('Erro ao restaurar rascunho:',e);}
+}
+
+function limparRascunho(){
+  if(!confirm('Limpar o rascunho salvo e começar do zero?')) return;
+  localStorage.removeItem('relatorio-rascunho');
+  location.reload();
+}
+
+// Listeners nos campos estáticos do painel semanal
+['meta-de','meta-ate','meta-resp'].forEach(id=>{
+  const el=document.getElementById(id);
+  if(el){
+    el.addEventListener('input',  ()=>salvarRascunho());
+    el.addEventListener('change', ()=>salvarRascunho());
+  }
+});
+
+// Restaurar rascunho ao carregar (antes de checar parâmetros de URL)
+restaurarRascunho();
 
 // Abrir direto pela URL (?id=UUID ou ?historico=1)
 const _urlParams=new URLSearchParams(window.location.search);
