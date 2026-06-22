@@ -312,7 +312,12 @@ const ALL_NICHOS=['WL','ML','DB','PT','DA','NP','ED','VL','RJ'];
 
 const SUPABASE_URL = 'https://dworzfcetqllydpnzsbi.supabase.co';
 const SUPABASE_KEY = 'sb_publishable_SSDXOOiqFFL-VvMwJLSK6A_YLHhS6zP';
-const _sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+let _sb;
+try {
+  _sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+} catch(e) {
+  console.error('[relatorio] Falha ao inicializar Supabase:', e);
+}
 
 // Carregar funis do Supabase para uso em _renderContasEl
 (async () => {
@@ -568,7 +573,7 @@ let activeNichos=[];
 let nichoData={};
 let _resumoTotal=0;
 
-async function carregarResumoNichos(){
+window.carregarResumoNichos = async function carregarResumoNichos(){
   const de=document.getElementById('meta-de')?.value;
   const ate=document.getElementById('meta-ate')?.value;
   const container=document.getElementById('resumo-nichos-container');
