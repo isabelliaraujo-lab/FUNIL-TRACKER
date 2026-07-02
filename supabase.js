@@ -86,6 +86,42 @@ const SupabaseStorage = (() => {
     return (data || []).map(fromRow);
   }
 
+  // ── Upsert resiliente a colunas ainda não criadas no banco ────────────
+  // Se a tabela 'funis' no Supabase ainda não tiver uma coluna recém
+  // adicionada ao código (ex.: mecanismo, print_trafego), o PostgREST
+  // rejeita o upsert inteiro com "Could not find the 'x' column of 'funis'
+  // in the schema cache" — e NENHUM funil é salvo. Em vez de falhar tudo,
+  // detectamos esse erro, removemos a coluna ausente e tentamos de novo,
+  // para que o funil seja salvo (só aquele campo específico fica sem
+  // persistir até a coluna ser criada — ver migrations/001_add_mecanismo_print_trafego.sql).
+  function extractMissingColumn(error) {
+    const msg = error?.message || '';
+    const match = /Could not find the '([^']+)' column of '[^']+' in the schema cache/.exec(msg);
+    return match ? match[1] : null;
+  }
+
+  async function upsertFunisResiliente(rows) {
+    let attempt = rows;
+    for (let i = 0; i < 10; i++) {
+      const { error } = await db.from('funis').upsert(attempt, { onConflict: 'id' });
+      if (!error) return null;
+
+      const col = extractMissingColumn(error);
+      if (!col || !(col in attempt[0])) return error;
+
+      console.warn(
+        `[Supabase] Coluna '${col}' não existe na tabela 'funis' — salvando sem ela. ` +
+        `Rode migrations/001_add_mecanismo_print_trafego.sql no Supabase para habilitá-la.`
+      );
+      attempt = attempt.map(row => {
+        const copy = { ...row };
+        delete copy[col];
+        return copy;
+      });
+    }
+    return new Error('Falha ao sincronizar: excesso de colunas desconhecidas.');
+  }
+
   // ── Sincronização ─────────────────────────────────────────────────────
   // newFunnels: array atual completo
   // deletedIds: IDs que existiam antes e foram removidos
@@ -94,9 +130,7 @@ const SupabaseStorage = (() => {
     const ops = [];
 
     if (newFunnels.length) {
-      ops.push(
-        db.from('funis').upsert(newFunnels.map(toRow), { onConflict: 'id' })
-      );
+      ops.push(upsertFunisResiliente(newFunnels.map(toRow)).then(error => ({ error })));
     }
 
     for (const id of deletedIds) {
@@ -128,9 +162,7 @@ const SupabaseStorage = (() => {
       }
     });
 
-    const { error } = await db
-      .from('funis')
-      .upsert(local.map(toRow), { onConflict: 'id' });
+    const error = await upsertFunisResiliente(local.map(toRow));
 
     if (error) { console.error('Migration error:', error); return -1; }
 
