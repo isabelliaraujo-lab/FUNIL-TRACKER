@@ -289,11 +289,12 @@ const Tabela = (() => {
           ${esc(truncate(f.conta || '—', 32))}
         </td>
         <td>${nichoTag(f.nicho)}</td>
-        <td title="${esc(f.produto || '')}"
+        <td title="${esc(f.produto || '')}${f.mecanismo ? ' · ' + esc(f.mecanismo) : ''}"
             style="font-size:12px;max-width:130px;">
           ${Storage.isProdutoDesconhecido(f.produto)
             ? '<span style="color:var(--text-muted);font-style:italic">—</span>'
             : esc(truncate(f.produto, 18))}
+          ${f.mecanismo ? `<div style="font-size:10px;color:var(--text-muted);margin-top:2px">${esc(truncate(f.mecanismo, 18))}</div>` : ''}
         </td>
         <td>${urlAnuncioCell}</td>
         <td>${viewsTag(f.views, f.id)}</td>
@@ -375,6 +376,7 @@ const Tabela = (() => {
     set('e-conta',        f.conta        || '');
     set('e-nicho',        f.nicho        || '');
     set('e-produto',      f.produto      || '');
+    set('e-mecanismo',    f.mecanismo    || '');
     // Reconstrói anuncios para compatibilidade com dados antigos
     const anunciosEdit = (f.anuncios && f.anuncios.length > 0)
       ? f.anuncios
@@ -665,6 +667,7 @@ const Tabela = (() => {
         conta:           val('e-conta'),
         nicho:           val('e-nicho'),
         produto:         Storage.normalizeProduto(val('e-produto')),
+        mecanismo:       val('e-mecanismo') || null,
         anuncios,
         urlAnuncio:      urlAn,
         urlAnuncioFull:  urlAn,

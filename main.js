@@ -75,6 +75,10 @@ function abrirDetalhe(id) {
         <div style="font-size:13px;font-weight:600">${f.produto ? esc(f.produto) : '<em style="color:var(--text-muted)">—</em>'}</div>
       </div>
       <div>
+        <div style="font-size:11px;color:var(--text-muted);text-transform:uppercase;letter-spacing:.08em;margin-bottom:4px">Mecanismo</div>
+        <div style="font-size:13px;font-weight:600">${f.mecanismo ? esc(f.mecanismo) : '<em style="color:var(--text-muted)">—</em>'}</div>
+      </div>
+      <div>
         <div style="font-size:11px;color:var(--text-muted);text-transform:uppercase;letter-spacing:.08em;margin-bottom:4px">Views</div>
         <div style="font-size:13px;font-weight:600">${f.views || '—'}</div>
       </div>
@@ -386,7 +390,8 @@ document.addEventListener('DOMContentLoaded', async () => {
     const v = id => document.getElementById(id).value.trim();
     const conta   = v('m-conta');
     const nicho   = v('m-nicho');
-    const produto = v('m-produto');
+    const produto    = v('m-produto');
+    const mecanismo  = v('m-mecanismo');
     if (!conta && !v('m-urlAnuncio')) {
       showToast('Preencha pelo menos a Conta ou a URL do anúncio.');
       return;
@@ -406,7 +411,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     const urlAn    = v('m-urlAnuncio');
     const funnel = {
       id: Storage.genId(), data: v('m-data'), hora: v('m-hora') || null, conta, nicho,
-      produto: produto.toUpperCase(), urlAnuncio: urlAn, urlAnuncioFull: urlAn,
+      produto: produto.toUpperCase(), mecanismo: mecanismo || null, urlAnuncio: urlAn, urlAnuncioFull: urlAn,
       urlVsl: v('m-urlVsl') || null,
       views: viewsRaw ? Parser.parseViews(viewsRaw) : null,
       famoso: v('m-famoso') || null, domAnuncio, domAnuncioFull,
