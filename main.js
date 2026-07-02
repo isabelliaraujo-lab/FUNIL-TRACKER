@@ -114,6 +114,14 @@ function abrirDetalhe(id) {
       <div style="font-size:11px;color:var(--text-muted);text-transform:uppercase;letter-spacing:.08em;margin-bottom:4px">Observações</div>
       <div style="font-size:13px;line-height:1.6">${esc(f.obs)}</div>
     </div>` : ''}
+
+    ${f.printTrafego ? `
+    <div style="margin-bottom:14px">
+      <div style="font-size:11px;color:var(--text-muted);text-transform:uppercase;letter-spacing:.08em;margin-bottom:6px">Print SimilarWeb / SEMrush</div>
+      <a href="${esc(f.printTrafego)}" target="_blank" title="Abrir em tamanho maior">
+        <img src="${esc(f.printTrafego)}" alt="Print de tráfego" style="max-width:100%;max-height:160px;border-radius:8px;border:1px solid var(--border);cursor:zoom-in;object-fit:contain" />
+      </a>
+    </div>` : ''}
   `;
 
   const modal = document.getElementById('modal-funil-detalhe-v2');
@@ -404,12 +412,23 @@ document.addEventListener('DOMContentLoaded', async () => {
       famoso: v('m-famoso') || null, domAnuncio, domAnuncioFull,
       domFinal, domFinalFull, split: splitVal, obs: v('m-obs'),
       gasto: null, conversao: null, moeda: 'BRL',
+      printTrafego: null,
     };
     funnels.unshift(funnel);
     saveFunnels(funnels);
     Tabela.renderTable();
     resetManual();
     showToast('Funil adicionado!');
+
+    // Upload do print de tráfego em background (não bloqueia)
+    const printFile = document.getElementById('m-print-trafego').files[0];
+    if (printFile && window.SupabaseStorage) {
+      SupabaseStorage.uploadPrintTrafego(printFile, funnel.id).then(url => {
+        if (!url) return;
+        const idx = funnels.findIndex(f => f.id === funnel.id);
+        if (idx !== -1) { funnels[idx].printTrafego = url; saveFunnels(funnels); }
+      });
+    }
   });
 
   document.getElementById('btn-reset-manual').addEventListener('click', resetManual);
@@ -417,6 +436,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     document.getElementById('manual-form').reset();
     document.getElementById('m-data').value = new Date().toISOString().slice(0, 10);
     document.getElementById('m-hora').value = new Date().toTimeString().slice(0, 5);
+    removePrintTrafegoPreview();
   }
 
   // ── CSV Export/Import ─────────────────────────────────────────────────
@@ -827,3 +847,36 @@ function abrirFunisDodominio(dominio) {
 }
 
 window.abrirFunisDodominio = abrirFunisDodominio;
+
+// ── Print SimilarWeb/SEMrush — preview no formulário ─────────────────────
+
+function onPrintTrafegoSelected(input) {
+  const file = input.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = e => {
+    const preview = document.getElementById('print-trafego-preview');
+    const placeholder = document.getElementById('print-trafego-placeholder');
+    const removeBtn = document.getElementById('print-trafego-remove');
+    preview.src = e.target.result;
+    preview.style.display = 'block';
+    placeholder.style.display = 'none';
+    removeBtn.style.display = 'inline-block';
+  };
+  reader.readAsDataURL(file);
+}
+
+function removePrintTrafegoPreview(e) {
+  if (e) e.stopPropagation();
+  const input = document.getElementById('m-print-trafego');
+  const preview = document.getElementById('print-trafego-preview');
+  const placeholder = document.getElementById('print-trafego-placeholder');
+  const removeBtn = document.getElementById('print-trafego-remove');
+  if (input) input.value = '';
+  if (preview) { preview.src = ''; preview.style.display = 'none'; }
+  if (placeholder) placeholder.style.display = '';
+  if (removeBtn) removeBtn.style.display = 'none';
+}
+
+window.onPrintTrafegoSelected = onPrintTrafegoSelected;
+window.removePrintTrafegoPreview = removePrintTrafegoPreview;

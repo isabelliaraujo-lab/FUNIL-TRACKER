@@ -37,6 +37,7 @@ const SupabaseStorage = (() => {
       anuncios:         Array.isArray(f.anuncios) ? f.anuncios : [],
       views_historico:  Array.isArray(f.viewsHistorico) ? f.viewsHistorico : [],
       tag_lateral:      f.tagLateral || '',
+      print_trafego:    f.printTrafego || null,
     };
   }
 
@@ -66,6 +67,7 @@ const SupabaseStorage = (() => {
       anuncios:       r.anuncios || [],
       viewsHistorico: r.views_historico || [],
       tagLateral:     r.tag_lateral || '',
+      printTrafego:   r.print_trafego || null,
     };
   }
 
@@ -188,5 +190,34 @@ const SupabaseStorage = (() => {
     return { historico: data?.historico || [], adsAtivos: data?.ads_ativos || 0 };
   }
 
-  return { loadFunnels, syncFunnels, migrarLocalStorage, loadMonitoradas, saveMonitorada, deleteMonitorada, loadDominiosBiblioteca, salvarAdsAtivos, getHistoricoDominio };
+  // ── Upload de imagem (prints SimilarWeb/SEMrush) ──────────────────────
+
+  const BUCKET = 'prints-trafego';
+
+  async function uploadPrintTrafego(file, funilId) {
+    const ext  = file.name.split('.').pop().toLowerCase() || 'jpg';
+    const path = `${funilId}.${ext}`;
+
+    // Tenta criar o bucket caso não exista (erro 409 = já existe, ignorar)
+    await db.storage.createBucket(BUCKET, { public: true }).catch(() => {});
+
+    const { error: upErr } = await db.storage
+      .from(BUCKET)
+      .upload(path, file, { upsert: true, contentType: file.type });
+
+    if (upErr) { console.error('Upload error:', upErr); return null; }
+
+    const { data } = db.storage.from(BUCKET).getPublicUrl(path);
+    return data?.publicUrl || null;
+  }
+
+  async function deletePrintTrafego(funilId) {
+    // Tenta remover qualquer extensão comum
+    const exts = ['png','jpg','jpeg','webp'];
+    await Promise.all(exts.map(ext =>
+      db.storage.from(BUCKET).remove([`${funilId}.${ext}`])
+    ));
+  }
+
+  return { loadFunnels, syncFunnels, migrarLocalStorage, loadMonitoradas, saveMonitorada, deleteMonitorada, loadDominiosBiblioteca, salvarAdsAtivos, getHistoricoDominio, uploadPrintTrafego, deletePrintTrafego };
 })();
