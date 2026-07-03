@@ -19,7 +19,6 @@ const SupabaseStorage = (() => {
       conta:            f.conta            || null,
       nicho:            f.nicho            || null,
       produto:          f.produto          || null,
-      mecanismo:        f.mecanismo        || null,
       url_anuncio:      f.urlAnuncio       || null,
       url_anuncio_full: f.urlAnuncioFull   || null,
       url_vsl:          f.urlVsl           || null,
@@ -38,7 +37,6 @@ const SupabaseStorage = (() => {
       anuncios:         Array.isArray(f.anuncios) ? f.anuncios : [],
       views_historico:  Array.isArray(f.viewsHistorico) ? f.viewsHistorico : [],
       tag_lateral:      f.tagLateral || '',
-      print_trafego:    f.printTrafego || null,
     };
   }
 
@@ -50,7 +48,6 @@ const SupabaseStorage = (() => {
       conta:          r.conta,
       nicho:          r.nicho,
       produto:        r.produto,
-      mecanismo:      r.mecanismo || null,
       urlAnuncio:     r.url_anuncio,
       urlAnuncioFull: r.url_anuncio_full,
       urlVsl:         r.url_vsl,
@@ -69,7 +66,6 @@ const SupabaseStorage = (() => {
       anuncios:       r.anuncios || [],
       viewsHistorico: r.views_historico || [],
       tagLateral:     r.tag_lateral || '',
-      printTrafego:   r.print_trafego || null,
     };
   }
 
@@ -86,42 +82,6 @@ const SupabaseStorage = (() => {
     return (data || []).map(fromRow);
   }
 
-  // ── Upsert resiliente a colunas ainda não criadas no banco ────────────
-  // Se a tabela 'funis' no Supabase ainda não tiver uma coluna recém
-  // adicionada ao código (ex.: mecanismo, print_trafego), o PostgREST
-  // rejeita o upsert inteiro com "Could not find the 'x' column of 'funis'
-  // in the schema cache" — e NENHUM funil é salvo. Em vez de falhar tudo,
-  // detectamos esse erro, removemos a coluna ausente e tentamos de novo,
-  // para que o funil seja salvo (só aquele campo específico fica sem
-  // persistir até a coluna ser criada — ver migrations/001_add_mecanismo_print_trafego.sql).
-  function extractMissingColumn(error) {
-    const msg = error?.message || '';
-    const match = /Could not find the '([^']+)' column of '[^']+' in the schema cache/.exec(msg);
-    return match ? match[1] : null;
-  }
-
-  async function upsertFunisResiliente(rows) {
-    let attempt = rows;
-    for (let i = 0; i < 10; i++) {
-      const { error } = await db.from('funis').upsert(attempt, { onConflict: 'id' });
-      if (!error) return null;
-
-      const col = extractMissingColumn(error);
-      if (!col || !(col in attempt[0])) return error;
-
-      console.warn(
-        `[Supabase] Coluna '${col}' não existe na tabela 'funis' — salvando sem ela. ` +
-        `Rode migrations/001_add_mecanismo_print_trafego.sql no Supabase para habilitá-la.`
-      );
-      attempt = attempt.map(row => {
-        const copy = { ...row };
-        delete copy[col];
-        return copy;
-      });
-    }
-    return new Error('Falha ao sincronizar: excesso de colunas desconhecidas.');
-  }
-
   // ── Sincronização ─────────────────────────────────────────────────────
   // newFunnels: array atual completo
   // deletedIds: IDs que existiam antes e foram removidos
@@ -130,7 +90,9 @@ const SupabaseStorage = (() => {
     const ops = [];
 
     if (newFunnels.length) {
-      ops.push(upsertFunisResiliente(newFunnels.map(toRow)).then(error => ({ error })));
+      ops.push(
+        db.from('funis').upsert(newFunnels.map(toRow), { onConflict: 'id' })
+      );
     }
 
     for (const id of deletedIds) {
@@ -162,7 +124,9 @@ const SupabaseStorage = (() => {
       }
     });
 
-    const error = await upsertFunisResiliente(local.map(toRow));
+    const { error } = await db
+      .from('funis')
+      .upsert(local.map(toRow), { onConflict: 'id' });
 
     if (error) { console.error('Migration error:', error); return -1; }
 
@@ -224,34 +188,5 @@ const SupabaseStorage = (() => {
     return { historico: data?.historico || [], adsAtivos: data?.ads_ativos || 0 };
   }
 
-  // ── Upload de imagem (prints SimilarWeb/SEMrush) ──────────────────────
-
-  const BUCKET = 'prints-trafego';
-
-  async function uploadPrintTrafego(file, funilId) {
-    const ext  = file.name.split('.').pop().toLowerCase() || 'jpg';
-    const path = `${funilId}.${ext}`;
-
-    // Tenta criar o bucket caso não exista (erro 409 = já existe, ignorar)
-    await db.storage.createBucket(BUCKET, { public: true }).catch(() => {});
-
-    const { error: upErr } = await db.storage
-      .from(BUCKET)
-      .upload(path, file, { upsert: true, contentType: file.type });
-
-    if (upErr) { console.error('Upload error:', upErr); return null; }
-
-    const { data } = db.storage.from(BUCKET).getPublicUrl(path);
-    return data?.publicUrl || null;
-  }
-
-  async function deletePrintTrafego(funilId) {
-    // Tenta remover qualquer extensão comum
-    const exts = ['png','jpg','jpeg','webp'];
-    await Promise.all(exts.map(ext =>
-      db.storage.from(BUCKET).remove([`${funilId}.${ext}`])
-    ));
-  }
-
-  return { loadFunnels, syncFunnels, migrarLocalStorage, loadMonitoradas, saveMonitorada, deleteMonitorada, loadDominiosBiblioteca, salvarAdsAtivos, getHistoricoDominio, uploadPrintTrafego, deletePrintTrafego };
+  return { loadFunnels, syncFunnels, migrarLocalStorage, loadMonitoradas, saveMonitorada, deleteMonitorada, loadDominiosBiblioteca, salvarAdsAtivos, getHistoricoDominio };
 })();
