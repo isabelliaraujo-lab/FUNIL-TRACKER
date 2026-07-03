@@ -75,10 +75,6 @@ function abrirDetalhe(id) {
         <div style="font-size:13px;font-weight:600">${f.produto ? esc(f.produto) : '<em style="color:var(--text-muted)">—</em>'}</div>
       </div>
       <div>
-        <div style="font-size:11px;color:var(--text-muted);text-transform:uppercase;letter-spacing:.08em;margin-bottom:4px">Mecanismo</div>
-        <div style="font-size:13px;font-weight:600">${f.mecanismo ? esc(f.mecanismo) : '<em style="color:var(--text-muted)">—</em>'}</div>
-      </div>
-      <div>
         <div style="font-size:11px;color:var(--text-muted);text-transform:uppercase;letter-spacing:.08em;margin-bottom:4px">Views</div>
         <div style="font-size:13px;font-weight:600">${f.views || '—'}</div>
       </div>
@@ -117,14 +113,6 @@ function abrirDetalhe(id) {
     <div style="margin-bottom:14px">
       <div style="font-size:11px;color:var(--text-muted);text-transform:uppercase;letter-spacing:.08em;margin-bottom:4px">Observações</div>
       <div style="font-size:13px;line-height:1.6">${esc(f.obs)}</div>
-    </div>` : ''}
-
-    ${f.printTrafego ? `
-    <div style="margin-bottom:14px">
-      <div style="font-size:11px;color:var(--text-muted);text-transform:uppercase;letter-spacing:.08em;margin-bottom:6px">Print SimilarWeb / SEMrush</div>
-      <a href="${esc(f.printTrafego)}" target="_blank" title="Abrir em tamanho maior">
-        <img src="${esc(f.printTrafego)}" alt="Print de tráfego" style="max-width:100%;max-height:160px;border-radius:8px;border:1px solid var(--border);cursor:zoom-in;object-fit:contain" />
-      </a>
     </div>` : ''}
   `;
 
@@ -396,8 +384,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     const v = id => document.getElementById(id).value.trim();
     const conta   = v('m-conta');
     const nicho   = v('m-nicho');
-    const produto    = v('m-produto');
-    const mecanismo  = v('m-mecanismo');
+    const produto = v('m-produto');
     if (!conta && !v('m-urlAnuncio')) {
       showToast('Preencha pelo menos a Conta ou a URL do anúncio.');
       return;
@@ -417,29 +404,18 @@ document.addEventListener('DOMContentLoaded', async () => {
     const urlAn    = v('m-urlAnuncio');
     const funnel = {
       id: Storage.genId(), data: v('m-data'), hora: v('m-hora') || null, conta, nicho,
-      produto: produto.toUpperCase(), mecanismo: mecanismo || null, urlAnuncio: urlAn, urlAnuncioFull: urlAn,
+      produto: produto.toUpperCase(), urlAnuncio: urlAn, urlAnuncioFull: urlAn,
       urlVsl: v('m-urlVsl') || null,
       views: viewsRaw ? Parser.parseViews(viewsRaw) : null,
       famoso: v('m-famoso') || null, domAnuncio, domAnuncioFull,
       domFinal, domFinalFull, split: splitVal, obs: v('m-obs'),
       gasto: null, conversao: null, moeda: 'BRL',
-      printTrafego: null,
     };
     funnels.unshift(funnel);
     saveFunnels(funnels);
     Tabela.renderTable();
     resetManual();
     showToast('Funil adicionado!');
-
-    // Upload do print de tráfego em background (não bloqueia)
-    const printFile = document.getElementById('m-print-trafego').files[0];
-    if (printFile && window.SupabaseStorage) {
-      SupabaseStorage.uploadPrintTrafego(printFile, funnel.id).then(url => {
-        if (!url) return;
-        const idx = funnels.findIndex(f => f.id === funnel.id);
-        if (idx !== -1) { funnels[idx].printTrafego = url; saveFunnels(funnels); }
-      });
-    }
   });
 
   document.getElementById('btn-reset-manual').addEventListener('click', resetManual);
@@ -447,7 +423,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     document.getElementById('manual-form').reset();
     document.getElementById('m-data').value = new Date().toISOString().slice(0, 10);
     document.getElementById('m-hora').value = new Date().toTimeString().slice(0, 5);
-    removePrintTrafegoPreview();
   }
 
   // ── CSV Export/Import ─────────────────────────────────────────────────
@@ -858,36 +833,3 @@ function abrirFunisDodominio(dominio) {
 }
 
 window.abrirFunisDodominio = abrirFunisDodominio;
-
-// ── Print SimilarWeb/SEMrush — preview no formulário ─────────────────────
-
-function onPrintTrafegoSelected(input) {
-  const file = input.files[0];
-  if (!file) return;
-  const reader = new FileReader();
-  reader.onload = e => {
-    const preview = document.getElementById('print-trafego-preview');
-    const placeholder = document.getElementById('print-trafego-placeholder');
-    const removeBtn = document.getElementById('print-trafego-remove');
-    preview.src = e.target.result;
-    preview.style.display = 'block';
-    placeholder.style.display = 'none';
-    removeBtn.style.display = 'inline-block';
-  };
-  reader.readAsDataURL(file);
-}
-
-function removePrintTrafegoPreview(e) {
-  if (e) e.stopPropagation();
-  const input = document.getElementById('m-print-trafego');
-  const preview = document.getElementById('print-trafego-preview');
-  const placeholder = document.getElementById('print-trafego-placeholder');
-  const removeBtn = document.getElementById('print-trafego-remove');
-  if (input) input.value = '';
-  if (preview) { preview.src = ''; preview.style.display = 'none'; }
-  if (placeholder) placeholder.style.display = '';
-  if (removeBtn) removeBtn.style.display = 'none';
-}
-
-window.onPrintTrafegoSelected = onPrintTrafegoSelected;
-window.removePrintTrafegoPreview = removePrintTrafegoPreview;
