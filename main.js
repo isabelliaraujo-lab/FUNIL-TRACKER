@@ -258,8 +258,14 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     setSyncStatus('saving');
     SupabaseStorage.syncFunnels(updated, deletedIds)
-      .then(ok => setSyncStatus(ok ? 'saved' : 'error'))
-      .catch(() => setSyncStatus('error'));
+      .then(ok => {
+        setSyncStatus(ok ? 'saved' : 'error');
+        if (!ok) showToast('Erro ao salvar na nuvem — veja o console para detalhes.', 4000);
+      })
+      .catch(() => {
+        setSyncStatus('error');
+        showToast('Erro ao salvar na nuvem — veja o console para detalhes.', 4000);
+      });
 
     if (!document.getElementById('tab-analise').hidden)  Analise.refresh();
     if (!document.getElementById('tab-escalada').hidden) Escalada.refresh();
