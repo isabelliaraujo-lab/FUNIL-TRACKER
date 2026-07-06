@@ -75,7 +75,7 @@ const Criativos = (() => {
 
   // ── Constantes ────────────────────────────────────────────────────────
 
-  const NICHOS = ['WL','DB','ML','ED','NP','DA','PT','VL','TN','LG','RJ','RE'];
+  const NICHOS = ['WL','DB','MM','ED','NR','DA','PT','VL','TN','LG','RJ','RE','BP'];
 
   const ANGULOS = [
     'Transformação','Revelação','Autoridade','Urgência',
@@ -85,9 +85,9 @@ const Criativos = (() => {
   const FORMATOS = ['Reel','Post vídeo','Post imagem','Story','Carrossel'];
 
   const NICHO_COLORS = {
-    WL:'#378ADD', DB:'#639922', ML:'#7F77DD', PT:'#BA7517',
-    DA:'#1D9E75', ED:'#E24B4A', NP:'#D85A30', VL:'#D4537E',
-    TN:'#888780', LG:'#888780', RJ:'#888780', RE:'#888780'
+    WL:'#378ADD', DB:'#639922', MM:'#7F77DD', PT:'#BA7517',
+    DA:'#1D9E75', ED:'#E24B4A', NR:'#D85A30', VL:'#D4537E',
+    TN:'#888780', LG:'#888780', RJ:'#888780', RE:'#888780', BP:'#14B8A6'
   };
 
   // ── Geração de semanas ────────────────────────────────────────────────
