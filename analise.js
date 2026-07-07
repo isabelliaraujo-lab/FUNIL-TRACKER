@@ -56,7 +56,7 @@ const Analise = (() => {
   function finalDomains(f) {
     if (!f.domFinal) return [];
     return (f.split === true || f.split === 'true')
-      ? f.domFinal.split(' / ').map(d => d.trim()).filter(Boolean)
+      ? f.domFinal.split('\n').map(d => d.trim()).filter(Boolean)
       : [f.domFinal.trim()];
   }
 

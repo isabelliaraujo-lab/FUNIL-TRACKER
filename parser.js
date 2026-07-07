@@ -184,14 +184,16 @@ const Parser = (() => {
       !/converteai\.net/i.test(l)
     );
 
-    // REGRA 5 — URL da VSL (linha contendo converteai.net e .m3u8)
-    const vslLine = lines.find(l =>
+    // REGRA 5 — URL(s) da VSL/CDN (linhas contendo converteai.net e .m3u8)
+    const vslLines = lines.filter(l =>
       /converteai\.net/i.test(l) && /\.m3u8/i.test(l)
     );
-    if (vslLine) {
-      const vslMatch = vslLine.match(/(https?:\/\/[^\s]+\.m3u8[^\s]*)/i);
-      if (vslMatch) urlVsl = vslMatch[1].trim();
-    }
+    const vslUrls = vslLines
+      .map(l => (l.match(/(https?:\/\/[^\s]+\.m3u8[^\s]*)/i) || [])[1])
+      .filter(Boolean)
+      .map(u => u.replace(/_+$/, '').trim());
+    if (vslUrls.length) urlVsl = vslUrls.join('\n');
+
     const finalUrls  = finalLines.map(extractUrl).filter(Boolean);
 
     if (finalUrls.length === 1) {
@@ -200,7 +202,7 @@ const Parser = (() => {
       split        = false;
     } else if (finalUrls.length >= 2) {
       const domains = [...new Set(finalUrls.map(domainFromUrl))];
-      domFinal     = domains.join(' / ');
+      domFinal     = domains.join('\n');
       domFinalFull = finalUrls.join('\n');
       split        = true;
     }
