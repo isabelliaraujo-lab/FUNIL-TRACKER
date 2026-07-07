@@ -814,10 +814,10 @@ const Analise = (() => {
                 <button class="${sortCls('biblioteca')}" data-sort-dom-final="biblioteca" style="font-size:10px;padding:2px 8px">Por biblioteca</button>
                 <select id="analise-dom-nicho" style="background:var(--bg);border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:11px;padding:4px 8px;cursor:pointer;margin-left:4px">
                   <option value="">Todos os nichos</option>
-                  <option>WL</option><option>DB</option><option>ML</option>
-                  <option>ED</option><option>NP</option><option>DA</option>
+                  <option>WL</option><option>DB</option><option>MM</option>
+                  <option>ED</option><option>NR</option><option>DA</option>
                   <option>PT</option><option>VL</option><option>TN</option>
-                  <option>LG</option><option>RJ</option><option>RE</option>
+                  <option>LG</option><option>RJ</option><option>RE</option><option>BP</option>
                 </select>
               </div>
             </div>
@@ -836,10 +836,10 @@ const Analise = (() => {
               <span class="escalada-card__title" style="margin-bottom:0">🎬 VSLs em destaque</span>
               <select id="analise-vsl-nicho" style="background:var(--bg);border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:11px;padding:4px 8px;cursor:pointer;margin-left:8px">
                 <option value="">Todos os nichos</option>
-                <option>WL</option><option>DB</option><option>ML</option>
-                <option>ED</option><option>NP</option><option>DA</option>
+                <option>WL</option><option>DB</option><option>MM</option>
+                <option>ED</option><option>NR</option><option>DA</option>
                 <option>PT</option><option>VL</option><option>TN</option>
-                <option>LG</option><option>RJ</option><option>RE</option>
+                <option>LG</option><option>RJ</option><option>RE</option><option>BP</option>
               </select>
             </div>
             <div id="analise-vsl-list">${intelVslHTML(funis)}</div>

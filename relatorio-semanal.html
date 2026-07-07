@@ -11,8 +11,8 @@
   --border:#ffffff0f;--border2:#ffffff18;
   --text:#f0f0f5;--muted:#707088;
   --accent:#c8ff57;--accent2:#7c6fff;--danger:#ff5757;--gold:#fbbf24;
-  --wl:#378ADD;--db:#639922;--ml:#7F77DD;--pt:#BA7517;
-  --da:#1D9E75;--ed:#E24B4A;--np:#D85A30;--vl:#D4537E;--rj:#888780;
+  --wl:#378ADD;--db:#639922;--mm:#7F77DD;--pt:#BA7517;
+  --da:#1D9E75;--ed:#E24B4A;--nr:#D85A30;--vl:#D4537E;--rj:#888780;--bp:#14B8A6;
 }
 *{box-sizing:border-box;margin:0;padding:0}
 body{font-family:'Syne',sans-serif;background:var(--bg);color:var(--text);min-height:100vh}
@@ -49,13 +49,14 @@ select option{background:#1a1a24}
 .nicho-btn.active{color:#fff;border-color:transparent}
 .nicho-btn[data-nicho=WL].active{background:var(--wl)}
 .nicho-btn[data-nicho=DB].active{background:var(--db)}
-.nicho-btn[data-nicho=ML].active{background:var(--ml)}
+.nicho-btn[data-nicho=MM].active{background:var(--mm)}
 .nicho-btn[data-nicho=PT].active{background:var(--pt)}
 .nicho-btn[data-nicho=DA].active{background:var(--da)}
 .nicho-btn[data-nicho=ED].active{background:var(--ed)}
-.nicho-btn[data-nicho=NP].active{background:var(--np)}
+.nicho-btn[data-nicho=NR].active{background:var(--nr)}
 .nicho-btn[data-nicho=VL].active{background:var(--vl)}
 .nicho-btn[data-nicho=RJ].active{background:var(--rj)}
+.nicho-btn[data-nicho=BP].active{background:var(--bp)}
 
 /* ── NICHO SECTION (semanal) ── */
 .nicho-section{background:var(--bg2);border:0.5px solid var(--border2);border-radius:14px;padding:22px;margin-bottom:18px}
@@ -258,14 +259,15 @@ select option{background:#1a1a24}
     <div class="field-label" style="margin-bottom:10px">Selecione os nichos da semana</div>
     <div class="nicho-picker" id="nicho-picker">
       <button class="nicho-btn" data-nicho="WL">WL</button>
-      <button class="nicho-btn" data-nicho="ML">ML</button>
+      <button class="nicho-btn" data-nicho="MM">MM</button>
       <button class="nicho-btn" data-nicho="DB">DB</button>
       <button class="nicho-btn" data-nicho="PT">PT</button>
       <button class="nicho-btn" data-nicho="DA">DA</button>
-      <button class="nicho-btn" data-nicho="NP">NP</button>
+      <button class="nicho-btn" data-nicho="NR">NR</button>
       <button class="nicho-btn" data-nicho="ED">ED</button>
       <button class="nicho-btn" data-nicho="VL">VL</button>
       <button class="nicho-btn" data-nicho="RJ">RJ</button>
+      <button class="nicho-btn" data-nicho="BP">BP</button>
     </div>
 
     <div id="nicho-sections"></div>
@@ -309,9 +311,9 @@ console.log('Script relatorio-semanal carregado');
 console.log('window.supabase:', typeof window.supabase);
 
 // ── UTILS ─────────────────────────────────────────────────────────────────
-const NICHO_COLORS={WL:'#378ADD',ML:'#7F77DD',DB:'#639922',PT:'#BA7517',DA:'#1D9E75',ED:'#E24B4A',NP:'#D85A30',VL:'#D4537E',RJ:'#888780'};
-const NICHO_NAMES={WL:'Weight Loss',ML:'Memória',DB:'Diabetes',PT:'Próstata',DA:'Dores',ED:'Disfunção Erétil',NP:'Nerve Pain',VL:'Visão',RJ:'Rejuvenescimento'};
-const ALL_NICHOS=['WL','ML','DB','PT','DA','NP','ED','VL','RJ'];
+const NICHO_COLORS={WL:'#378ADD',MM:'#7F77DD',DB:'#639922',PT:'#BA7517',DA:'#1D9E75',ED:'#E24B4A',NR:'#D85A30',VL:'#D4537E',RJ:'#888780',BP:'#14B8A6'};
+const NICHO_NAMES={WL:'Weight Loss',MM:'Memória',DB:'Diabetes',PT:'Próstata',DA:'Dores',ED:'Disfunção Erétil',NR:'Nerve Pain',VL:'Visão',RJ:'Rejuvenescimento',BP:'Blood Pressure'};
+const ALL_NICHOS=['WL','MM','DB','PT','DA','NR','ED','VL','RJ','BP'];
 
 const SUPABASE_URL = 'https://dworzfcetqllydpnzsbi.supabase.co';
 const SUPABASE_KEY = 'sb_publishable_SSDXOOiqFFL-VvMwJLSK6A_YLHhS6zP';
@@ -405,7 +407,7 @@ function renderJanelas(){
         </div>
         <div class="field-group">
           <label class="field-label">💡 Seu Feeling</label>
-          <input type="text" placeholder="Ex: mercado aquecido em ML"
+          <input type="text" placeholder="Ex: mercado aquecido em MM"
             value="${esc(dailyData[j.id].feeling)}"
             onchange="dailyData['${j.id}'].feeling=this.value"/>
         </div>

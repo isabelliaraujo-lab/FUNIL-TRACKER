@@ -703,14 +703,14 @@ tbody tr.row-repeated:hover td {
   line-height:   1.6;
 }
 
-/* ── Nicho (12 distinct dark tones) ── */
+/* ── Nicho (13 distinct dark tones) ── */
 .tag-nicho { }
 
 .nicho-WL { background: #002a1a; color: #00c47a; }
 .nicho-DB { background: #00143a; color: #60a5fa; }
-.nicho-ML { background: #2a1400; color: #fb923c; }
+.nicho-MM { background: #2a1400; color: #fb923c; }
 .nicho-ED { background: #2a0028; color: #e879f9; }
-.nicho-NP { background: #1a1040; color: #a78bfa; }
+.nicho-NR { background: #1a1040; color: #a78bfa; }
 .nicho-DA { background: #2a0a0a; color: #ff4d4d; }
 .nicho-PT { background: #0a2a00; color: #86efac; }
 .nicho-VL { background: #1e1e1e; color: #d4d4d4; }
@@ -718,6 +718,7 @@ tbody tr.row-repeated:hover td {
 .nicho-LG { background: #001a2a; color: #38bdf8; }
 .nicho-RJ { background: #2a1800; color: #fdba74; }
 .nicho-RE { background: #2a001a; color: #f472b6; }
+.nicho-BP { background: #002a2a; color: #2dd4bf; }
 
 /* ── Other tags ── */
 .tag-views       { background: #1a1040; color: #a78bfa; }
