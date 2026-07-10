@@ -232,7 +232,7 @@ const Tabela = (() => {
     const filters   = readFilters();
     const filtered  = ordenarPorData(applyFilters(funnels, filters, domCounts), sortOrder);
 
-    renderDashboard(funnels);
+    renderDashboard(filtered);
 
     const { items, page, totalPages, total } = Pagination.paginate(filtered, _page, _perPage);
     _page       = page;
