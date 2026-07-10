@@ -398,7 +398,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       domFinal = domFinalFull.split('\n').map(u => u.trim()).filter(Boolean).map(u => {
         try { return new URL(u).hostname.replace(/^www\./i, '').toUpperCase(); }
         catch { return u.toUpperCase(); }
-      }).join(' / ');
+      }).join('\n');
     }
     const viewsRaw = v('m-views');
     const urlAn    = v('m-urlAnuncio');

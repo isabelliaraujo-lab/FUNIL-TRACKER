@@ -56,7 +56,7 @@ const Analise = (() => {
   function finalDomains(f) {
     if (!f.domFinal) return [];
     return (f.split === true || f.split === 'true')
-      ? f.domFinal.split(' / ').map(d => d.trim()).filter(Boolean)
+      ? f.domFinal.split('\n').map(d => d.trim()).filter(Boolean)
       : [f.domFinal.trim()];
   }
 
@@ -543,7 +543,6 @@ const Analise = (() => {
       items.sort((a, b) => b[1].count - a[1].count);
     }
 
-    items = items.slice(0, 15);
     if (!items.length) return '<p class="analysis-no-results">Nenhum domínio final no período.</p>';
 
     return items.map(([dom, d], i) => {

@@ -37,7 +37,7 @@ const Storage = (() => {
     for (const f of funnels) {
       if (!f.domFinal) continue;
       const domains = f.split
-        ? f.domFinal.split(' / ').map(d => d.trim()).filter(Boolean)
+        ? f.domFinal.split('\n').map(d => d.trim()).filter(Boolean)
         : [f.domFinal.trim()];
       for (const d of domains) {
         counts[d] = (counts[d] || 0) + 1;
@@ -50,7 +50,7 @@ const Storage = (() => {
   function isRepeated(funnel, domCounts) {
     if (!funnel.domFinal) return false;
     const domains = funnel.split
-      ? funnel.domFinal.split(' / ').map(d => d.trim()).filter(Boolean)
+      ? funnel.domFinal.split('\n').map(d => d.trim()).filter(Boolean)
       : [funnel.domFinal.trim()];
     return domains.some(d => (domCounts[d] || 0) > 1);
   }

@@ -102,7 +102,7 @@ const Tabela = (() => {
     if (!f.domFinal) return dash();
 
     if (isSplit(f)) {
-      const domains  = f.domFinal.split(' / ');
+      const domains  = f.domFinal.split('\n');
       const urls     = (f.domFinalFull || '').split('\n');
       const splitTag = '<span class="tag tag-split" style="margin-bottom:4px;">split</span>';
       const links    = domains.map((raw, i) => {
@@ -180,7 +180,7 @@ const Tabela = (() => {
     const uniqueDoms = new Set();
     funnels.forEach(f => {
       if (!f.domFinal) return;
-      (isSplit(f) ? f.domFinal.split(' / ') : [f.domFinal])
+      (isSplit(f) ? f.domFinal.split('\n') : [f.domFinal])
         .forEach(d => uniqueDoms.add(d.trim()));
     });
 
@@ -232,7 +232,7 @@ const Tabela = (() => {
     const filters   = readFilters();
     const filtered  = ordenarPorData(applyFilters(funnels, filters, domCounts), sortOrder);
 
-    renderDashboard(funnels);
+    renderDashboard(filtered);
 
     const { items, page, totalPages, total } = Pagination.paginate(filtered, _page, _perPage);
     _page       = page;
@@ -656,7 +656,7 @@ const Tabela = (() => {
           .map(u => {
             try { return new URL(u).hostname.replace(/^www\./i, '').toUpperCase(); }
             catch { return u.toUpperCase(); }
-          }).join(' / ');
+          }).join('\n');
       }
 
       Object.assign(f, {
