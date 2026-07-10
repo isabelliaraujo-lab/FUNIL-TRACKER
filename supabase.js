@@ -71,15 +71,35 @@ const SupabaseStorage = (() => {
 
   // ── Leitura ───────────────────────────────────────────────────────────
 
-  async function loadFunnels() {
-    const { data, error } = await db
-      .from('funis')
-      .select('*')
-      .order('data',       { ascending: false })
-      .order('created_at', { ascending: false });
+  // PostgREST limita cada resposta a um número máximo de linhas (padrão do
+  // Supabase: 1000) mesmo sem LIMIT explícito no select. Sem paginação por
+  // .range(), tabelas com mais de 1000 funis nunca carregam o restante — o
+  // contador "Total de funis" ficava travado em ~1000 mesmo com mais
+  // registros salvos. Aqui buscamos em páginas até a página vir incompleta.
+  const LOAD_PAGE_SIZE = 1000;
 
-    if (error) { console.error('Supabase load error:', error); return null; }
-    return (data || []).map(fromRow);
+  async function loadFunnels() {
+    const all = [];
+    let from = 0;
+
+    while (true) {
+      const { data, error } = await db
+        .from('funis')
+        .select('*')
+        .order('data',       { ascending: false })
+        .order('created_at', { ascending: false })
+        .order('id',         { ascending: true })
+        .range(from, from + LOAD_PAGE_SIZE - 1);
+
+      if (error) { console.error('Supabase load error:', error); return null; }
+      if (!data || !data.length) break;
+
+      all.push(...data);
+      if (data.length < LOAD_PAGE_SIZE) break;
+      from += LOAD_PAGE_SIZE;
+    }
+
+    return all.map(fromRow);
   }
 
   // ── Sincronização ─────────────────────────────────────────────────────
