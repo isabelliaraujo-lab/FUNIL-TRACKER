@@ -45,10 +45,23 @@ const Analise = (() => {
     // Atualizar cache local imediatamente
     if (!_dominiosBibliotecaCache) _dominiosBibliotecaCache = {};
     if (!_dominiosBibliotecaCache[domain]) _dominiosBibliotecaCache[domain] = { adsAtivos: 0, historico: [] };
-    _dominiosBibliotecaCache[domain].adsAtivos = safeVal;
+    const cacheEntry   = _dominiosBibliotecaCache[domain];
+    const valorAnterior = cacheEntry.adsAtivos;
+    cacheEntry.adsAtivos = safeVal;
+    if (valorAnterior !== safeVal) {
+      cacheEntry.historico = [...(cacheEntry.historico || []), {
+        data: new Date().toISOString().slice(0, 10),
+        hora: new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }),
+        anterior: valorAnterior,
+        novo: safeVal,
+      }];
+    }
 
     // Persistir no Supabase (async, sem bloquear UI)
     SupabaseStorage.salvarAdsAtivos(domain, safeVal).catch(console.error);
+
+    // Re-renderizar a lista para refletir a tag de tendência imediatamente
+    refreshDomAnuncioList(GlobalFilters.filter(_getFunnels()));
   }
 
   // ── Helpers de domínio ────────────────────────────────────────────────
@@ -516,6 +529,26 @@ const Analise = (() => {
 
   // ── BLOCO 2: Domínios do anúncio (sortable + ads na biblioteca) ──────
 
+  // Tendência de ads ativos com base no último registro do histórico do domínio
+  function trendTagHTML(dom, libCount) {
+    if (libCount === '') return '';
+
+    const hist = _dominiosBibliotecaCache?.[dom]?.historico || [];
+    if (!hist.length) {
+      return `<span title="Primeiro registro de ads ativos para este domínio" style="font-size:9px;font-weight:700;padding:1px 6px;border-radius:10px;background:#00143a;color:#60a5fa;white-space:nowrap">🆕 Novo</span>`;
+    }
+
+    const anterior = hist[hist.length - 1].anterior;
+    const atual    = Number(libCount);
+    if (atual > anterior) {
+      return `<span title="Subiu em relação ao registro anterior (${anterior})" style="font-size:9px;font-weight:700;padding:1px 6px;border-radius:10px;background:#002a1a;color:#00c47a;white-space:nowrap">📈 Subindo</span>`;
+    }
+    if (atual < anterior) {
+      return `<span title="Caiu em relação ao registro anterior (${anterior})" style="font-size:9px;font-weight:700;padding:1px 6px;border-radius:10px;background:#2a0a0a;color:#ff4d4d;white-space:nowrap">📉 Caindo</span>`;
+    }
+    return `<span title="Igual ao registro anterior" style="font-size:9px;font-weight:700;padding:1px 6px;border-radius:10px;background:#1e1e1e;color:#9ca3af;white-space:nowrap">➡️ Estável</span>`;
+  }
+
   function intelDomFinalSortableHTML(funis) {
     const domMap = {};
     funis.forEach(f => {
@@ -562,9 +595,10 @@ const Analise = (() => {
             <span style="font-size:10px;color:var(--text-muted);flex-shrink:0">${d.count} funis</span>
           </div>
           ${prodTags ? `<div style="display:flex;flex-wrap:wrap;gap:3px;margin-bottom:4px">${prodTags}</div>` : ''}
-          <div style="display:flex;align-items:center;gap:5px">
+          <div style="display:flex;align-items:center;gap:5px;flex-wrap:wrap">
             <span style="font-size:10px;color:var(--text-muted);white-space:nowrap">Ads ativos:</span>
             <input type="number" min="0" class="dom-lib-input" data-dom="${esc(dom)}" value="${esc(String(libCount))}" placeholder="—" style="width:56px;padding:2px 5px;font-size:11px;border:1px solid var(--border);border-radius:4px;background:var(--bg);color:var(--text)">
+            ${trendTagHTML(dom, libCount)}
             <a href="${esc(fbLibUrl)}" target="_blank" rel="noopener" title="Buscar na Biblioteca de Anúncios" style="text-decoration:none;line-height:1;font-size:14px">🔍</a>
             <span style="cursor:pointer;font-size:14px;line-height:1" onclick="abrirHistoricoDominio('${esc(dom)}')" title="Ver histórico de Ads ativos">📋</span>
           </div>
