@@ -534,7 +534,7 @@ const Analise = (() => {
     if (libCount === '') return '';
 
     const hist = _dominiosBibliotecaCache?.[dom]?.historico || [];
-    if (!hist.length) {
+    if (hist.length < 2) {
       return `<span title="Primeiro registro de ads ativos para este domínio" style="font-size:9px;font-weight:700;padding:1px 6px;border-radius:10px;background:#00143a;color:#60a5fa;white-space:nowrap">🆕 Novo</span>`;
     }
 
