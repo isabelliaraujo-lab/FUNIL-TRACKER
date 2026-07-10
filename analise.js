@@ -543,7 +543,6 @@ const Analise = (() => {
       items.sort((a, b) => b[1].count - a[1].count);
     }
 
-    items = items.slice(0, 15);
     if (!items.length) return '<p class="analysis-no-results">Nenhum domínio final no período.</p>';
 
     return items.map(([dom, d], i) => {
