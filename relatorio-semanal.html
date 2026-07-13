@@ -854,9 +854,20 @@ function carregarThumbnailBloco(input){
   if(!url) return;
   const preview=bloco.querySelector('.cdn-preview-container');
   if(!preview) return;
-  preview.innerHTML=`<div data-vsl-url="${esc(url)}" style="width:160px;height:90px;background:#000;border-radius:8px;overflow:hidden;position:relative"><canvas style="width:100%;height:100%;display:none"></canvas><div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:#ffffff66;font-size:10px">carregando...</div></div>`;
+
+  // Reconstituir o mesmo id vsl-cont-${fdId}-${di}-${ci} usado por
+  // adicionarCdn/renderFunisDestaque, a partir do contexto no DOM.
+  const dominioBloco=input.closest('.dominio-bloco');
+  const dominiosContainer=input.closest('[id^="dominios-"]');
+  const cdnsContainer=bloco.closest('.cdns-container');
+  const fdId=dominiosContainer?dominiosContainer.id.slice('dominios-'.length):'';
+  const di=dominioBloco?dominioBloco.dataset.di:'';
+  const irmaosCdn=cdnsContainer?[...cdnsContainer.children].filter(el=>el.classList.contains('cdn-bloco')):[];
+  const ci=irmaosCdn.indexOf(bloco);
+
+  preview.innerHTML=`<div id="vsl-cont-${fdId}-${di}-${ci}" data-vsl-url="${esc(url)}" style="width:160px;height:90px;background:#000;border-radius:8px;overflow:hidden;position:relative"><canvas style="width:100%;height:100%;display:none"></canvas><div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:#ffffff66;font-size:10px">carregando...</div></div>`;
   const c=preview.querySelector('[data-vsl-url]');
-  if(c) capturarFrameRelatorio(url,c);
+  if(c){ c.dataset.vslLoaded='1'; capturarFrameRelatorio(url,c); }
 }
 
 function renderCdnsContainer(cdns,fdId,nicho,di){
@@ -1251,7 +1262,8 @@ function generateWeekly(){
         html+=`<div class="report-funil" style="margin-bottom:14px">`;
         if(fd.titulo) html+=`<div style="font-size:15px;font-weight:700;color:#f0f0f0;margin-bottom:12px">${esc(fd.titulo)}</div>`;
         dominios.forEach((dom,di)=>{
-          if(!dom.domAnuncio&&!dom.cdn) return;
+          const temCdn=(dom.cdns||[]).some(c=>c&&c.trim())||!!dom.cdn;
+          if(!dom.domAnuncio&&!temCdn) return;
           if(dominios.length>1) html+=`<div style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;margin-bottom:4px${di>0?';margin-top:12px':''}">Domínio ${di+1}</div>`;
           if(dom.domAnuncio){
             html+=`<div class="report-funil-label">Domínio do anúncio</div><div style="font-size:13px;color:var(--accent);font-weight:600;margin-bottom:4px">${esc(dom.domAnuncio)}</div>`;
