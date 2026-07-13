@@ -1415,12 +1415,14 @@ async function verRelatorio(id){
 
   if(error||!data){alert('Erro ao carregar relatório.');return;}
 
+  const overlayId='overlay-relatorio-'+id;
   const overlay=document.createElement('div');
+  overlay.id=overlayId;
   overlay.style.cssText='position:fixed;inset:0;background:var(--bg);z-index:999;overflow-y:auto;padding:40px 24px';
   overlay.innerHTML=`
     <div style="max-width:860px;margin:0 auto">
       <div style="display:flex;gap:10px;margin-bottom:32px">
-        <button class="btn-back" onclick="this.closest('[style]').remove()">← Fechar</button>
+        <button class="btn-back" onclick="document.getElementById('${overlayId}').remove()">← Fechar</button>
         <button class="btn-copy-report" onclick="copiarLinkRelatorio('${id}')">🔗 Copiar link</button>
       </div>
       ${data.tipo==='diario'
