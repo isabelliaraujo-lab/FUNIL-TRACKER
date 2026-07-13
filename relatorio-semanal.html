@@ -1180,7 +1180,6 @@ function generateWeekly(){
   [nichoAtual].forEach(n=>{
     const d=nichoData[n];
     const color=NICHO_COLORS[n];
-    const hasAds=d.ads.length>0;
 
     html+=`<div class="report-nicho">`;
     html+=`
@@ -1197,33 +1196,53 @@ function generateWeekly(){
       html+=`<div class="report-resumo">${auto}${esc(d.resumo)}</div>`;
     }
 
-    // Ads
-    if(hasAds){
-      html+=`<div class="report-section-label">Ads em destaque</div>`;
-      d.ads.forEach((ad,i)=>{
-        if(!ad.link&&!ad.context)return;
-        html+=`
-          <div class="report-ad">
-            <div class="report-ad-num">${String(i+1).padStart(2,'0')}</div>
-            <div class="report-ad-body">
-              ${ad.context?`<div class="report-ad-context">${esc(ad.context)}</div>`:''}
-              <div class="report-ad-flags">
-                ${ad.funilDestaqueId&&(d.funisDestaque||[]).find(fd=>fd.id===ad.funilDestaqueId)?`<span class="report-flag" style="background:#1a2a1a;color:#00c47a;border:1px solid #00c47a33">🔗 ${esc((d.funisDestaque||[]).find(fd=>fd.id===ad.funilDestaqueId)?.domAnuncio||'Funil vinculado')}</span>`:''}
-                ${ad.lateral?'<span class="report-flag lateral">🔄 Lateralizado</span>':''}
-                ${ad.famoso?'<span class="report-flag famoso">⭐ Com famoso</span>':''}
-              </div>
-              ${ad.link?`<a href="${esc(ad.link)}" class="report-ad-link" target="_blank">${esc(ad.link)}</a>`:''}
-            </div>
-          </div>
-        `;
-      });
-    }
-
-    // Funis em destaque
+    // Funis em destaque que de fato serão exibidos (com algum conteúdo preenchido)
     const funisDestaque=(d.funisDestaque||[]).filter(fd=>{
-      const temDominio=(fd.dominios&&fd.dominios.some(d=>d.domAnuncio))||fd.domAnuncio;
+      const temDominio=(fd.dominios&&fd.dominios.some(dm=>dm.domAnuncio))||fd.domAnuncio;
       return fd.titulo||temDominio||fd.urlFinal||fd.headline;
     });
+    const funisDestaqueIds=new Set(funisDestaque.map(fd=>fd.id));
+
+    // Separa ads com vínculo válido a um funil em destaque (renderizados junto
+    // com o funil) dos demais (renderizados na seção geral "Ads em destaque").
+    // Um funilDestaqueId que aponta pra um funil deletado/sem conteúdo cai de
+    // volta na seção geral, como se não estivesse vinculado.
+    const adsComConteudo=(d.ads||[]).filter(ad=>ad.link||ad.context);
+    const adsPorFunil={};
+    const adsSoltos=[];
+    adsComConteudo.forEach(ad=>{
+      if(ad.funilDestaqueId&&funisDestaqueIds.has(ad.funilDestaqueId)){
+        (adsPorFunil[ad.funilDestaqueId]=adsPorFunil[ad.funilDestaqueId]||[]).push(ad);
+      } else {
+        adsSoltos.push(ad);
+      }
+    });
+
+    function renderAdBlock(ad,i,fd){
+      const domVinculado=fd?((fd.dominios&&fd.dominios[0]?.domAnuncio)||fd.domAnuncio||'Funil sem domínio'):null;
+      return `
+        <div class="report-ad">
+          <div class="report-ad-num">${String(i+1).padStart(2,'0')}</div>
+          <div class="report-ad-body">
+            ${ad.context?`<div class="report-ad-context">${esc(ad.context)}</div>`:''}
+            <div class="report-ad-flags">
+              ${domVinculado?`<span class="report-flag" style="background:#1a2a1a;color:#00c47a;border:1px solid #00c47a33">🔗 ${esc(domVinculado)}</span>`:''}
+              ${ad.lateral?'<span class="report-flag lateral">🔄 Lateralizado</span>':''}
+              ${ad.famoso?'<span class="report-flag famoso">⭐ Com famoso</span>':''}
+            </div>
+            ${ad.link?`<a href="${esc(ad.link)}" class="report-ad-link" target="_blank">${esc(ad.link)}</a>`:''}
+          </div>
+        </div>
+      `;
+    }
+
+    // Ads sem funil vinculado (ou com vínculo quebrado)
+    if(adsSoltos.length){
+      html+=`<div class="report-section-label">Ads em destaque</div>`;
+      adsSoltos.forEach((ad,i)=>{ html+=renderAdBlock(ad,i,null); });
+    }
+
+    // Funis em destaque, cada um já com seus ads vinculados logo abaixo
     if(funisDestaque.length){
       html+=`<div class="report-section-label" style="margin-top:22px">Funis em destaque</div>`;
       funisDestaque.forEach((fd,i)=>{
@@ -1245,6 +1264,13 @@ function generateWeekly(){
         });
         if(fd.headline) html+=`<div class="report-funil-label">Headline campeã</div><div class="report-headline">"${esc(fd.headline)}"</div>`;
         if(fd.urlFinal) html+=`<div class="report-link-row"><span class="report-link-label">URL Final</span><a href="${esc(fd.urlFinal)}" class="report-link" target="_blank">${esc(fd.urlFinal)}</a></div>`;
+
+        const adsDoFunil=adsPorFunil[fd.id]||[];
+        if(adsDoFunil.length){
+          html+=`<div class="report-section-label" style="margin-top:16px;margin-bottom:8px">Ads vinculados</div>`;
+          adsDoFunil.forEach((ad,ai)=>{ html+=renderAdBlock(ad,ai,fd); });
+        }
+
         html+=`</div>`;
       });
     }
