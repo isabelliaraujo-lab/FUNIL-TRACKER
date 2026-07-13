@@ -256,7 +256,7 @@ select option{background:#1a1a24}
       </div>
     </div>
 
-    <div class="field-label" style="margin-bottom:10px">Selecione os nichos da semana</div>
+    <div class="field-label" style="margin-bottom:10px">Selecione o nicho para preencher (um por vez)</div>
     <div class="nicho-picker" id="nicho-picker">
       <button class="nicho-btn" data-nicho="WL">WL</button>
       <button class="nicho-btn" data-nicho="MM">MM</button>
@@ -575,9 +575,10 @@ function copyDaily(){
 // SEMANAL
 // ══════════════════════════════════════════════════════════════════════════
 
-let activeNichos=[];
+let nichoAtual=null;
 let nichoData={};
 let _resumoTotal=0;
+let _resumoContagem={};
 
 window.carregarResumoNichos = async function carregarResumoNichos(){
   const de=document.getElementById('meta-de')?.value;
@@ -607,11 +608,10 @@ window.carregarResumoNichos = async function carregarResumoNichos(){
     data.forEach(f=>{if(f.nicho)contagem[f.nicho]=(contagem[f.nicho]||0)+1;});
     const ordenado=Object.entries(contagem).sort((a,b)=>b[1]-a[1]);
     _resumoTotal=Object.values(contagem).reduce((acc,v)=>acc+v,0);
+    _resumoContagem=contagem;
 
-    // Atualizar nichoData com contagens automáticas
-    activeNichos.forEach(n=>{
-      if(nichoData[n]) nichoData[n].funis=String(contagem[n]||0);
-    });
+    // Atualizar nichoData do nicho selecionado com a contagem automática
+    if(nichoAtual && nichoData[nichoAtual]) nichoData[nichoAtual].funis=String(contagem[nichoAtual]||0);
     renderNichoSections();
 
     if(!ordenado.length){
@@ -644,22 +644,26 @@ console.log('carregarResumoNichos definida:', typeof window.carregarResumoNichos
 document.querySelectorAll('.nicho-btn').forEach(btn=>{
   btn.addEventListener('click',()=>{
     const n=btn.dataset.nicho;
-    if(btn.classList.contains('active')){
+    if(nichoAtual===n){
+      // clique no nicho já selecionado: desmarca
+      nichoAtual=null;
       btn.classList.remove('active');
-      activeNichos=activeNichos.filter(x=>x!==n);
     } else {
+      document.querySelectorAll('.nicho-btn').forEach(b=>b.classList.remove('active'));
       btn.classList.add('active');
-      activeNichos.push(n);
+      nichoAtual=n;
       if(!nichoData[n]) nichoData[n]={funis:'',nichoAlta:'',resumo:'',ads:[],funisDestaque:[],vsls:[],templates:[],obs:''};
     }
     renderNichoSections();
+    salvarRascunho();
   });
 });
 
 function renderNichoSections(){
   const container=document.getElementById('nicho-sections');
   container.innerHTML='';
-  activeNichos.forEach(n=>{
+  if(!nichoAtual) return;
+  [nichoAtual].forEach(n=>{
     const d=nichoData[n];
     const color=NICHO_COLORS[n];
     const section=document.createElement('div');
@@ -1146,25 +1150,34 @@ function capturarFrameRelatorio(url,container){
 
 // Generate weekly
 function generateWeekly(){
+  if(!nichoAtual){
+    alert('Selecione um nicho para gerar o relatório.');
+    return;
+  }
   const de=document.getElementById('meta-de').value;
   const ate=document.getElementById('meta-ate').value;
   const total=_resumoTotal||'';
   const resp=document.getElementById('meta-resp').value;
+  const contagemOrdenada=Object.entries(_resumoContagem).sort((a,b)=>b[1]-a[1]);
 
+  // Overview geral da semana — igual independentemente do nicho selecionado
   let html=`
     <div class="report-masthead">
       <div class="eyebrow">⚡ Spy Nativo — Relatório Semanal</div>
       <div class="report-title">Overview<br><em style="font-style:italic;color:var(--muted)">da Semana</em></div>
       <div class="report-meta">
         ${de||ate?`<span>📅 ${fmtDate(de)}${ate?' – '+fmtDate(ate):''}</span>`:''}
-        ${total?`<span>🔍 ${esc(total)} funis minerados</span>`:''}
+        ${total?`<span>🔍 ${esc(total)} funis minerados (todos os nichos)</span>`:''}
         ${resp?`<span>👤 ${esc(resp)}</span>`:''}
-        <span>📊 ${activeNichos.length} nicho(s)</span>
       </div>
+      ${contagemOrdenada.length?`
+      <div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:16px">
+        ${contagemOrdenada.map(([nn,c])=>`<span style="font-size:11px;font-weight:700;padding:3px 10px;border-radius:20px;color:#fff;background:${NICHO_COLORS[nn]||'#555'}">${esc(nn)} · ${c}</span>`).join('')}
+      </div>`:''}
     </div>
   `;
 
-  activeNichos.forEach(n=>{
+  [nichoAtual].forEach(n=>{
     const d=nichoData[n];
     const color=NICHO_COLORS[n];
     const hasAds=d.ads.length>0;
@@ -1173,7 +1186,7 @@ function generateWeekly(){
     html+=`
       <div class="report-nicho-header">
         <div class="report-nicho-badge" style="background:${color}">${n}</div>
-        <div class="report-nicho-title">${NICHO_NAMES[n]}</div>
+        <div class="report-nicho-title">Relatório Semanal — ${n}</div>
         ${d.funis?`<div class="report-nicho-count">${esc(d.funis)} funis</div>`:''}
       </div>
     `;
@@ -1338,21 +1351,24 @@ async function salvarDiario(){
 }
 
 async function salvarSemanal(){
+  if(!nichoAtual){alert('Selecione um nicho antes de salvar.');return;}
   const de=document.getElementById('meta-de').value;
   const ate=document.getElementById('meta-ate').value;
   const resp=document.getElementById('meta-resp').value.trim()||'—';
-  const titulo=`Semanal ${fmtDate(de)}${ate?' – '+fmtDate(ate):''} — ${resp}`;
+  const n=nichoAtual;
+  const titulo=`Semanal ${fmtDate(de)}${ate?' – '+fmtDate(ate):''} — ${n} — ${resp}`;
   const html=document.getElementById('report-weekly-content').innerHTML;
 
   const {error}=await _sb.from('relatorios').insert({
     tipo:'semanal',
     titulo,
-    conteudo:{de,ate,resp,activeNichos,nichoData},
+    nicho:n,
+    conteudo:{de,ate,resp,nicho:n,nichoData:nichoData[n]},
     html_gerado:html,
   });
 
   if(error){alert('Erro ao salvar: '+error.message);return;}
-  alert('✓ Relatório salvo no histórico!');
+  alert(`✓ Relatório de ${n} salvo no histórico! Selecione outro nicho para preencher o próximo.`);
   carregarHistorico();
 }
 
@@ -1363,7 +1379,7 @@ async function carregarHistorico(){
 
   const {data,error}=await _sb
     .from('relatorios')
-    .select('id,tipo,titulo,created_at')
+    .select('id,tipo,titulo,nicho,created_at')
     .order('created_at',{ascending:false});
 
   if(error||!data?.length){
@@ -1374,7 +1390,10 @@ async function carregarHistorico(){
   lista.innerHTML=data.map(r=>`
     <div style="background:var(--bg2);border:0.5px solid var(--border2);border-radius:12px;padding:16px 20px;margin-bottom:10px;display:flex;align-items:center;justify-content:space-between;gap:12px">
       <div>
-        <div style="font-size:13px;font-weight:700;margin-bottom:4px">${esc(r.titulo)}</div>
+        <div style="font-size:13px;font-weight:700;margin-bottom:4px;display:flex;align-items:center;gap:8px">
+          ${r.nicho?`<span style="font-size:10px;font-weight:800;letter-spacing:.05em;padding:2px 8px;border-radius:20px;color:#fff;background:${NICHO_COLORS[r.nicho]||'#555'}">${esc(r.nicho)}</span>`:''}
+          <span>${esc(r.titulo)}</span>
+        </div>
         <div style="font-size:11px;color:var(--muted);font-family:'DM Mono',monospace">
           ${r.tipo==='diario'?'📊 Diário':'📋 Semanal'} · ${new Date(r.created_at).toLocaleDateString('pt-BR')}
         </div>
@@ -1436,8 +1455,8 @@ function coletarDadosRelatorio(){
     metaDe:    document.getElementById('meta-de')?.value  || '',
     metaAte:   document.getElementById('meta-ate')?.value || '',
     metaResp:  document.getElementById('meta-resp')?.value|| '',
-    activeNichos: [...activeNichos],
-    nichoData:    JSON.parse(JSON.stringify(nichoData)),
+    nichoAtual,
+    nichoData: JSON.parse(JSON.stringify(nichoData)),
   };
 }
 
@@ -1459,11 +1478,12 @@ function preencherFormulario(dados){
   if(dados.metaAte)  document.getElementById('meta-ate').value  =dados.metaAte;
   if(dados.metaResp) document.getElementById('meta-resp').value =dados.metaResp;
 
-  nichoData    = dados.nichoData    || {};
-  activeNichos = dados.activeNichos || [];
+  nichoData  = dados.nichoData  || {};
+  // Compatível com rascunhos antigos (formato multi-nicho anterior)
+  nichoAtual = dados.nichoAtual || (dados.activeNichos && dados.activeNichos[0]) || null;
 
   document.querySelectorAll('.nicho-btn').forEach(btn=>{
-    btn.classList.toggle('active', activeNichos.includes(btn.dataset.nicho));
+    btn.classList.toggle('active', btn.dataset.nicho===nichoAtual);
   });
   renderNichoSections();
   if(dados.metaDe||dados.metaAte) carregarResumoNichos();
