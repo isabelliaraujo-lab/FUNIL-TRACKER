@@ -10,6 +10,7 @@ const Analise = (() => {
   let _pgDomAnuncio = 1;
   let _pgDomFinal   = 1;
   let _pgProduto    = 1;
+  let _pgVsl        = 1;
   const _ANALISE_PER = 10;
 
   const esc      = Storage.escHtml;
@@ -699,14 +700,17 @@ const Analise = (() => {
       map[key].ids.push(f.id);
     });
 
-    const items = Object.values(map)
+    const allItems = Object.values(map)
       .map(v => ({ ...v, score: v.funis * 10 + Math.floor(v.views / 1000) + v.nichos.size * 5 }))
-      .sort((a, b) => b.score - a.score)
-      .slice(0, 10);
+      .sort((a, b) => b.score - a.score);
 
-    if (!items.length) return '<p class="analysis-no-results">Nenhuma VSL cadastrada nos funis do período.</p>';
+    if (!allItems.length) return '<p class="analysis-no-results">Nenhuma VSL cadastrada nos funis do período.</p>';
 
-    return items.map((v, i) => {
+    const { items, page: pg, totalPages, total } = Pagination.paginate(allItems, _pgVsl, _ANALISE_PER);
+    _pgVsl = pg;
+
+    const rows = items.map((v, i) => {
+      const globalIdx = (pg - 1) * _ANALISE_PER + i;
       const nichoTags = [...v.nichos].map(n =>
         `<span class="tag tag-nicho nicho-${esc(n)}" style="font-size:10px;padding:1px 6px">${esc(n)}</span>`
       ).join('');
@@ -716,7 +720,7 @@ const Analise = (() => {
       const verFunisIds = v.ids.join(',');
       return `
         <div class="rank-item" style="align-items:flex-start;gap:14px;padding:14px 0">
-          <span class="rank-pos ${i < 3 ? 'top' : ''}">#${i + 1}</span>
+          <span class="rank-pos ${globalIdx < 3 ? 'top' : ''}">#${globalIdx + 1}</span>
           <div style="flex-shrink:0;width:160px;height:90px;background:#000;border-radius:8px;overflow:hidden;position:relative"
                data-vsl-url="${esc(v.urlVsl)}">
             <canvas style="width:100%;height:100%;display:none"></canvas>
@@ -743,6 +747,8 @@ const Analise = (() => {
           </div>
         </div>`;
     }).join('');
+
+    return rows + Pagination.controlsHTML(pg, totalPages, total, _ANALISE_PER, 'vsl');
   }
 
   function capturarFrameVslEmContainer(url, container) {
@@ -932,6 +938,17 @@ const Analise = (() => {
 
     const intelEl = document.getElementById('analise-intel');
     intelEl.addEventListener('click', e => {
+      const pgBtn = e.target.closest('.pg-btn[data-pg]');
+      if (pgBtn && pgBtn.dataset.pgSection === 'vsl') {
+        const action = pgBtn.dataset.pg;
+        if      (action === 'first') _pgVsl = 1;
+        else if (action === 'prev')  _pgVsl = Math.max(1, _pgVsl - 1);
+        else if (action === 'next')  _pgVsl++;
+        else if (action === 'last')  _pgVsl = 9999;
+        refreshVslList(GlobalFilters.filter(_getFunnels()));
+        return;
+      }
+
       const sortBtn = e.target.closest('[data-sort-dom-final]');
       if (!sortBtn) return;
       _domFinalSort = sortBtn.dataset.sortDomFinal;
@@ -946,6 +963,7 @@ const Analise = (() => {
         return;
       }
       if (e.target.id === 'analise-vsl-nicho') {
+        _pgVsl = 1;
         refreshVslList(GlobalFilters.filter(_getFunnels()));
         return;
       }
