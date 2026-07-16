@@ -64,6 +64,19 @@ select option{background:#1a1a24}
 .nicho-badge-big{width:36px;height:36px;border-radius:9px;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:800;color:#fff;flex-shrink:0}
 .nicho-section-header h3{font-size:15px;font-weight:700;flex:1}
 
+/* ── NICHO SECTION (colapsada após salvar) ── */
+.nicho-section.collapsed{padding:16px 22px}
+.nicho-section-header-collapsed{display:flex;align-items:center;gap:10px;cursor:pointer;margin:0;padding:0;border-bottom:none}
+.nicho-section-header-collapsed h3{font-size:15px;font-weight:700;flex:1}
+.nicho-saved-badge{font-size:11px;color:#00c47a;font-weight:700;letter-spacing:.02em;flex-shrink:0}
+.btn-save-nicho{padding:9px 18px;border:1px solid #00c47a;border-radius:8px;background:rgba(0,196,122,.08);color:#00c47a;font-family:'Syne',sans-serif;font-size:12px;font-weight:700;cursor:pointer;transition:all .15s;flex-shrink:0}
+.btn-save-nicho:hover{background:rgba(0,196,122,.16)}
+.btn-edit-nicho{padding:6px 12px;border:1px solid var(--border2);border-radius:8px;background:none;color:var(--text);font-family:'Syne',sans-serif;font-size:11px;cursor:pointer;transition:border-color .15s;flex-shrink:0}
+.btn-edit-nicho:hover{border-color:#ffffff44}
+
+/* ── RESUMO FIXO (topo do painel semanal) ── */
+.resumo-semana-fixo{background:var(--bg2);border:0.5px solid var(--border2);border-radius:14px;padding:20px;margin-bottom:28px}
+
 /* ── AD ITEM ── */
 .ad-item{background:var(--bg3);border:0.5px solid var(--border);border-radius:10px;padding:14px;margin-bottom:8px}
 .ad-item-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px}
@@ -249,14 +262,21 @@ select option{background:#1a1a24}
       </div>
     </div>
 
-    <div class="field-group" style="margin-bottom:20px">
-      <label class="field-label">Funis minerados por nicho</label>
-      <div id="resumo-nichos-container" style="margin-top:6px;min-height:32px">
-        <div style="font-size:12px;color:var(--muted)">Selecione o período acima para carregar automaticamente.</div>
+    <div class="resumo-semana-fixo">
+      <div class="field-group" style="margin-bottom:16px">
+        <label class="field-label">Funis minerados por nicho</label>
+        <div id="resumo-nichos-container" style="margin-top:6px;min-height:32px">
+          <div style="font-size:12px;color:var(--muted)">Selecione o período acima para carregar automaticamente.</div>
+        </div>
+      </div>
+      <div class="field-group">
+        <label class="field-label">Comentários Gerais da Semana</label>
+        <textarea id="meta-comentarios-gerais" placeholder="Panorama geral da semana, tendências entre nichos, observações macro…"
+          oninput="comentariosGerais=this.value;salvarRascunho()"></textarea>
       </div>
     </div>
 
-    <div class="field-label" style="margin-bottom:10px">Selecione o nicho para preencher (um por vez)</div>
+    <div class="field-label" style="margin-bottom:10px">Selecione os nichos da semana</div>
     <div class="nicho-picker" id="nicho-picker">
       <button class="nicho-btn" data-nicho="WL">WL</button>
       <button class="nicho-btn" data-nicho="MM">MM</button>
@@ -575,10 +595,35 @@ function copyDaily(){
 // SEMANAL
 // ══════════════════════════════════════════════════════════════════════════
 
-let nichoAtual=null;
+let activeNichos=[];
+let nichoCollapsed={};
 let nichoData={};
+let comentariosGerais='';
 let _resumoTotal=0;
 let _resumoContagem={};
+
+function gerarGraficoResumoBarsHTML(contagem){
+  const entries=Object.entries(contagem||{});
+  if(!entries.length) return '';
+  const ordenado=entries.sort((a,b)=>b[1]-a[1]);
+  const maxVal=ordenado[0][1];
+  const total=Object.values(contagem).reduce((acc,v)=>acc+v,0);
+  return `
+    <div style="font-size:11px;color:var(--muted);margin-bottom:8px">
+      Total: <strong style="color:var(--accent)">${total} funis</strong> no período
+    </div>
+    <div style="display:flex;flex-direction:column;gap:5px">
+      ${ordenado.map(([nicho,count],i)=>`
+        <div style="display:flex;align-items:center;gap:8px">
+          <span style="font-size:10px;font-weight:700;letter-spacing:.06em;padding:2px 7px;border-radius:4px;min-width:34px;text-align:center;background:${NICHO_COLORS[nicho]||'#333'};color:#fff">${nicho}</span>
+          <div style="flex:1;background:var(--bg3);border-radius:4px;height:6px;overflow:hidden">
+            <div style="width:${Math.round((count/maxVal)*100)}%;height:100%;background:${i===0?'var(--accent)':'var(--accent2)'};border-radius:4px;transition:width .3s"></div>
+          </div>
+          <span style="font-size:12px;font-weight:600;color:var(--text);min-width:22px;text-align:right">${count}</span>
+        </div>
+      `).join('')}
+    </div>`;
+}
 
 window.carregarResumoNichos = async function carregarResumoNichos(){
   const de=document.getElementById('meta-de')?.value;
@@ -610,30 +655,17 @@ window.carregarResumoNichos = async function carregarResumoNichos(){
     _resumoTotal=Object.values(contagem).reduce((acc,v)=>acc+v,0);
     _resumoContagem=contagem;
 
-    // Atualizar nichoData do nicho selecionado com a contagem automática
-    if(nichoAtual && nichoData[nichoAtual]) nichoData[nichoAtual].funis=String(contagem[nichoAtual]||0);
+    // Atualizar nichoData dos nichos ativos com a contagem automática
+    activeNichos.forEach(n=>{
+      if(nichoData[n]) nichoData[n].funis=String(contagem[n]||0);
+    });
     renderNichoSections();
 
     if(!ordenado.length){
       container.innerHTML='<div style="font-size:12px;color:var(--muted)">Nenhum funil encontrado no período.</div>';
       return;
     }
-    const maxVal=ordenado[0][1];
-    container.innerHTML=`
-      <div style="font-size:11px;color:var(--muted);margin-bottom:8px">
-        Total: <strong style="color:var(--accent)">${_resumoTotal} funis</strong> no período
-      </div>
-      <div style="display:flex;flex-direction:column;gap:5px">
-        ${ordenado.map(([nicho,count],i)=>`
-          <div style="display:flex;align-items:center;gap:8px">
-            <span style="font-size:10px;font-weight:700;letter-spacing:.06em;padding:2px 7px;border-radius:4px;min-width:34px;text-align:center;background:${NICHO_COLORS[nicho]||'#333'};color:#fff">${nicho}</span>
-            <div style="flex:1;background:var(--bg3);border-radius:4px;height:6px;overflow:hidden">
-              <div style="width:${Math.round((count/maxVal)*100)}%;height:100%;background:${i===0?'var(--accent)':'var(--accent2)'};border-radius:4px;transition:width .3s"></div>
-            </div>
-            <span style="font-size:12px;font-weight:600;color:var(--text);min-width:22px;text-align:right">${count}</span>
-          </div>
-        `).join('')}
-      </div>`;
+    container.innerHTML=gerarGraficoResumoBarsHTML(contagem);
   }catch(e){
     container.innerHTML='<div style="font-size:12px;color:var(--danger)">Erro ao carregar.</div>';
     console.error('carregarResumoNichos:',e);
@@ -644,31 +676,53 @@ console.log('carregarResumoNichos definida:', typeof window.carregarResumoNichos
 document.querySelectorAll('.nicho-btn').forEach(btn=>{
   btn.addEventListener('click',()=>{
     const n=btn.dataset.nicho;
-    if(nichoAtual===n){
-      // clique no nicho já selecionado: desmarca
-      nichoAtual=null;
+    const isActive=btn.classList.contains('active');
+    if(isActive && nichoCollapsed[n]){
+      // painel já salvo/colapsado: clicar no nicho reabre em vez de desmarcar
+      nichoCollapsed[n]=false;
+    } else if(isActive){
       btn.classList.remove('active');
+      activeNichos=activeNichos.filter(x=>x!==n);
     } else {
-      document.querySelectorAll('.nicho-btn').forEach(b=>b.classList.remove('active'));
       btn.classList.add('active');
-      nichoAtual=n;
+      activeNichos.push(n);
       if(!nichoData[n]) nichoData[n]={funis:'',nichoAlta:'',resumo:'',ads:[],funisDestaque:[],vsls:[],templates:[],obs:''};
+      nichoCollapsed[n]=false;
     }
     renderNichoSections();
     salvarRascunho();
   });
 });
 
+function toggleNichoCollapsed(n){
+  nichoCollapsed[n]=!nichoCollapsed[n];
+  renderNichoSections();
+}
+
 function renderNichoSections(){
   const container=document.getElementById('nicho-sections');
   container.innerHTML='';
-  if(!nichoAtual) return;
-  [nichoAtual].forEach(n=>{
+  activeNichos.forEach(n=>{
     const d=nichoData[n];
     const color=NICHO_COLORS[n];
     const section=document.createElement('div');
-    section.className='nicho-section';
     section.dataset.nicho=n;
+
+    if(nichoCollapsed[n]){
+      section.className='nicho-section collapsed';
+      section.innerHTML=`
+        <div class="nicho-section-header-collapsed" onclick="toggleNichoCollapsed('${n}')">
+          <div class="nicho-badge-big" style="background:${color}">${n}</div>
+          <h3>${NICHO_NAMES[n]}</h3>
+          <span class="nicho-saved-badge">✓ salvo</span>
+          <button class="btn-edit-nicho" onclick="event.stopPropagation();toggleNichoCollapsed('${n}')">✎ Editar</button>
+        </div>
+      `;
+      container.appendChild(section);
+      return;
+    }
+
+    section.className='nicho-section';
     section.innerHTML=`
       <div class="nicho-section-header">
         <div class="nicho-badge-big" style="background:${color}">${n}</div>
@@ -690,6 +744,9 @@ function renderNichoSections(){
       <div class="section-sub" style="margin-top:18px">Observações gerais</div>
       <textarea placeholder="Qualquer insight adicional…"
         onchange="setNichoField('${n}','obs',this.value)">${esc(d.obs)}</textarea>
+      <div style="display:flex;justify-content:flex-end;margin-top:20px">
+        <button class="btn-save-nicho" onclick="salvarNichoPanel('${n}')">💾 Salvar ${n}</button>
+      </div>
     `;
     container.appendChild(section);
     renderAds(n);
@@ -1160,19 +1217,34 @@ function capturarFrameRelatorio(url,container){
 }
 
 // Generate weekly
-function generateWeekly(){
-  if(!nichoAtual){
-    alert('Selecione um nicho para gerar o relatório.');
-    return;
-  }
+function renderAdBlock(ad,i,fd){
+  const domVinculado=fd?((fd.dominios&&fd.dominios[0]?.domAnuncio)||fd.domAnuncio||'Funil sem domínio'):null;
+  return `
+    <div class="report-ad">
+      <div class="report-ad-num">${String(i+1).padStart(2,'0')}</div>
+      <div class="report-ad-body">
+        ${ad.context?`<div class="report-ad-context">${esc(ad.context)}</div>`:''}
+        <div class="report-ad-flags">
+          ${domVinculado?`<span class="report-flag" style="background:#1a2a1a;color:#00c47a;border:1px solid #00c47a33">🔗 ${esc(domVinculado)}</span>`:''}
+          ${ad.lateral?'<span class="report-flag lateral">🔄 Lateralizado</span>':''}
+          ${ad.famoso?'<span class="report-flag famoso">⭐ Com famoso</span>':''}
+        </div>
+        ${ad.link?`<a href="${esc(ad.link)}" class="report-ad-link" target="_blank">${esc(ad.link)}</a>`:''}
+      </div>
+    </div>
+  `;
+}
+
+// Overview geral da semana (gráfico de resumo + comentários gerais) — igual
+// independentemente de quais/quantos nichos estejam sendo relatados.
+function montarHtmlResumoMasthead(){
   const de=document.getElementById('meta-de').value;
   const ate=document.getElementById('meta-ate').value;
   const total=_resumoTotal||'';
   const resp=document.getElementById('meta-resp').value;
-  const contagemOrdenada=Object.entries(_resumoContagem).sort((a,b)=>b[1]-a[1]);
+  const barsHtml=gerarGraficoResumoBarsHTML(_resumoContagem);
 
-  // Overview geral da semana — igual independentemente do nicho selecionado
-  let html=`
+  return `
     <div class="report-masthead">
       <div class="eyebrow">⚡ Spy Nativo — Relatório Semanal</div>
       <div class="report-title">Overview<br><em style="font-style:italic;color:var(--muted)">da Semana</em></div>
@@ -1181,116 +1253,105 @@ function generateWeekly(){
         ${total?`<span>🔍 ${esc(total)} funis minerados (todos os nichos)</span>`:''}
         ${resp?`<span>👤 ${esc(resp)}</span>`:''}
       </div>
-      ${contagemOrdenada.length?`
-      <div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:16px">
-        ${contagemOrdenada.map(([nn,c])=>`<span style="font-size:11px;font-weight:700;padding:3px 10px;border-radius:20px;color:#fff;background:${NICHO_COLORS[nn]||'#555'}">${esc(nn)} · ${c}</span>`).join('')}
-      </div>`:''}
+      ${barsHtml?`<div style="margin-top:18px">${barsHtml}</div>`:''}
+      ${comentariosGerais?`<div class="report-resumo" style="margin-top:18px">${esc(comentariosGerais).replace(/\n/g,'<br>')}</div>`:''}
+    </div>
+  `;
+}
+
+function montarHtmlNicho(n){
+  const d=nichoData[n];
+  const color=NICHO_COLORS[n];
+  let html=`<div class="report-nicho">`;
+  html+=`
+    <div class="report-nicho-header">
+      <div class="report-nicho-badge" style="background:${color}">${n}</div>
+      <div class="report-nicho-title">Relatório Semanal — ${n}</div>
+      ${d.funis?`<div class="report-nicho-count">${esc(d.funis)} funis</div>`:''}
     </div>
   `;
 
-  [nichoAtual].forEach(n=>{
-    const d=nichoData[n];
-    const color=NICHO_COLORS[n];
+  // Resumo
+  if(d.resumo||d.funis){
+    const auto=d.funis?`Ao todo foram ${esc(d.funis)} funis ${n} minerados na semana${d.resumo?'. ':'.'}`:' ';
+    html+=`<div class="report-resumo">${auto}${esc(d.resumo)}</div>`;
+  }
 
-    html+=`<div class="report-nicho">`;
-    html+=`
-      <div class="report-nicho-header">
-        <div class="report-nicho-badge" style="background:${color}">${n}</div>
-        <div class="report-nicho-title">Relatório Semanal — ${n}</div>
-        ${d.funis?`<div class="report-nicho-count">${esc(d.funis)} funis</div>`:''}
-      </div>
-    `;
-
-    // Resumo
-    if(d.resumo||d.funis){
-      const auto=d.funis?`Ao todo foram ${esc(d.funis)} funis ${n} minerados na semana${d.resumo?'. ':'.'}`:' ';
-      html+=`<div class="report-resumo">${auto}${esc(d.resumo)}</div>`;
-    }
-
-    // Funis em destaque que de fato serão exibidos (com algum conteúdo preenchido)
-    const funisDestaque=(d.funisDestaque||[]).filter(fd=>{
-      const temDominio=(fd.dominios&&fd.dominios.some(dm=>dm.domAnuncio))||fd.domAnuncio;
-      return fd.titulo||temDominio||fd.urlFinal||fd.headline;
-    });
-    const funisDestaqueIds=new Set(funisDestaque.map(fd=>fd.id));
-
-    // Separa ads com vínculo válido a um funil em destaque (renderizados junto
-    // com o funil) dos demais (renderizados na seção geral "Ads em destaque").
-    // Um funilDestaqueId que aponta pra um funil deletado/sem conteúdo cai de
-    // volta na seção geral, como se não estivesse vinculado.
-    const adsComConteudo=(d.ads||[]).filter(ad=>ad.link||ad.context);
-    const adsPorFunil={};
-    const adsSoltos=[];
-    adsComConteudo.forEach(ad=>{
-      if(ad.funilDestaqueId&&funisDestaqueIds.has(ad.funilDestaqueId)){
-        (adsPorFunil[ad.funilDestaqueId]=adsPorFunil[ad.funilDestaqueId]||[]).push(ad);
-      } else {
-        adsSoltos.push(ad);
-      }
-    });
-
-    function renderAdBlock(ad,i,fd){
-      const domVinculado=fd?((fd.dominios&&fd.dominios[0]?.domAnuncio)||fd.domAnuncio||'Funil sem domínio'):null;
-      return `
-        <div class="report-ad">
-          <div class="report-ad-num">${String(i+1).padStart(2,'0')}</div>
-          <div class="report-ad-body">
-            ${ad.context?`<div class="report-ad-context">${esc(ad.context)}</div>`:''}
-            <div class="report-ad-flags">
-              ${domVinculado?`<span class="report-flag" style="background:#1a2a1a;color:#00c47a;border:1px solid #00c47a33">🔗 ${esc(domVinculado)}</span>`:''}
-              ${ad.lateral?'<span class="report-flag lateral">🔄 Lateralizado</span>':''}
-              ${ad.famoso?'<span class="report-flag famoso">⭐ Com famoso</span>':''}
-            </div>
-            ${ad.link?`<a href="${esc(ad.link)}" class="report-ad-link" target="_blank">${esc(ad.link)}</a>`:''}
-          </div>
-        </div>
-      `;
-    }
-
-    // Ads sem funil vinculado (ou com vínculo quebrado)
-    if(adsSoltos.length){
-      html+=`<div class="report-section-label">Ads em destaque</div>`;
-      adsSoltos.forEach((ad,i)=>{ html+=renderAdBlock(ad,i,null); });
-    }
-
-    // Funis em destaque, cada um já com seus ads vinculados logo abaixo
-    if(funisDestaque.length){
-      html+=`<div class="report-section-label" style="margin-top:22px">Funis em destaque</div>`;
-      funisDestaque.forEach((fd,i)=>{
-        // Garantir formato array
-        const dominios=fd.dominios||[{domAnuncio:fd.domAnuncio||'',cdn:fd.cdn||''}];
-        html+=`<div class="report-funil" style="margin-bottom:14px">`;
-        if(fd.titulo) html+=`<div style="font-size:15px;font-weight:700;color:#f0f0f0;margin-bottom:12px">${esc(fd.titulo)}</div>`;
-        dominios.forEach((dom,di)=>{
-          const temCdn=(dom.cdns||[]).some(c=>c&&c.trim())||!!dom.cdn;
-          if(!dom.domAnuncio&&!temCdn) return;
-          if(dominios.length>1) html+=`<div style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;margin-bottom:4px${di>0?';margin-top:12px':''}">Domínio ${di+1}</div>`;
-          if(dom.domAnuncio){
-            html+=`<div class="report-funil-label">Domínio do anúncio</div><div style="font-size:13px;color:var(--accent);font-weight:600;margin-bottom:4px">${esc(dom.domAnuncio)}</div>`;
-            html+=`<div data-historico-dominio="${esc(dom.domAnuncio)}" class="funil-historico-container"><div style="font-size:11px;color:#555">Carregando histórico...</div></div>`;
-            html+=`<div data-contas-dominio="${esc(dom.domAnuncio)}" class="funil-contas-container"><div style="font-size:11px;color:#555">Carregando contas...</div></div>`;
-          }
-          (dom.cdns||[dom.cdn||'']).filter(Boolean).forEach(cdn=>{
-            html+=`<div style="margin:10px 0"><div data-vsl-url="${esc(cdn)}" style="width:160px;height:90px;background:#000;border-radius:8px;overflow:hidden;position:relative"><canvas style="width:100%;height:100%;display:none"></canvas><div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:#ffffff66;font-size:10px">carregando...</div></div></div>`;
-          });
-        });
-        if(fd.headline) html+=`<div class="report-funil-label">Headline campeã</div><div class="report-headline">"${esc(fd.headline)}"</div>`;
-        if(fd.urlFinal) html+=`<div class="report-link-row"><span class="report-link-label">URL Final</span><a href="${esc(fd.urlFinal)}" class="report-link" target="_blank">${esc(fd.urlFinal)}</a></div>`;
-
-        const adsDoFunil=adsPorFunil[fd.id]||[];
-        if(adsDoFunil.length){
-          html+=`<div class="report-section-label" style="margin-top:16px;margin-bottom:8px">Ads vinculados</div>`;
-          adsDoFunil.forEach((ad,ai)=>{ html+=renderAdBlock(ad,ai,fd); });
-        }
-
-        html+=`</div>`;
-      });
-    }
-
-
-    if(d.obs) html+=`<div class="report-section-label" style="margin-top:18px">Observações</div><div class="report-obs">${esc(d.obs)}</div>`;
-    html+=`</div>`;
+  // Funis em destaque que de fato serão exibidos (com algum conteúdo preenchido)
+  const funisDestaque=(d.funisDestaque||[]).filter(fd=>{
+    const temDominio=(fd.dominios&&fd.dominios.some(dm=>dm.domAnuncio))||fd.domAnuncio;
+    return fd.titulo||temDominio||fd.urlFinal||fd.headline;
   });
+  const funisDestaqueIds=new Set(funisDestaque.map(fd=>fd.id));
+
+  // Separa ads com vínculo válido a um funil em destaque (renderizados junto
+  // com o funil) dos demais (renderizados na seção geral "Ads em destaque").
+  // Um funilDestaqueId que aponta pra um funil deletado/sem conteúdo cai de
+  // volta na seção geral, como se não estivesse vinculado.
+  const adsComConteudo=(d.ads||[]).filter(ad=>ad.link||ad.context);
+  const adsPorFunil={};
+  const adsSoltos=[];
+  adsComConteudo.forEach(ad=>{
+    if(ad.funilDestaqueId&&funisDestaqueIds.has(ad.funilDestaqueId)){
+      (adsPorFunil[ad.funilDestaqueId]=adsPorFunil[ad.funilDestaqueId]||[]).push(ad);
+    } else {
+      adsSoltos.push(ad);
+    }
+  });
+
+  // Ads sem funil vinculado (ou com vínculo quebrado)
+  if(adsSoltos.length){
+    html+=`<div class="report-section-label">Ads em destaque</div>`;
+    adsSoltos.forEach((ad,i)=>{ html+=renderAdBlock(ad,i,null); });
+  }
+
+  // Funis em destaque, cada um já com seus ads vinculados logo abaixo
+  if(funisDestaque.length){
+    html+=`<div class="report-section-label" style="margin-top:22px">Funis em destaque</div>`;
+    funisDestaque.forEach((fd,i)=>{
+      // Garantir formato array
+      const dominios=fd.dominios||[{domAnuncio:fd.domAnuncio||'',cdn:fd.cdn||''}];
+      html+=`<div class="report-funil" style="margin-bottom:14px">`;
+      if(fd.titulo) html+=`<div style="font-size:15px;font-weight:700;color:#f0f0f0;margin-bottom:12px">${esc(fd.titulo)}</div>`;
+      dominios.forEach((dom,di)=>{
+        const temCdn=(dom.cdns||[]).some(c=>c&&c.trim())||!!dom.cdn;
+        if(!dom.domAnuncio&&!temCdn) return;
+        if(dominios.length>1) html+=`<div style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;margin-bottom:4px${di>0?';margin-top:12px':''}">Domínio ${di+1}</div>`;
+        if(dom.domAnuncio){
+          html+=`<div class="report-funil-label">Domínio do anúncio</div><div style="font-size:13px;color:var(--accent);font-weight:600;margin-bottom:4px">${esc(dom.domAnuncio)}</div>`;
+          html+=`<div data-historico-dominio="${esc(dom.domAnuncio)}" class="funil-historico-container"><div style="font-size:11px;color:#555">Carregando histórico...</div></div>`;
+          html+=`<div data-contas-dominio="${esc(dom.domAnuncio)}" class="funil-contas-container"><div style="font-size:11px;color:#555">Carregando contas...</div></div>`;
+        }
+        (dom.cdns||[dom.cdn||'']).filter(Boolean).forEach(cdn=>{
+          html+=`<div style="margin:10px 0"><div data-vsl-url="${esc(cdn)}" style="width:160px;height:90px;background:#000;border-radius:8px;overflow:hidden;position:relative"><canvas style="width:100%;height:100%;display:none"></canvas><div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:#ffffff66;font-size:10px">carregando...</div></div></div>`;
+        });
+      });
+      if(fd.headline) html+=`<div class="report-funil-label">Headline campeã</div><div class="report-headline">"${esc(fd.headline)}"</div>`;
+      if(fd.urlFinal) html+=`<div class="report-link-row"><span class="report-link-label">URL Final</span><a href="${esc(fd.urlFinal)}" class="report-link" target="_blank">${esc(fd.urlFinal)}</a></div>`;
+
+      const adsDoFunil=adsPorFunil[fd.id]||[];
+      if(adsDoFunil.length){
+        html+=`<div class="report-section-label" style="margin-top:16px;margin-bottom:8px">Ads vinculados</div>`;
+        adsDoFunil.forEach((ad,ai)=>{ html+=renderAdBlock(ad,ai,fd); });
+      }
+
+      html+=`</div>`;
+    });
+  }
+
+  if(d.obs) html+=`<div class="report-section-label" style="margin-top:18px">Observações</div><div class="report-obs">${esc(d.obs)}</div>`;
+  html+=`</div>`;
+  return html;
+}
+
+function generateWeekly(){
+  if(!activeNichos.length){
+    alert('Selecione ao menos um nicho para gerar o relatório.');
+    return;
+  }
+
+  let html=montarHtmlResumoMasthead();
+  activeNichos.forEach(n=>{ html+=montarHtmlNicho(n); });
 
   document.getElementById('report-weekly-content').innerHTML=html;
   document.getElementById('report-semanal-form').style.display='none';
@@ -1301,6 +1362,32 @@ function generateWeekly(){
     injetarThumbnailsCDN();
     await injetarHistoricosDominios();
   },100);
+}
+
+// Salva o painel de um único nicho (registro separado por nicho) sem passar
+// pela tela de relatório final, e colapsa apenas aquele painel — os demais
+// nichos ativos continuam abertos e intocados.
+async function salvarNichoPanel(nicho){
+  const de=document.getElementById('meta-de').value;
+  const ate=document.getElementById('meta-ate').value;
+  const resp=document.getElementById('meta-resp').value.trim()||'—';
+  const titulo=`Semanal ${fmtDate(de)}${ate?' – '+fmtDate(ate):''} — ${nicho} — ${resp}`;
+  const html=montarHtmlResumoMasthead()+montarHtmlNicho(nicho);
+
+  const {error}=await _sb.from('relatorios').insert({
+    tipo:'semanal',
+    titulo,
+    nicho,
+    conteudo:{de,ate,resp,comentariosGerais,nicho,nichoData:nichoData[nicho]},
+    html_gerado:html,
+  });
+
+  if(error){alert(`Erro ao salvar ${nicho}: `+error.message);return;}
+
+  nichoCollapsed[nicho]=true;
+  renderNichoSections();
+  salvarRascunho();
+  if(document.getElementById('panel-historico')?.classList.contains('active')) carregarHistorico();
 }
 
 function injetarThumbnailsCDN(){
@@ -1389,24 +1476,33 @@ async function salvarDiario(){
 }
 
 async function salvarSemanal(){
-  if(!nichoAtual){alert('Selecione um nicho antes de salvar.');return;}
+  if(!activeNichos.length){alert('Selecione ao menos um nicho antes de salvar.');return;}
   const de=document.getElementById('meta-de').value;
   const ate=document.getElementById('meta-ate').value;
   const resp=document.getElementById('meta-resp').value.trim()||'—';
-  const n=nichoAtual;
-  const titulo=`Semanal ${fmtDate(de)}${ate?' – '+fmtDate(ate):''} — ${n} — ${resp}`;
-  const html=document.getElementById('report-weekly-content').innerHTML;
+  const masthead=montarHtmlResumoMasthead();
 
-  const {error}=await _sb.from('relatorios').insert({
-    tipo:'semanal',
-    titulo,
-    nicho:n,
-    conteudo:{de,ate,resp,nicho:n,nichoData:nichoData[n]},
-    html_gerado:html,
-  });
+  try{
+    for(const n of activeNichos){
+      const titulo=`Semanal ${fmtDate(de)}${ate?' – '+fmtDate(ate):''} — ${n} — ${resp}`;
+      const html=masthead+montarHtmlNicho(n);
+      const {error}=await _sb.from('relatorios').insert({
+        tipo:'semanal',
+        titulo,
+        nicho:n,
+        conteudo:{de,ate,resp,comentariosGerais,nicho:n,nichoData:nichoData[n]},
+        html_gerado:html,
+      });
+      if(error) throw error;
+      nichoCollapsed[n]=true;
+    }
+  }catch(e){
+    alert('Erro ao salvar: '+e.message);
+    return;
+  }
 
-  if(error){alert('Erro ao salvar: '+error.message);return;}
-  alert(`✓ Relatório de ${n} salvo no histórico! Selecione outro nicho para preencher o próximo.`);
+  renderNichoSections();
+  alert('✓ Relatório salvo no histórico (um registro por nicho)!');
   carregarHistorico();
 }
 
@@ -1495,7 +1591,9 @@ function coletarDadosRelatorio(){
     metaDe:    document.getElementById('meta-de')?.value  || '',
     metaAte:   document.getElementById('meta-ate')?.value || '',
     metaResp:  document.getElementById('meta-resp')?.value|| '',
-    nichoAtual,
+    comentariosGerais,
+    activeNichos: [...activeNichos],
+    nichoCollapsed: {...nichoCollapsed},
     nichoData: JSON.parse(JSON.stringify(nichoData)),
   };
 }
@@ -1518,12 +1616,17 @@ function preencherFormulario(dados){
   if(dados.metaAte)  document.getElementById('meta-ate').value  =dados.metaAte;
   if(dados.metaResp) document.getElementById('meta-resp').value =dados.metaResp;
 
-  nichoData  = dados.nichoData  || {};
-  // Compatível com rascunhos antigos (formato multi-nicho anterior)
-  nichoAtual = dados.nichoAtual || (dados.activeNichos && dados.activeNichos[0]) || null;
+  comentariosGerais=dados.comentariosGerais||'';
+  const comEl=document.getElementById('meta-comentarios-gerais');
+  if(comEl) comEl.value=comentariosGerais;
+
+  nichoData      = dados.nichoData      || {};
+  nichoCollapsed = dados.nichoCollapsed || {};
+  // Compatível com rascunhos antigos (seleção única `nichoAtual`)
+  activeNichos = dados.activeNichos || (dados.nichoAtual ? [dados.nichoAtual] : []);
 
   document.querySelectorAll('.nicho-btn').forEach(btn=>{
-    btn.classList.toggle('active', btn.dataset.nicho===nichoAtual);
+    btn.classList.toggle('active', activeNichos.includes(btn.dataset.nicho));
   });
   renderNichoSections();
   if(dados.metaDe||dados.metaAte) carregarResumoNichos();
