@@ -226,7 +226,7 @@ select option{background:#1a1a24}
     <div class="section-sub">Relatório gerado</div>
     <div class="daily-report-output" id="daily-text"></div>
     <button class="daily-copy-btn" onclick="copyDaily()">⎘ Copiar para WhatsApp / ClickUp</button>
-    <button class="daily-copy-btn" style="border-color:var(--accent2);color:var(--accent2)" onclick="salvarDiario()">💾 Salvar no histórico</button>
+    <button id="btn-salvar-diario" class="daily-copy-btn" style="border-color:var(--accent2);color:var(--accent2)" onclick="salvarDiario()">💾 Salvar no histórico</button>
   </div>
 </div>
 </div>
@@ -302,7 +302,7 @@ select option{background:#1a1a24}
       <button class="btn-back" onclick="backToWeeklyForm()">← Editar</button>
       <button class="btn-copy-report" onclick="copyWeekly()">⎘ Copiar para ClickUp</button>
       <button class="btn-print" onclick="window.print()">↓ Salvar PDF</button>
-      <button class="btn-print" style="border-color:#00c47a;color:#00c47a" onclick="salvarSemanal()">💾 Salvar no histórico</button>
+      <button id="btn-salvar-semanal" class="btn-print" style="border-color:#00c47a;color:#00c47a" onclick="salvarSemanal()">💾 Salvar no histórico</button>
     </div>
     <div id="report-weekly-content"></div>
   </div>
@@ -572,6 +572,7 @@ function generateDaily(){
   document.getElementById('daily-text').textContent=lines.join('\n');
   document.getElementById('daily-output').style.display='block';
   document.getElementById('daily-output').scrollIntoView({behavior:'smooth',block:'nearest'});
+  resetBotaoSalvarDiario();
 }
 
 function copyDaily(){
@@ -1357,6 +1358,7 @@ function generateWeekly(){
   document.getElementById('report-semanal-form').style.display='none';
   document.getElementById('report-semanal-output').style.display='block';
   window.scrollTo(0,0);
+  resetBotaoSalvarSemanal();
 
   setTimeout(async()=>{
     injetarThumbnailsCDN();
@@ -1457,7 +1459,30 @@ function showWeeklyCopyFeedback(){
 // HISTÓRICO
 // ══════════════════════════════════════════════════════════════════════════
 
+let _salvandoDiario=false;
+let _salvandoSemanal=false;
+
+function resetBotaoSalvarDiario(){
+  _salvandoDiario=false;
+  const btn=document.getElementById('btn-salvar-diario');
+  btn.disabled=false;
+  btn.textContent='💾 Salvar no histórico';
+}
+
+function resetBotaoSalvarSemanal(){
+  _salvandoSemanal=false;
+  const btn=document.getElementById('btn-salvar-semanal');
+  btn.disabled=false;
+  btn.textContent='💾 Salvar no histórico';
+}
+
 async function salvarDiario(){
+  if(_salvandoDiario) return;
+  _salvandoDiario=true;
+  const btn=document.getElementById('btn-salvar-diario');
+  btn.disabled=true;
+  btn.textContent='Salvando...';
+
   const data=document.getElementById('d-data').value;
   const resp=document.getElementById('d-resp').value.trim()||'—';
   const titulo=`Diário ${fmtDate(data)} — ${resp}`;
@@ -1470,13 +1495,28 @@ async function salvarDiario(){
     html_gerado:html,
   });
 
-  if(error){alert('Erro ao salvar: '+error.message);return;}
+  _salvandoDiario=false;
+
+  if(error){
+    btn.disabled=false;
+    btn.textContent='💾 Salvar no histórico';
+    alert('Erro ao salvar: '+error.message);
+    return;
+  }
+
+  btn.textContent='✓ Salvo';
   alert('✓ Relatório salvo no histórico!');
   carregarHistorico();
 }
 
 async function salvarSemanal(){
+  if(_salvandoSemanal) return;
   if(!activeNichos.length){alert('Selecione ao menos um nicho antes de salvar.');return;}
+  _salvandoSemanal=true;
+  const btn=document.getElementById('btn-salvar-semanal');
+  btn.disabled=true;
+  btn.textContent='Salvando...';
+
   const de=document.getElementById('meta-de').value;
   const ate=document.getElementById('meta-ate').value;
   const resp=document.getElementById('meta-resp').value.trim()||'—';
@@ -1497,10 +1537,15 @@ async function salvarSemanal(){
       nichoCollapsed[n]=true;
     }
   }catch(e){
+    _salvandoSemanal=false;
+    btn.disabled=false;
+    btn.textContent='💾 Salvar no histórico';
     alert('Erro ao salvar: '+e.message);
     return;
   }
 
+  _salvandoSemanal=false;
+  btn.textContent='✓ Salvo';
   renderNichoSections();
   alert('✓ Relatório salvo no histórico (um registro por nicho)!');
   carregarHistorico();
@@ -1565,6 +1610,7 @@ async function verRelatorio(id){
     </div>
   `;
   document.body.appendChild(overlay);
+  injetarThumbnailsCDN();
 }
 
 function copiarLinkRelatorio(id){
