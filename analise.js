@@ -49,9 +49,13 @@ const Analise = (() => {
     const cacheEntry   = _dominiosBibliotecaCache[domain];
     const valorAnterior = cacheEntry.adsAtivos;
     cacheEntry.adsAtivos = safeVal;
-    if (valorAnterior !== safeVal) {
-      cacheEntry.historico = [...(cacheEntry.historico || []), {
-        data: new Date().toISOString().slice(0, 10),
+    const hoje = new Date().toISOString().slice(0, 10);
+    const hist = cacheEntry.historico || [];
+    const ultimaEntradaHoje = hist.length && hist[hist.length - 1].data === hoje && hist[hist.length - 1].novo === safeVal;
+
+    if (!ultimaEntradaHoje) {
+      cacheEntry.historico = [...hist, {
+        data: hoje,
         hora: new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }),
         anterior: valorAnterior,
         novo: safeVal,
@@ -973,6 +977,11 @@ const Analise = (() => {
         refreshVslList(GlobalFilters.filter(_getFunnels()));
         return;
       }
+      const inp = e.target.closest('.dom-lib-input');
+      if (!inp) return;
+      saveAdsLibraryCount(inp.dataset.dom, inp.value.trim());
+    });
+    intelEl.addEventListener('focusout', e => {
       const inp = e.target.closest('.dom-lib-input');
       if (!inp) return;
       saveAdsLibraryCount(inp.dataset.dom, inp.value.trim());
