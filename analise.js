@@ -49,9 +49,13 @@ const Analise = (() => {
     const cacheEntry   = _dominiosBibliotecaCache[domain];
     const valorAnterior = cacheEntry.adsAtivos;
     cacheEntry.adsAtivos = safeVal;
-    if (valorAnterior !== safeVal) {
-      cacheEntry.historico = [...(cacheEntry.historico || []), {
-        data: new Date().toISOString().slice(0, 10),
+    const hoje = new Date().toISOString().slice(0, 10);
+    const hist = cacheEntry.historico || [];
+    const ultimaEntradaHoje = hist.length && hist[hist.length - 1].data === hoje && hist[hist.length - 1].novo === safeVal;
+
+    if (!ultimaEntradaHoje) {
+      cacheEntry.historico = [...hist, {
+        data: hoje,
         hora: new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }),
         anterior: valorAnterior,
         novo: safeVal,
@@ -550,6 +554,26 @@ const Analise = (() => {
     return `<span title="Igual ao registro anterior" style="font-size:9px;font-weight:700;padding:1px 6px;border-radius:10px;background:#1e1e1e;color:#9ca3af;white-space:nowrap">➡️ Estável</span>`;
   }
 
+  function historicoNoPeriodo(dom) {
+    const hist = _dominiosBibliotecaCache?.[dom]?.historico || [];
+    const de  = GlobalFilters.de;
+    const ate = GlobalFilters.ate;
+    return hist.filter(h => (!de || h.data >= de) && (!ate || h.data <= ate));
+  }
+
+  function picoNoPeriodo(dom) {
+    const filtrado = historicoNoPeriodo(dom);
+    if (!filtrado.length) return null;
+    return Math.max(...filtrado.map(h => h.novo));
+  }
+
+  function mediaNoPeriodo(dom) {
+    const filtrado = historicoNoPeriodo(dom);
+    if (!filtrado.length) return null;
+    const soma = filtrado.reduce((s, h) => s + h.novo, 0);
+    return { media: soma / filtrado.length, registros: filtrado.length };
+  }
+
   function intelDomFinalSortableHTML(funis) {
     const domMap = {};
     funis.forEach(f => {
@@ -573,6 +597,24 @@ const Analise = (() => {
         if (cb === -1) return -1;
         return cb - ca;
       });
+    } else if (_domFinalSort === 'pico') {
+      items.sort((a, b) => {
+        const pa = picoNoPeriodo(a[0]);
+        const pb = picoNoPeriodo(b[0]);
+        if (pa == null && pb == null) return b[1].count - a[1].count;
+        if (pa == null) return 1;
+        if (pb == null) return -1;
+        return pb - pa;
+      });
+    } else if (_domFinalSort === 'media') {
+      items.sort((a, b) => {
+        const ma = mediaNoPeriodo(a[0]);
+        const mb = mediaNoPeriodo(b[0]);
+        if (!ma && !mb) return b[1].count - a[1].count;
+        if (!ma) return 1;
+        if (!mb) return -1;
+        return mb.media - ma.media;
+      });
     } else {
       items.sort((a, b) => b[1].count - a[1].count);
     }
@@ -584,6 +626,8 @@ const Analise = (() => {
         `<span class="tag" style="font-size:10px;padding:1px 5px">${esc(p)}</span>`
       ).join('');
       const libCount = counts[dom] != null ? counts[dom] : '';
+      const pico  = _domFinalSort === 'pico'  ? picoNoPeriodo(dom)  : null;
+      const media = _domFinalSort === 'media' ? mediaNoPeriodo(dom) : null;
       const domLower = dom.toLowerCase().replace(/^www\./i, '');
       const fbLibUrl = `https://www.facebook.com/ads/library/?active_status=active&ad_type=all&country=ALL&q=${encodeURIComponent(domLower)}&search_type=keyword_unordered`;
       const domUrl   = d.url || ('https://' + domLower);
@@ -600,6 +644,8 @@ const Analise = (() => {
             <span style="font-size:10px;color:var(--text-muted);white-space:nowrap">Ads ativos:</span>
             <input type="number" min="0" class="dom-lib-input" data-dom="${esc(dom)}" value="${esc(String(libCount))}" placeholder="—" style="width:56px;padding:2px 5px;font-size:11px;border:1px solid var(--border);border-radius:4px;background:var(--bg);color:var(--text)">
             ${trendTagHTML(dom, libCount)}
+            ${pico != null ? `<span style="font-size:10px;color:#a78bfa;white-space:nowrap">🔺 pico: ${pico.toLocaleString('pt-BR')}</span>` : ''}
+            ${media != null ? `<span style="font-size:10px;color:#60a5fa;white-space:nowrap">📊 média: ${Math.round(media.media).toLocaleString('pt-BR')} (${media.registros}× checado)</span>` : ''}
             <a href="${esc(fbLibUrl)}" target="_blank" rel="noopener" title="Buscar na Biblioteca de Anúncios" style="text-decoration:none;line-height:1;font-size:14px">🔍</a>
             <span style="cursor:pointer;font-size:14px;line-height:1" onclick="abrirHistoricoDominio('${esc(dom)}')" title="Ver histórico de Ads ativos">📋</span>
           </div>
@@ -718,11 +764,13 @@ const Analise = (() => {
         `<span class="tag" style="font-size:10px">${esc(p)}</span>`
       ).join('');
       const verFunisIds = v.ids.join(',');
+      const cdns = v.urlVsl.split('\n').map(s => s.trim()).filter(Boolean);
+      const cdnPrincipal = cdns[0] || v.urlVsl;
       return `
         <div class="rank-item" style="align-items:flex-start;gap:14px;padding:14px 0">
           <span class="rank-pos ${globalIdx < 3 ? 'top' : ''}">#${globalIdx + 1}</span>
           <div style="flex-shrink:0;width:160px;height:90px;background:#000;border-radius:8px;overflow:hidden;position:relative"
-               data-vsl-url="${esc(v.urlVsl)}">
+               data-vsl-url="${esc(cdnPrincipal)}">
             <canvas style="width:100%;height:100%;display:none"></canvas>
             <div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:#ffffff66;font-size:10px;font-family:monospace">carregando...</div>
           </div>
@@ -734,9 +782,13 @@ const Analise = (() => {
             </div>
             ${prodTags ? `<div style="display:flex;flex-wrap:wrap;gap:4px;margin-bottom:8px">${prodTags}</div>` : ''}
             <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
-              <a href="${esc(v.urlVsl)}" target="_blank"
-                 style="font-family:monospace;font-size:10px;color:var(--accent);word-break:break-all;max-width:300px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;display:block"
-                 title="${esc(v.urlVsl)}">${esc(v.urlVsl)}</a>
+              <div style="display:flex;flex-direction:column;gap:2px">
+                ${cdns.map((url, idx) => `
+                  <a href="${esc(url)}" target="_blank"
+                     style="font-family:monospace;font-size:10px;color:var(--accent);word-break:break-all;max-width:300px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;display:block"
+                     title="${esc(url)}">${cdns.length > 1 ? `CDN ${idx + 1}: ` : ''}${esc(url)}</a>
+                `).join('')}
+              </div>
               <button class="btn btn-sm btn-secondary" style="flex-shrink:0;font-size:11px"
                 onclick="analiseVerFunisVsl('${esc(verFunisIds)}')">Ver funis</button>
             </div>
@@ -851,12 +903,14 @@ const Analise = (() => {
               <div style="display:flex;gap:4px;align-items:center;flex-wrap:wrap">
                 <button class="${sortCls('funis')}" data-sort-dom-final="funis" style="font-size:10px;padding:2px 8px">Por funis</button>
                 <button class="${sortCls('biblioteca')}" data-sort-dom-final="biblioteca" style="font-size:10px;padding:2px 8px">Por biblioteca</button>
+                <button class="${sortCls('pico')}" data-sort-dom-final="pico" style="font-size:10px;padding:2px 8px">Pico no período</button>
+                <button class="${sortCls('media')}" data-sort-dom-final="media" style="font-size:10px;padding:2px 8px">Média no período</button>
                 <select id="analise-dom-nicho" style="background:var(--bg);border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:11px;padding:4px 8px;cursor:pointer;margin-left:4px">
                   <option value="">Todos os nichos</option>
                   <option>WL</option><option>DB</option><option>MM</option>
                   <option>ED</option><option>NR</option><option>DA</option>
                   <option>PT</option><option>VL</option><option>TN</option>
-                  <option>LG</option><option>RJ</option><option>RE</option><option>BP</option>
+                  <option>LG</option><option>RJ</option><option>RE</option><option>PA</option><option>CP</option>
                 </select>
               </div>
             </div>
@@ -878,7 +932,7 @@ const Analise = (() => {
                 <option>WL</option><option>DB</option><option>MM</option>
                 <option>ED</option><option>NR</option><option>DA</option>
                 <option>PT</option><option>VL</option><option>TN</option>
-                <option>LG</option><option>RJ</option><option>RE</option><option>BP</option>
+                <option>LG</option><option>RJ</option><option>RE</option><option>PA</option><option>CP</option>
               </select>
             </div>
             <div id="analise-vsl-list">${intelVslHTML(funis)}</div>
@@ -967,6 +1021,11 @@ const Analise = (() => {
         refreshVslList(GlobalFilters.filter(_getFunnels()));
         return;
       }
+      const inp = e.target.closest('.dom-lib-input');
+      if (!inp) return;
+      saveAdsLibraryCount(inp.dataset.dom, inp.value.trim());
+    });
+    intelEl.addEventListener('focusout', e => {
       const inp = e.target.closest('.dom-lib-input');
       if (!inp) return;
       saveAdsLibraryCount(inp.dataset.dom, inp.value.trim());

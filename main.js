@@ -29,7 +29,8 @@ let prevFunnels = [];
 const NICHO_COLORS = {
   WL:'#378ADD', DB:'#639922', MM:'#7F77DD', PT:'#BA7517',
   DA:'#1D9E75', ED:'#E24B4A', NR:'#D85A30', VL:'#D4537E',
-  TN:'#888780', LG:'#888780', RJ:'#888780', RE:'#888780', BP:'#14B8A6'
+  TN:'#888780', LG:'#888780', RJ:'#888780', RE:'#888780',
+  PA:'#14B8A6', CP:'#F59E0B'
 };
 
 function abrirDetalhe(id) {
@@ -47,14 +48,20 @@ function abrirDetalhe(id) {
     roiHtml = `<span style="color:${cor};font-weight:700">${roi >= 0 ? '+' : ''}${roi.toFixed(1)}%</span>`;
   }
 
-  const vslHtml = f.urlVsl ? `
+  const vslCdns = f.urlVsl ? f.urlVsl.split('\n').map(s => s.trim()).filter(Boolean) : [];
+  const vslCdnPrincipal = vslCdns[0] || '';
+  const vslHtml = vslCdns.length ? `
     <div style="margin-bottom:20px">
       <div style="font-size:11px;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:.08em;margin-bottom:8px">VSL</div>
       <div id="mfd2-vsl-container" style="position:relative;width:100%;max-width:480px;background:#000;border-radius:10px;overflow:hidden;aspect-ratio:16/9;display:flex;align-items:center;justify-content:center">
         <canvas id="mfd2-vsl-canvas" style="width:100%;height:100%;display:none"></canvas>
         <div id="mfd2-vsl-loading" style="color:#fff;font-size:12px;font-family:monospace">Carregando frame...</div>
       </div>
-      <a href="${esc(f.urlVsl)}" target="_blank" style="font-family:monospace;font-size:11px;color:var(--accent2);word-break:break-all;display:block;margin-top:6px">${esc(f.urlVsl)}</a>
+      <div style="display:flex;flex-direction:column;gap:2px;margin-top:6px">
+        ${vslCdns.map((url, idx) => `
+          <a href="${esc(url)}" target="_blank" style="font-family:monospace;font-size:11px;color:var(--accent2);word-break:break-all;display:block">${vslCdns.length > 1 ? `CDN ${idx + 1}: ` : ''}${esc(url)}</a>
+        `).join('')}
+      </div>
     </div>
   ` : '';
 
@@ -119,7 +126,7 @@ function abrirDetalhe(id) {
   const modal = document.getElementById('modal-funil-detalhe-v2');
   modal.hidden = false;
 
-  if (f.urlVsl) capturarFrameVsl(f.urlVsl);
+  if (vslCdnPrincipal) capturarFrameVsl(vslCdnPrincipal);
 
   document.getElementById('mfd2-btn-editar').onclick = () => {
     modal.hidden = true;
@@ -289,6 +296,15 @@ document.addEventListener('DOMContentLoaded', async () => {
     return f;
   });
   if (_migrou) saveFunnels(funnels);
+
+  // Migração silenciosa: nichos renomeados (BP→PA, ML→MM)
+  let _migrouNicho = false;
+  funnels = funnels.map(f => {
+    if (f.nicho === 'BP') { _migrouNicho = true; return { ...f, nicho: 'PA' }; }
+    if (f.nicho === 'ML') { _migrouNicho = true; return { ...f, nicho: 'MM' }; }
+    return f;
+  });
+  if (_migrouNicho) saveFunnels(funnels);
 
   window._funnelsGlobal = funnels;
   window._saveFunnelsGlobal = saveFunnels;
