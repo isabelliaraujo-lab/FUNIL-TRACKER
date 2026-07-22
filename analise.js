@@ -862,7 +862,7 @@ const Analise = (() => {
                   <option>WL</option><option>DB</option><option>MM</option>
                   <option>ED</option><option>NR</option><option>DA</option>
                   <option>PT</option><option>VL</option><option>TN</option>
-                  <option>LG</option><option>RJ</option><option>RE</option><option>BP</option>
+                  <option>LG</option><option>RJ</option><option>RE</option><option>PA</option><option>CP</option>
                 </select>
               </div>
             </div>
@@ -884,7 +884,7 @@ const Analise = (() => {
                 <option>WL</option><option>DB</option><option>MM</option>
                 <option>ED</option><option>NR</option><option>DA</option>
                 <option>PT</option><option>VL</option><option>TN</option>
-                <option>LG</option><option>RJ</option><option>RE</option><option>BP</option>
+                <option>LG</option><option>RJ</option><option>RE</option><option>PA</option><option>CP</option>
               </select>
             </div>
             <div id="analise-vsl-list">${intelVslHTML(funis)}</div>
