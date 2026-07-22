@@ -718,11 +718,13 @@ const Analise = (() => {
         `<span class="tag" style="font-size:10px">${esc(p)}</span>`
       ).join('');
       const verFunisIds = v.ids.join(',');
+      const cdns = v.urlVsl.split('\n').map(s => s.trim()).filter(Boolean);
+      const cdnPrincipal = cdns[0] || v.urlVsl;
       return `
         <div class="rank-item" style="align-items:flex-start;gap:14px;padding:14px 0">
           <span class="rank-pos ${globalIdx < 3 ? 'top' : ''}">#${globalIdx + 1}</span>
           <div style="flex-shrink:0;width:160px;height:90px;background:#000;border-radius:8px;overflow:hidden;position:relative"
-               data-vsl-url="${esc(v.urlVsl)}">
+               data-vsl-url="${esc(cdnPrincipal)}">
             <canvas style="width:100%;height:100%;display:none"></canvas>
             <div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:#ffffff66;font-size:10px;font-family:monospace">carregando...</div>
           </div>
@@ -734,9 +736,13 @@ const Analise = (() => {
             </div>
             ${prodTags ? `<div style="display:flex;flex-wrap:wrap;gap:4px;margin-bottom:8px">${prodTags}</div>` : ''}
             <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
-              <a href="${esc(v.urlVsl)}" target="_blank"
-                 style="font-family:monospace;font-size:10px;color:var(--accent);word-break:break-all;max-width:300px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;display:block"
-                 title="${esc(v.urlVsl)}">${esc(v.urlVsl)}</a>
+              <div style="display:flex;flex-direction:column;gap:2px">
+                ${cdns.map((url, idx) => `
+                  <a href="${esc(url)}" target="_blank"
+                     style="font-family:monospace;font-size:10px;color:var(--accent);word-break:break-all;max-width:300px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;display:block"
+                     title="${esc(url)}">${cdns.length > 1 ? `CDN ${idx + 1}: ` : ''}${esc(url)}</a>
+                `).join('')}
+              </div>
               <button class="btn btn-sm btn-secondary" style="flex-shrink:0;font-size:11px"
                 onclick="analiseVerFunisVsl('${esc(verFunisIds)}')">Ver funis</button>
             </div>
