@@ -1611,6 +1611,7 @@ async function verRelatorio(id){
   `;
   document.body.appendChild(overlay);
   injetarThumbnailsCDN();
+  await injetarHistoricosDominios();
 }
 
 function copiarLinkRelatorio(id){
