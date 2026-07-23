@@ -902,7 +902,8 @@ async function carregarDadosDominioBloco(input){
   if(!bloco) return;
   const dominio=input.value.trim().toUpperCase();
   if(!dominio) return;
-  await carregarDadosDominio(dominio,bloco.querySelector('.hist-dom-container'),bloco.querySelector('.contas-dom-container'));
+  const nicho=input.closest('[data-nicho]')?.dataset.nicho;
+  await carregarDadosDominio(dominio,bloco.querySelector('.hist-dom-container'),bloco.querySelector('.contas-dom-container'),nicho);
 }
 
 function carregarThumbnailBloco(input){
@@ -1016,7 +1017,7 @@ function filtrarFunisNoPeriodo(funis){
   });
 }
 
-function _renderContasEl(containerEl, dominio){
+function _renderContasEl(containerEl, dominio, nicho){
   const todos=window._funnelsGlobal||[];
   const funis=filtrarFunisNoPeriodo(todos);
   const domBusca=dominio.toUpperCase().trim();
@@ -1025,15 +1026,16 @@ function _renderContasEl(containerEl, dominio){
   console.log('[contas] Funis com domAnuncio:', funis.filter(f=>f.domAnuncio).length);
   const matched=funis.filter(f=>{
     const domFunil=(f.domAnuncio||'').toUpperCase().trim();
-    return domFunil===domBusca||domFunil.includes(domBusca)||domBusca.includes(domFunil);
+    return domFunil===domBusca;
   });
-  console.log('[contas] Matches encontrados:', matched.length);
-  if(!matched.length){
+  const matchedPorNicho = nicho ? matched.filter(f => f.nicho === nicho) : matched;
+  console.log('[contas] Matches encontrados:', matchedPorNicho.length);
+  if(!matchedPorNicho.length){
     containerEl.innerHTML='<div style="font-size:11px;color:#555;margin-top:8px">Nenhuma conta cadastrada com este domínio.</div>';
     return;
   }
   const contas={};
-  matched.forEach(f=>{
+  matchedPorNicho.forEach(f=>{
     const k=f.conta||'(sem conta)';
     if(!contas[k]) contas[k]={produtos:new Set(),funis:0,views:0};
     contas[k].funis++;
@@ -1056,7 +1058,7 @@ function _renderContasEl(containerEl, dominio){
       </div>`).join('')}`;
 }
 
-async function carregarDadosDominio(dominio,containerHistorico,containerContas){
+async function carregarDadosDominio(dominio,containerHistorico,containerContas,nicho){
   if(!dominio.trim()){containerHistorico.innerHTML='';if(containerContas)containerContas.innerHTML='';return;}
   containerHistorico.innerHTML='<div style="font-size:11px;color:#555">Buscando...</div>';
   if(containerContas) containerContas.innerHTML='';
@@ -1066,7 +1068,7 @@ async function carregarDadosDominio(dominio,containerHistorico,containerContas){
   }catch(e){
     containerHistorico.innerHTML='<div style="font-size:11px;color:#555">Nenhum histórico registrado.</div>';
   }
-  if(containerContas) _renderContasEl(containerContas,dominio);
+  if(containerContas) _renderContasEl(containerContas,dominio,nicho);
 }
 
 // Manter compatibilidade com chamadas antigas sem containerContas
@@ -1321,7 +1323,7 @@ function montarHtmlNicho(n){
         if(dom.domAnuncio){
           html+=`<div class="report-funil-label">Domínio do anúncio</div><div style="font-size:13px;color:var(--accent);font-weight:600;margin-bottom:4px">${esc(dom.domAnuncio)}</div>`;
           html+=`<div data-historico-dominio="${esc(dom.domAnuncio)}" class="funil-historico-container"><div style="font-size:11px;color:#555">Carregando histórico...</div></div>`;
-          html+=`<div data-contas-dominio="${esc(dom.domAnuncio)}" class="funil-contas-container"><div style="font-size:11px;color:#555">Carregando contas...</div></div>`;
+          html+=`<div data-contas-dominio="${esc(dom.domAnuncio)}" data-nicho="${esc(n)}" class="funil-contas-container"><div style="font-size:11px;color:#555">Carregando contas...</div></div>`;
         }
         (dom.cdns||[dom.cdn||'']).filter(Boolean).forEach(cdn=>{
           html+=`<div style="margin:10px 0"><div data-vsl-url="${esc(cdn)}" style="width:160px;height:90px;background:#000;border-radius:8px;overflow:hidden;position:relative"><canvas style="width:100%;height:100%;display:none"></canvas><div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:#ffffff66;font-size:10px">carregando...</div></div></div>`;
@@ -1416,7 +1418,7 @@ async function injetarHistoricosDominios(){
   });
 
   document.querySelectorAll('[data-contas-dominio]').forEach(container=>{
-    _renderContasEl(container,container.dataset.contasDominio);
+    _renderContasEl(container,container.dataset.contasDominio,container.dataset.nicho);
   });
 }
 
