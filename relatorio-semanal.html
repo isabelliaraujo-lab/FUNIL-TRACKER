@@ -145,6 +145,9 @@ select option{background:#1a1a24}
 .report-link{font-family:'DM Mono',monospace;font-size:11px;color:var(--accent2);word-break:break-all;text-decoration:none}
 .report-link:hover{text-decoration:underline}
 .report-obs{font-size:13px;line-height:1.7;color:var(--muted);padding:12px 16px;border:0.5px dashed var(--border2);border-radius:10px;margin-bottom:8px}
+.report-vsl-thumb{display:inline-block;margin:0 10px 10px 0;vertical-align:top}
+.btn-copy-cdn{display:block;width:160px;margin-top:4px;padding:5px 0;border:1px solid var(--border2);border-radius:6px;background:none;color:var(--muted);font-family:'Syne',sans-serif;font-size:11px;cursor:pointer;transition:all .15s}
+.btn-copy-cdn:hover{border-color:#ffffff33;color:var(--text)}
 
 /* ── DIÁRIO ── */
 .diario-card{background:var(--bg2);border:0.5px solid var(--border2);border-radius:14px;padding:22px;margin-bottom:18px}
@@ -1262,6 +1265,19 @@ function montarHtmlResumoMasthead(){
   `;
 }
 
+// Thumbnail de uma VSL: link clicável pro CDN + botão de copiar a URL.
+// O container com data-vsl-url é o mesmo que injetarThumbnailsCDN()/
+// capturarFrameRelatorio() já procuram pra desenhar o frame no canvas.
+function renderVslThumbUrl(url){
+  const urlJs=url.replace(/\\/g,'\\\\').replace(/'/g,"\\'");
+  return `<div class="report-vsl-thumb">
+    <a href="${esc(url)}" target="_blank" rel="noopener" style="display:block;cursor:pointer">
+      <div data-vsl-url="${esc(url)}" style="width:160px;height:90px;background:#000;border-radius:8px;overflow:hidden;position:relative"><canvas style="width:100%;height:100%;display:none"></canvas><div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:#ffffff66;font-size:10px">carregando...</div></div>
+    </a>
+    <button class="btn-copy-cdn" onclick="navigator.clipboard.writeText('${urlJs}').then(()=>this.textContent='✓ Copiado').catch(()=>{})">🔗 Copiar link</button>
+  </div>`;
+}
+
 function montarHtmlNicho(n){
   const d=nichoData[n];
   const color=NICHO_COLORS[n];
@@ -1325,8 +1341,10 @@ function montarHtmlNicho(n){
           html+=`<div data-historico-dominio="${esc(dom.domAnuncio)}" class="funil-historico-container"><div style="font-size:11px;color:#555">Carregando histórico...</div></div>`;
           html+=`<div data-contas-dominio="${esc(dom.domAnuncio)}" class="funil-contas-container"><div style="font-size:11px;color:#555">Carregando contas...</div></div>`;
         }
-        (dom.cdns||[dom.cdn||'']).filter(Boolean).forEach(cdn=>{
-          html+=`<div style="margin:10px 0"><div data-vsl-url="${esc(cdn)}" style="width:160px;height:90px;background:#000;border-radius:8px;overflow:hidden;position:relative"><canvas style="width:100%;height:100%;display:none"></canvas><div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:#ffffff66;font-size:10px">carregando...</div></div></div>`;
+        (dom.cdns||[dom.cdn||'']).filter(Boolean).forEach(cdnRaw=>{
+          cdnRaw.split('\n').map(s=>s.trim()).filter(Boolean).forEach(cdn=>{
+            html+=renderVslThumbUrl(cdn);
+          });
         });
       });
       if(fd.headline) html+=`<div class="report-funil-label">Headline campeã</div><div class="report-headline">"${esc(fd.headline)}"</div>`;
