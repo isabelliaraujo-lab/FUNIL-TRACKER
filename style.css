@@ -1141,6 +1141,15 @@ tbody tr.row-repeated:hover td {
   margin-bottom: 16px;
 }
 
+.modal-box__title-row {
+  display:         flex;
+  align-items:     center;
+  justify-content: space-between;
+  gap:             12px;
+  margin-bottom:   16px;
+}
+.modal-box__title-row .modal-box__title { margin-bottom: 0; }
+
 .modal-summary-count {
   font-size:     14px;
   color:         var(--text);

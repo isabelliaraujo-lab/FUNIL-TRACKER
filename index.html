@@ -32,17 +32,13 @@
       <a class="btn btn-secondary btn-sm" href="relatorio-semanal.html" target="_blank">
         📊 Relatório
       </a>
-      <button class="btn btn-secondary btn-sm" id="btn-export-csv">
-        ↓ Exportar CSV
-      </button>
-      <label class="btn btn-secondary btn-sm" id="btn-import-label">
-        ↑ Importar CSV
-        <input type="file" id="input-import-csv" accept=".csv" hidden />
-      </label>
       <label class="btn btn-secondary btn-sm" id="btn-import-text-label">
         ↑ Importar .txt/.docx
         <input type="file" id="input-import-text" accept=".txt,.docx" hidden />
       </label>
+      <button class="btn btn-primary btn-sm" id="btn-novo-funil">
+        + Novo Funil
+      </button>
     </div>
   </header>
 
@@ -79,6 +75,146 @@
          TAB: FUNIS
     ========================================= -->
     <div class="tab-content" id="tab-funis" role="tabpanel" hidden>
+
+      <!-- ---- Dashboard ---- -->
+      <div class="dashboard-grid" id="dashboard">
+        <div class="stat-card" id="stat-total">
+          <div class="stat-label">Total de funis</div>
+          <div class="stat-value" id="stat-total-val">0</div>
+        </div>
+        <div class="stat-card" id="stat-doms">
+          <div class="stat-label">Dom. finais únicos</div>
+          <div class="stat-value" id="stat-doms-val">0</div>
+        </div>
+        <div class="stat-card" id="stat-contas">
+          <div class="stat-label">Contas únicas</div>
+          <div class="stat-value" id="stat-contas-val">0</div>
+        </div>
+        <div class="stat-card" id="stat-repetidos">
+          <div class="stat-label">Dom. finais repetidos</div>
+          <div class="stat-value" id="stat-repetidos-val">0</div>
+        </div>
+      </div>
+
+      <!-- ---- Filters ---- -->
+      <div class="filters-bar">
+        <input
+          type="search"
+          id="filter-search"
+          class="filter-input filter-search"
+          placeholder="Buscar em todos os campos…"
+          autocomplete="off"
+        />
+
+        <select id="filter-repetido" class="filter-input">
+          <option value="">Repetido: todos</option>
+          <option value="sim">Dom. repetido</option>
+          <option value="nao">Dom. único</option>
+        </select>
+
+        <button class="btn btn-secondary btn-sm" id="btn-clear-filters">
+          Limpar filtros
+        </button>
+      </div>
+
+      <!-- ---- Table ---- -->
+      <div id="tabela-pg-top"></div>
+      <div class="table-wrapper">
+        <table id="main-table">
+          <thead>
+            <tr>
+              <th class="sortable" id="th-data" onclick="Tabela.toggleSort()">Data <span id="sort-icon">↓</span></th>
+              <th>Conta</th>
+              <th>Nicho</th>
+              <th>Produto</th>
+              <th>URL Anúncio</th>
+              <th>Views</th>
+              <th>Famoso</th>
+              <th>Dom. Anúncio</th>
+              <th>Dom. Final</th>
+              <th>Obs.</th>
+              <th>Status</th>
+              <th>Performance</th>
+              <th aria-label="Ações"></th>
+            </tr>
+          </thead>
+          <tbody id="table-body">
+            <!-- rows injected by tabela.js -->
+            <tr id="table-empty-row">
+              <td colspan="13">
+                <div class="empty-state">
+                  <div class="empty-icon">📋</div>
+                  <h3>Nenhum funil cadastrado ainda</h3>
+                  <p>Cole um texto ou adicione manualmente para começar.</p>
+                </div>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      <div id="tabela-pg-bottom"></div>
+
+    </div><!-- /tab-funis -->
+
+
+    <!-- ========================================
+         TAB: ANÁLISE
+    ========================================= -->
+    <div class="tab-content" id="tab-analise" role="tabpanel" hidden>
+
+      <!-- Painel de inteligência do período -->
+      <div id="analise-intel"></div>
+
+      <!-- Buscas compactas -->
+      <div class="analysis-block" style="padding:14px 18px">
+        <div style="font-size:11px;text-transform:uppercase;letter-spacing:.1em;color:var(--text-muted);font-weight:700;margin-bottom:12px">Buscas</div>
+        <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:16px">
+          <div>
+            <div style="font-size:10px;text-transform:uppercase;letter-spacing:.05em;color:var(--text-muted);font-weight:600;margin-bottom:5px">🔍 Dom. Anúncio</div>
+            <input type="search" id="search-dom-anuncio" class="analysis-search" placeholder="Ex: healthofbrain" autocomplete="off" style="max-width:100%;padding:6px 10px;font-size:12px;margin-bottom:10px">
+            <div id="result-dom-anuncio" class="analysis-result"></div>
+          </div>
+          <div>
+            <div style="font-size:10px;text-transform:uppercase;letter-spacing:.05em;color:var(--text-muted);font-weight:600;margin-bottom:5px">🎯 Dom. Final</div>
+            <input type="search" id="search-dom-final" class="analysis-search" placeholder="Ex: mmemoryhealth" autocomplete="off" style="max-width:100%;padding:6px 10px;font-size:12px;margin-bottom:10px">
+            <div id="result-dom-final" class="analysis-result"></div>
+          </div>
+          <div>
+            <div style="font-size:10px;text-transform:uppercase;letter-spacing:.05em;color:var(--text-muted);font-weight:600;margin-bottom:5px">📦 Produto</div>
+            <input type="search" id="search-produto" class="analysis-search" placeholder="Ex: lean drops" autocomplete="off" style="max-width:100%;padding:6px 10px;font-size:12px;margin-bottom:10px">
+            <div id="result-produto" class="analysis-result"></div>
+          </div>
+        </div>
+      </div>
+
+    </div><!-- /tab-analise -->
+
+    <div class="tab-content" id="tab-criativos" role="tabpanel" hidden>
+    </div>
+
+  </main><!-- /main -->
+
+  <!-- ===== TOAST ===== -->
+  <div id="toast" class="toast" role="alert" aria-live="polite"></div>
+
+  <!-- ===== MODAL NOVO FUNIL ===== -->
+  <div id="modal-novo-funil" class="modal-overlay" hidden
+       role="dialog" aria-modal="true" aria-labelledby="novo-funil-modal-title">
+    <div class="modal-box modal-box--wide">
+      <div class="modal-box__title-row">
+        <div class="modal-box__title" id="novo-funil-modal-title">Novo Funil</div>
+        <button type="button" class="btn-icon" id="btn-fechar-novo-funil" aria-label="Fechar">✕</button>
+      </div>
+
+      <div class="btn-row" style="margin-bottom: 16px;">
+        <button class="btn btn-secondary btn-sm" id="btn-export-csv">
+          ↓ Exportar CSV
+        </button>
+        <label class="btn btn-secondary btn-sm" id="btn-import-label">
+          ↑ Importar CSV
+          <input type="file" id="input-import-csv" accept=".csv" hidden />
+        </label>
+      </div>
 
       <!-- Mode selector -->
       <div class="mode-selector" role="group" aria-label="Modo de entrada">
@@ -254,127 +390,8 @@
           </div>
         </form>
       </section>
-
-      <!-- ---- Dashboard ---- -->
-      <div class="dashboard-grid" id="dashboard">
-        <div class="stat-card" id="stat-total">
-          <div class="stat-label">Total de funis</div>
-          <div class="stat-value" id="stat-total-val">0</div>
-        </div>
-        <div class="stat-card" id="stat-doms">
-          <div class="stat-label">Dom. finais únicos</div>
-          <div class="stat-value" id="stat-doms-val">0</div>
-        </div>
-        <div class="stat-card" id="stat-contas">
-          <div class="stat-label">Contas únicas</div>
-          <div class="stat-value" id="stat-contas-val">0</div>
-        </div>
-        <div class="stat-card" id="stat-repetidos">
-          <div class="stat-label">Dom. finais repetidos</div>
-          <div class="stat-value" id="stat-repetidos-val">0</div>
-        </div>
-      </div>
-
-      <!-- ---- Filters ---- -->
-      <div class="filters-bar">
-        <input
-          type="search"
-          id="filter-search"
-          class="filter-input filter-search"
-          placeholder="Buscar em todos os campos…"
-          autocomplete="off"
-        />
-
-        <select id="filter-repetido" class="filter-input">
-          <option value="">Repetido: todos</option>
-          <option value="sim">Dom. repetido</option>
-          <option value="nao">Dom. único</option>
-        </select>
-
-        <button class="btn btn-secondary btn-sm" id="btn-clear-filters">
-          Limpar filtros
-        </button>
-      </div>
-
-      <!-- ---- Table ---- -->
-      <div id="tabela-pg-top"></div>
-      <div class="table-wrapper">
-        <table id="main-table">
-          <thead>
-            <tr>
-              <th class="sortable" id="th-data" onclick="Tabela.toggleSort()">Data <span id="sort-icon">↓</span></th>
-              <th>Conta</th>
-              <th>Nicho</th>
-              <th>Produto</th>
-              <th>URL Anúncio</th>
-              <th>Views</th>
-              <th>Famoso</th>
-              <th>Dom. Anúncio</th>
-              <th>Dom. Final</th>
-              <th>Obs.</th>
-              <th>Status</th>
-              <th>Performance</th>
-              <th aria-label="Ações"></th>
-            </tr>
-          </thead>
-          <tbody id="table-body">
-            <!-- rows injected by tabela.js -->
-            <tr id="table-empty-row">
-              <td colspan="13">
-                <div class="empty-state">
-                  <div class="empty-icon">📋</div>
-                  <h3>Nenhum funil cadastrado ainda</h3>
-                  <p>Cole um texto ou adicione manualmente para começar.</p>
-                </div>
-              </td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
-      <div id="tabela-pg-bottom"></div>
-
-    </div><!-- /tab-funis -->
-
-
-    <!-- ========================================
-         TAB: ANÁLISE
-    ========================================= -->
-    <div class="tab-content" id="tab-analise" role="tabpanel" hidden>
-
-      <!-- Painel de inteligência do período -->
-      <div id="analise-intel"></div>
-
-      <!-- Buscas compactas -->
-      <div class="analysis-block" style="padding:14px 18px">
-        <div style="font-size:11px;text-transform:uppercase;letter-spacing:.1em;color:var(--text-muted);font-weight:700;margin-bottom:12px">Buscas</div>
-        <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:16px">
-          <div>
-            <div style="font-size:10px;text-transform:uppercase;letter-spacing:.05em;color:var(--text-muted);font-weight:600;margin-bottom:5px">🔍 Dom. Anúncio</div>
-            <input type="search" id="search-dom-anuncio" class="analysis-search" placeholder="Ex: healthofbrain" autocomplete="off" style="max-width:100%;padding:6px 10px;font-size:12px;margin-bottom:10px">
-            <div id="result-dom-anuncio" class="analysis-result"></div>
-          </div>
-          <div>
-            <div style="font-size:10px;text-transform:uppercase;letter-spacing:.05em;color:var(--text-muted);font-weight:600;margin-bottom:5px">🎯 Dom. Final</div>
-            <input type="search" id="search-dom-final" class="analysis-search" placeholder="Ex: mmemoryhealth" autocomplete="off" style="max-width:100%;padding:6px 10px;font-size:12px;margin-bottom:10px">
-            <div id="result-dom-final" class="analysis-result"></div>
-          </div>
-          <div>
-            <div style="font-size:10px;text-transform:uppercase;letter-spacing:.05em;color:var(--text-muted);font-weight:600;margin-bottom:5px">📦 Produto</div>
-            <input type="search" id="search-produto" class="analysis-search" placeholder="Ex: lean drops" autocomplete="off" style="max-width:100%;padding:6px 10px;font-size:12px;margin-bottom:10px">
-            <div id="result-produto" class="analysis-result"></div>
-          </div>
-        </div>
-      </div>
-
-    </div><!-- /tab-analise -->
-
-    <div class="tab-content" id="tab-criativos" role="tabpanel" hidden>
     </div>
-
-  </main><!-- /main -->
-
-  <!-- ===== TOAST ===== -->
-  <div id="toast" class="toast" role="alert" aria-live="polite"></div>
+  </div>
 
   <!-- ===== PERFORMANCE MODAL ===== -->
   <div id="modal-performance" class="modal-overlay" hidden
@@ -682,6 +699,19 @@
   <script src="analise.js"></script>
   <script src="criativos.js"></script>
   <script src="main.js"></script>
+
+  <!-- ===== PAINEL "NOVO FUNIL" (abrir/fechar) ===== -->
+  <script>
+    (function () {
+      const modal = document.getElementById('modal-novo-funil');
+      const abrir = document.getElementById('btn-novo-funil');
+      const fechar = document.getElementById('btn-fechar-novo-funil');
+
+      abrir.addEventListener('click', () => { modal.hidden = false; });
+      fechar.addEventListener('click', () => { modal.hidden = true; });
+      modal.addEventListener('click', e => { if (e.target === modal) modal.hidden = true; });
+    })();
+  </script>
 
 </body>
 </html>
