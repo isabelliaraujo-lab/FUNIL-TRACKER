@@ -17,13 +17,19 @@
       é destruído antes de chrome.runtime.sendMessage conseguir
       entregar a mensagem — na prática, nenhum envio chega no
       background. Por isso o popstate real usa um mecanismo à parte:
-      navigator.sendBeacon direto pro Supabase, a única API do
-      navegador com garantia de sobreviver ao descarte da página
-      (diferente de fetch com keepalive e de mensagens pro
-      background). Como sendBeacon não permite headers customizados,
-      a apikey vai na própria query string da URL (sem Authorization —
-      o PostgREST assume o papel "anon" quando não há JWT, e a policy
-      de insert da tabela é pública).
+      navigator.sendBeacon pra uma Edge Function do Supabase
+      (registrar-backredirect, ver supabase/functions/), a única API
+      do navegador com garantia de sobreviver ao descarte da página.
+      Essa function foi deployada com --no-verify-jwt e usa a service
+      role key internamente, então o cliente não precisa mandar
+      nenhuma credencial — o que também deixa o corpo como
+      text/plain (comportamento padrão do sendBeacon com uma string),
+      uma requisição CORS "simples" que não depende de um preflight
+      correndo a tempo antes da página descarregar.
+      (Tentativa anterior: sendBeacon direto pro REST do PostgREST com
+      apikey na query string. Não persistiu em teste real — o registro
+      dos 8s existia, mas backredirect_confirmado nunca chegava a
+      true — por isso a migração pra Edge Function.)
    ============================================================ */
 
 (function () {
@@ -263,19 +269,17 @@
     };
   }
 
-  // sendBeacon não aceita headers customizados (nada de apikey/
-  // Authorization em header), então a apikey vai na query string da
-  // própria URL. Sem Authorization, o PostgREST usa o papel "anon"
-  // (db-anon-role) — e a policy "insercao publica" de analises_extensao
-  // permite o INSERT normalmente para esse papel.
+  // Edge Function que aceita o POST sem nenhuma credencial do cliente
+  // (deployada com --no-verify-jwt) e faz o UPDATE/INSERT internamente
+  // com a service role key — ver supabase/functions/registrar-backredirect.
+  // Manda o payload como string (não Blob/JSON) de propósito: isso faz o
+  // sendBeacon usar Content-Type text/plain, que é "CORS simples" e não
+  // precisa de preflight — nada que dependa de mais uma viagem de rede
+  // antes da página descarregar de vez.
   function enviarBeaconUrgente(payload) {
     try {
-      const url = `${SUPABASE_URL}/rest/v1/analises_extensao?apikey=${encodeURIComponent(SUPABASE_ANON_KEY)}`;
-      // Blob com type explícito faz o navegador mandar o Content-Type
-      // correto (application/json) — sendBeacon manda texto puro como
-      // text/plain por padrão, que o PostgREST não aceita para o INSERT.
-      const blob = new Blob([JSON.stringify(payload)], { type: 'application/json' });
-      return navigator.sendBeacon(url, blob);
+      const url = `${SUPABASE_URL}/functions/v1/registrar-backredirect`;
+      return navigator.sendBeacon(url, JSON.stringify(payload));
     } catch (err) {
       console.error('[Funil Tracker] erro ao montar/enviar o beacon de urgência:', err);
       return false;
