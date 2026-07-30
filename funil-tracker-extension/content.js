@@ -9,15 +9,21 @@
       verdade — se disparar enquanto o usuário está na página, isso
       é confirmação, não suspeita.
    c) Painel visual fixo no canto inferior direito.
-   d) Envio automático (INSERT) após 8s ou no unload; se o popstate real
-      disparar antes ou depois desse envio, o resultado é gravado
-      imediatamente (INSERT ou PATCH, conforme o caso) — sem depender
-      do timer nem do beforeunload. Quem fala com o Supabase é sempre o
-      background.js (service worker): páginas de anúncio costumam ter
-      um CSP que bloqueia fetch para domínios externos a partir do
-      content script, então aqui só enviamos mensagens via
-      chrome.runtime.sendMessage — o background roda num contexto
-      isolado, não afetado pelo CSP da página.
+   d) Envio automático (INSERT) após 8s ou no unload, via mensagem para
+      o background.js (service worker — não afetado pelo CSP da
+      página). Isso é suficiente para o caso comum, mas não para o
+      back-redirect real: nesse caso a própria página costuma navegar
+      embora (location.href = destino) tão rápido que o content script
+      é destruído antes de chrome.runtime.sendMessage conseguir
+      entregar a mensagem — na prática, nenhum envio chega no
+      background. Por isso o popstate real usa um mecanismo à parte:
+      navigator.sendBeacon direto pro Supabase, a única API do
+      navegador com garantia de sobreviver ao descarte da página
+      (diferente de fetch com keepalive e de mensagens pro
+      background). Como sendBeacon não permite headers customizados,
+      a apikey vai na própria query string da URL (sem Authorization —
+      o PostgREST assume o papel "anon" quando não há JWT, e a policy
+      de insert da tabela é pública).
    ============================================================ */
 
 (function () {
@@ -106,31 +112,38 @@
 
   // ── b) Detecção comportamental real de back-redirect ─────────────────
 
+  // Guarda a última URL conhecida para o log de diagnóstico (URL antes
+  // vs. URL depois do popstate) — atualizada a cada disparo real.
+  let urlConhecidaAntes = window.location.href;
+
   window.addEventListener('popstate', () => {
+    // Lida na hora, sem setTimeout: por definição o popstate já dispara
+    // depois que a navegação por history aconteceu, então
+    // window.location.href já reflete o destino real nesse exato instante.
+    const urlAntes  = urlConhecidaAntes;
+    const urlDepois = window.location.href;
+    urlConhecidaAntes = urlDepois;
+
+    // eslint-disable-next-line no-console
+    console.log('[Funil Tracker] popstate disparado — URL antes:', urlAntes, '| URL depois:', urlDepois);
+
     estado.backredirectConfirmado = true;
-    estado.backredirectUrl = window.location.href;
+    estado.backredirectUrl = urlDepois;
     if (!estado.backredirectTipos.includes('popstate-disparado')) {
       estado.backredirectTipos.push('popstate-disparado');
     }
     atualizarPainel();
 
-    // Envio/atualização imediata — não espera o timer de 8s nem o
-    // beforeunload, porque a página pode navegar embora de verdade a
-    // qualquer momento a partir daqui (é o próprio back-redirect).
-    if (estado.enviado && estado.registroId) {
-      // Fire-and-forget: a página pode navegar embora logo em seguida,
-      // então não faz sentido esperar a resposta do background aqui.
-      enviarMensagem({
-        tipo: 'atualizar_backredirect',
-        id: estado.registroId,
-        campos: {
-          backredirect_confirmado: true,
-          backredirect_url: estado.backredirectUrl,
-        },
-      });
-    } else {
-      enviarDados();
-    }
+    // Envio de urgência via sendBeacon — ver nota no cabeçalho do
+    // arquivo sobre por que isso não pode depender do timer de 8s, do
+    // beforeunload nem de chrome.runtime.sendMessage.
+    const aceito = enviarBeaconUrgente(construirPayload());
+    // eslint-disable-next-line no-console
+    console.log('[Funil Tracker] navigator.sendBeacon aceito pelo navegador?', aceito);
+
+    // Evita que o fluxo normal (8s/beforeunload) reenvie com dados já
+    // desatualizados por cima do que o beacon acabou de mandar.
+    estado.enviado = true;
   });
 
   // ── c) Painel visual fixo ─────────────────────────────────────────────
@@ -232,8 +245,10 @@
   }
 
   // ── d) Envio automático dos dados coletados ──────────────────────────
-  // Todo o acesso ao Supabase é feito pelo background.js — este content
-  // script só troca mensagens com ele via chrome.runtime.sendMessage.
+  // Fluxo normal (8s/beforeunload): mensagem pro background.js, que fala
+  // com o Supabase por trás — ver enviarMensagem()/enviarDados() abaixo.
+  // Fluxo de urgência (popstate real): sendBeacon direto pro Supabase a
+  // partir do próprio content script — ver enviarBeaconUrgente() abaixo.
 
   function construirPayload() {
     return {
@@ -246,6 +261,25 @@
       backredirect_url: estado.backredirectUrl || null,
       backredirect_tipo: estado.backredirectTipos,
     };
+  }
+
+  // sendBeacon não aceita headers customizados (nada de apikey/
+  // Authorization em header), então a apikey vai na query string da
+  // própria URL. Sem Authorization, o PostgREST usa o papel "anon"
+  // (db-anon-role) — e a policy "insercao publica" de analises_extensao
+  // permite o INSERT normalmente para esse papel.
+  function enviarBeaconUrgente(payload) {
+    try {
+      const url = `${SUPABASE_URL}/rest/v1/analises_extensao?apikey=${encodeURIComponent(SUPABASE_ANON_KEY)}`;
+      // Blob com type explícito faz o navegador mandar o Content-Type
+      // correto (application/json) — sendBeacon manda texto puro como
+      // text/plain por padrão, que o PostgREST não aceita para o INSERT.
+      const blob = new Blob([JSON.stringify(payload)], { type: 'application/json' });
+      return navigator.sendBeacon(url, blob);
+    } catch (err) {
+      console.error('[Funil Tracker] erro ao montar/enviar o beacon de urgência:', err);
+      return false;
+    }
   }
 
   function enviarMensagem(msg) {

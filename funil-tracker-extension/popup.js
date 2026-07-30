@@ -47,9 +47,21 @@
     return resp.json();
   }
 
+  // Só http(s) vira link de verdade. Páginas de extensão (MV3) bloqueiam
+  // por CSP qualquer tentativa de execução de esquema javascript:, e
+  // mailto:/tel:/# ou valores relativos não fazem sentido como link aqui
+  // — links_pagina vem de <a href> reais da página analisada e pode
+  // conter qualquer um desses.
+  function ehUrlSegura(url) {
+    return typeof url === 'string' && /^https?:\/\//i.test(url.trim());
+  }
+
   function linkTruncadoHtml(url, max = 40) {
     if (!url) return '<span style="color:#555">—</span>';
     const label = url.length > max ? url.slice(0, max - 1) + '…' : url;
+    if (!ehUrlSegura(url)) {
+      return `<span style="color:#666;word-break:break-all" title="${escHtml(url)}">${escHtml(label)}</span>`;
+    }
     return `<a href="${escHtml(url)}" target="_blank" rel="noopener noreferrer" title="${escHtml(url)}" ` +
       `style="color:#00d4ff;text-decoration:none;word-break:break-all">${escHtml(label)}</a>`;
   }
@@ -65,12 +77,18 @@
     const badges = [];
 
     if (registro.backredirect_confirmado) {
-      const href = registro.backredirect_url || '#';
-      badges.push(
-        `<a class="badge" href="${escHtml(href)}" target="_blank" rel="noopener noreferrer" ` +
-        `style="background:#002a1a;color:#00c47a;text-decoration:none" ` +
-        `title="${escHtml(registro.backredirect_url || '')}">🔙 BR confirmado</a>`
-      );
+      const url = registro.backredirect_url;
+      if (ehUrlSegura(url)) {
+        badges.push(
+          `<a class="badge" href="${escHtml(url)}" target="_blank" rel="noopener noreferrer" ` +
+          `style="background:#002a1a;color:#00c47a;text-decoration:none" ` +
+          `title="${escHtml(url)}">🔙 BR confirmado</a>`
+        );
+      } else {
+        badges.push(
+          `<span class="badge" style="background:#002a1a;color:#00c47a" title="${escHtml(url || '')}">🔙 BR confirmado</span>`
+        );
+      }
     } else if (registro.backredirect_detectado) {
       badges.push(`<span class="badge" style="background:#2a1400;color:#f59e0b">🔙 BR suspeita</span>`);
     }
