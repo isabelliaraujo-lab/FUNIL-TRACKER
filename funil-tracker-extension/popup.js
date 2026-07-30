@@ -47,6 +47,20 @@
     return resp.json();
   }
 
+  function linkTruncadoHtml(url, max = 40) {
+    if (!url) return '<span style="color:#555">—</span>';
+    const label = url.length > max ? url.slice(0, max - 1) + '…' : url;
+    return `<a href="${escHtml(url)}" target="_blank" rel="noopener noreferrer" title="${escHtml(url)}" ` +
+      `style="color:#00d4ff;text-decoration:none;word-break:break-all">${escHtml(label)}</a>`;
+  }
+
+  function linksListaHtml(links) {
+    if (!Array.isArray(links) || !links.length) {
+      return '<div style="color:#555;padding:4px 2px">Nenhum link coletado.</div>';
+    }
+    return links.map(l => `<div style="padding:2px 2px">${linkTruncadoHtml(l, 60)}</div>`).join('');
+  }
+
   function badgesHtml(registro) {
     const badges = [];
 
@@ -79,7 +93,14 @@
           <span class="card-hora">${formatarHora(registro.created_at)}</span>
         </div>
         <div class="card-badges">${badgesHtml(registro)}</div>
-        <div class="card-links">🔗 ${totalLinks} link(s) na página</div>
+        <div class="card-urls">
+          <div class="card-url-linha"><span class="card-url-label">Original</span>${linkTruncadoHtml(registro.url_original)}</div>
+          <div class="card-url-linha"><span class="card-url-label">Final</span>${linkTruncadoHtml(registro.url_final)}</div>
+        </div>
+        <button class="links-toggle" type="button" data-id="${escHtml(registro.id)}" data-total="${totalLinks}">
+          🔗 ${totalLinks} link(s) na página ▾
+        </button>
+        <div class="links-lista" id="links-${escHtml(registro.id)}" hidden>${linksListaHtml(registro.links_pagina)}</div>
       </div>
     `;
   }
@@ -112,6 +133,16 @@
       listaEl.innerHTML = `<div class="erro">Erro ao carregar: ${escHtml(err.message)}</div>`;
     }
   }
+
+  listaEl.addEventListener('click', e => {
+    const btn = e.target.closest('.links-toggle');
+    if (!btn) return;
+    const painel = document.getElementById(`links-${btn.dataset.id}`);
+    if (!painel) return;
+    const vaiAbrir = painel.hidden;
+    painel.hidden = !vaiAbrir;
+    btn.innerHTML = `🔗 ${btn.dataset.total} link(s) na página ${vaiAbrir ? '▴' : '▾'}`;
+  });
 
   inputData.value = hojeISO();
   inputData.addEventListener('change', carregar);

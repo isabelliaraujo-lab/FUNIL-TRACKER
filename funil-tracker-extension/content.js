@@ -9,7 +9,12 @@
       verdade — se disparar enquanto o usuário está na página, isso
       é confirmação, não suspeita.
    c) Painel visual fixo no canto inferior direito.
-   d) Envio automático para o background.js após 8s ou no unload.
+   d) Envio automático (INSERT) ao Supabase após 8s ou no unload; se o
+      popstate real disparar antes ou depois desse envio, o resultado é
+      gravado imediatamente (INSERT ou PATCH, conforme o caso) — sem
+      depender do timer nem do beforeunload. Usa fetch com keepalive
+      porque a página costuma navegar de verdade logo em seguida (o
+      próprio back-redirect), o que mataria uma requisição comum.
    ============================================================ */
 
 (function () {
@@ -37,6 +42,8 @@
     backredirectUrl: null,
     backredirectTipos: [],
     verificandoScripts: true,
+    enviado: false,     // já existe um registro salvo no Supabase para esta análise
+    registroId: null,   // id do registro salvo, para permitir PATCH depois
   };
 
   const MAX_LINKS = 300;
@@ -103,6 +110,18 @@
       estado.backredirectTipos.push('popstate-disparado');
     }
     atualizarPainel();
+
+    // Envio/atualização imediata — não espera o timer de 8s nem o
+    // beforeunload, porque a página pode navegar embora de verdade a
+    // qualquer momento a partir daqui (é o próprio back-redirect).
+    if (estado.enviado && estado.registroId) {
+      atualizarBackredirect(estado.registroId, {
+        backredirect_confirmado: true,
+        backredirect_url: estado.backredirectUrl,
+      }).catch(err => console.error('[Funil Tracker] erro ao atualizar back-redirect:', err));
+    } else {
+      enviarDados();
+    }
   });
 
   // ── c) Painel visual fixo ─────────────────────────────────────────────
@@ -204,14 +223,14 @@
   }
 
   // ── d) Envio automático dos dados coletados ──────────────────────────
+  // Grava direto na REST API do Supabase (mesmas credenciais de
+  // supabase-config.js). Usa keepalive:true porque estas chamadas
+  // costumam ser feitas bem perto de uma navegação real da página
+  // (beforeunload, ou o próprio back-redirect via popstate) — sem
+  // keepalive, o navegador cancelaria a requisição no meio do caminho.
 
-  let jaEnviado = false;
-
-  function enviarDados() {
-    if (jaEnviado) return;
-    jaEnviado = true;
-
-    const dados = {
+  function construirPayload() {
+    return {
       url_original: estado.urlOriginal,
       url_final: window.location.href,
       links_pagina: estado.links,
@@ -221,15 +240,68 @@
       backredirect_url: estado.backredirectUrl || null,
       backredirect_tipo: estado.backredirectTipos,
     };
+  }
 
-    try {
-      chrome.runtime.sendMessage({ type: 'FUNIL_TRACKER_ANALISE', dados }, () => {
-        // void chrome.runtime.lastError — nada a fazer se a aba já fechou
-        void chrome.runtime.lastError;
-      });
-    } catch {
-      // extensão pode ter sido recarregada/desabilitada durante a navegação
-    }
+  async function inserirAnalise(dados) {
+    const resp = await fetch(`${SUPABASE_URL}/rest/v1/analises_extensao`, {
+      method: 'POST',
+      keepalive: true,
+      headers: {
+        apikey: SUPABASE_ANON_KEY,
+        Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
+        'Content-Type': 'application/json',
+        Prefer: 'return=representation',
+      },
+      body: JSON.stringify(dados),
+    });
+    if (!resp.ok) throw new Error(`Supabase respondeu ${resp.status}: ${await resp.text()}`);
+    const linhas = await resp.json();
+    return Array.isArray(linhas) ? linhas[0] : linhas;
+  }
+
+  async function atualizarBackredirect(id, campos) {
+    const resp = await fetch(`${SUPABASE_URL}/rest/v1/analises_extensao?id=eq.${encodeURIComponent(id)}`, {
+      method: 'PATCH',
+      keepalive: true,
+      headers: {
+        apikey: SUPABASE_ANON_KEY,
+        Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
+        'Content-Type': 'application/json',
+        Prefer: 'return=minimal',
+      },
+      body: JSON.stringify(campos),
+    });
+    if (!resp.ok) throw new Error(`Supabase respondeu ${resp.status}: ${await resp.text()}`);
+  }
+
+  let envioPromise = null;
+
+  function enviarDados() {
+    if (estado.enviado) return Promise.resolve();
+    if (envioPromise) return envioPromise;
+
+    const payloadEnviado = construirPayload();
+
+    envioPromise = inserirAnalise(payloadEnviado)
+      .then(registro => {
+        estado.enviado = true;
+        if (registro && registro.id) estado.registroId = registro.id;
+
+        // Se o back-redirect foi confirmado bem no meio dessa requisição
+        // (corrida com o listener de popstate), o payload já enviado
+        // ficou desatualizado — sincroniza agora com um PATCH.
+        const desatualizado = estado.backredirectConfirmado && !payloadEnviado.backredirect_confirmado;
+        if (desatualizado && estado.registroId) {
+          return atualizarBackredirect(estado.registroId, {
+            backredirect_confirmado: true,
+            backredirect_url: estado.backredirectUrl,
+          });
+        }
+      })
+      .catch(err => console.error('[Funil Tracker] erro ao salvar análise:', err))
+      .finally(() => { envioPromise = null; });
+
+    return envioPromise;
   }
 
   // ── Inicialização ─────────────────────────────────────────────────────
