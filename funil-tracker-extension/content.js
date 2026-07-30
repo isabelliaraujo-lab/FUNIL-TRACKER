@@ -38,6 +38,13 @@
   if (window.__funilTrackerInjetado) return;
   window.__funilTrackerInjetado = true;
 
+  // URL conhecida no instante do carregamento, comparada a cada popstate
+  // real (ver listener mais abaixo) pra decidir se a navegação por history
+  // mudou o destino de verdade. Inicializada aqui, incondicionalmente —
+  // não reaproveita estado.urlOriginal, que serve a um propósito
+  // diferente (o valor enviado como url_original no payload).
+  let urlConhecidaAntes = window.location.href;
+
   const REGEX_BACKREDIRECT = [
     { nome: 'pushState',        re: /history\s*\.\s*pushState\s*\(/i },
     { nome: 'replaceState',     re: /history\s*\.\s*replaceState\s*\(/i },
@@ -118,38 +125,47 @@
 
   // ── b) Detecção comportamental real de back-redirect ─────────────────
 
-  // Guarda a última URL conhecida para o log de diagnóstico (URL antes
-  // vs. URL depois do popstate) — atualizada a cada disparo real.
-  let urlConhecidaAntes = window.location.href;
-
   window.addEventListener('popstate', () => {
     // Lida na hora, sem setTimeout: por definição o popstate já dispara
     // depois que a navegação por history aconteceu, então
     // window.location.href já reflete o destino real nesse exato instante.
     const urlAntes  = urlConhecidaAntes;
     const urlDepois = window.location.href;
-    urlConhecidaAntes = urlDepois;
+
+    // Comparação estrita entre as duas strings completas (URL + query
+    // string). Bug corrigido aqui: a versão anterior marcava
+    // backredirectConfirmado = true incondicionalmente em qualquer
+    // popstate, sem nunca checar se o destino realmente mudou — por isso
+    // um teste real gravou backredirect_url idêntica a url_original.
+    const mudouDeVerdade = urlAntes !== urlDepois;
 
     // eslint-disable-next-line no-console
-    console.log('[Funil Tracker] popstate disparado — URL antes:', urlAntes, '| URL depois:', urlDepois);
+    console.log('[Funil Tracker] popstate disparado — URL antes:', urlAntes, '| URL depois:', urlDepois, '| mudou?', mudouDeVerdade);
 
-    estado.backredirectConfirmado = true;
-    estado.backredirectUrl = urlDepois;
-    if (!estado.backredirectTipos.includes('popstate-disparado')) {
-      estado.backredirectTipos.push('popstate-disparado');
+    if (mudouDeVerdade) {
+      estado.backredirectConfirmado = true;
+      estado.backredirectUrl = urlDepois;
+      if (!estado.backredirectTipos.includes('popstate-disparado')) {
+        estado.backredirectTipos.push('popstate-disparado');
+      }
+      atualizarPainel();
+
+      // Envio de urgência via sendBeacon — ver nota no cabeçalho do
+      // arquivo sobre por que isso não pode depender do timer de 8s, do
+      // beforeunload nem de chrome.runtime.sendMessage.
+      const aceito = enviarBeaconUrgente(construirPayload());
+      // eslint-disable-next-line no-console
+      console.log('[Funil Tracker] navigator.sendBeacon aceito pelo navegador?', aceito);
+
+      // Evita que o fluxo normal (8s/beforeunload) reenvie com dados já
+      // desatualizados por cima do que o beacon acabou de mandar.
+      estado.enviado = true;
     }
-    atualizarPainel();
 
-    // Envio de urgência via sendBeacon — ver nota no cabeçalho do
-    // arquivo sobre por que isso não pode depender do timer de 8s, do
-    // beforeunload nem de chrome.runtime.sendMessage.
-    const aceito = enviarBeaconUrgente(construirPayload());
-    // eslint-disable-next-line no-console
-    console.log('[Funil Tracker] navigator.sendBeacon aceito pelo navegador?', aceito);
-
-    // Evita que o fluxo normal (8s/beforeunload) reenvie com dados já
-    // desatualizados por cima do que o beacon acabou de mandar.
-    estado.enviado = true;
+    // Atualiza ao final do handler — dá suporte a múltiplos disparos de
+    // popstate na mesma sessão de página (ex.: back/forward mais de uma
+    // vez), cada um comparado contra o destino do disparo anterior.
+    urlConhecidaAntes = urlDepois;
   });
 
   // ── c) Painel visual fixo ─────────────────────────────────────────────
