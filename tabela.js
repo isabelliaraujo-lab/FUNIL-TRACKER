@@ -157,6 +157,23 @@ const Tabela = (() => {
     );
   }
 
+  // Badges vindos da análise da funil-tracker-extension (extensão de
+  // navegador), quando existir uma correspondência por dom_final.
+  function analiseExtensaoTagsHtml(analise) {
+    if (!analise) return [];
+    const tags = [];
+    if (analise.backredirect_confirmado) {
+      tags.push('<span class="tag-status" style="background:#002a1a;color:#00c47a" title="' +
+        esc(analise.backredirect_url || '') + '">🔙 BR confirmado</span>');
+    } else if (analise.backredirect_detectado) {
+      tags.push('<span class="tag-status" style="background:#2a1400;color:#f59e0b">🔙 BR suspeita</span>');
+    }
+    if (analise.exit_intent_detectado) {
+      tags.push('<span class="tag-status" style="background:#2a1400;color:#f59e0b">🚪 Exit intent</span>');
+    }
+    return tags;
+  }
+
   function statusCellContent(f, topViews) {
     const tags = [];
     if (topViews.has(f.produto)) {
@@ -168,6 +185,7 @@ const Tabela = (() => {
     if (_getMonitoradas().includes(f.conta)) {
       tags.push('<span class="tag-status" style="background:#00143a;color:#00d4ff">👁</span>');
     }
+    tags.push(...analiseExtensaoTagsHtml(f.analiseExtensao));
     return tags.length
       ? `<div style="display:flex;flex-direction:column;gap:3px">${tags.join('')}</div>`
       : '';
