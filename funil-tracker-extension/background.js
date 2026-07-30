@@ -77,6 +77,48 @@ async function atualizarBackredirect(id, campos) {
   }
 }
 
+// Mecanismo principal de confirmação de back-redirect: a página de
+// DESTINO (que sabe de onde veio via sessionStorage — ver content.js)
+// avisa qual era a url_original da página de origem. Busca o registro
+// mais recente com essa url_original (pode haver duplicatas, uma por
+// carregamento) e faz o PATCH nele.
+async function buscarIdMaisRecentePorUrlOriginal(urlOriginal) {
+  const url = `${SUPABASE_URL}/rest/v1/analises_extensao`
+    + `?url_original=eq.${encodeURIComponent(urlOriginal)}`
+    + `&select=id`
+    + `&order=created_at.desc`
+    + `&limit=1`;
+
+  const resposta = await fetch(url, {
+    headers: {
+      apikey: SUPABASE_ANON_KEY,
+      Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
+    },
+  });
+
+  if (!resposta.ok) {
+    throw new Error(`Supabase respondeu ${resposta.status}: ${await resposta.text()}`);
+  }
+
+  const linhas = await resposta.json();
+  return linhas[0]?.id ?? null;
+}
+
+async function atualizarBackredirectPorOrigem(urlOrigem, urlDestino) {
+  const id = await buscarIdMaisRecentePorUrlOriginal(urlOrigem);
+
+  if (!id) {
+    throw new Error(`nenhum registro encontrado com url_original = ${urlOrigem}`);
+  }
+
+  await atualizarBackredirect(id, {
+    backredirect_confirmado: true,
+    backredirect_url: urlDestino,
+  });
+
+  return id;
+}
+
 chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
   if (!msg || typeof msg.tipo !== 'string') return;
 
@@ -95,6 +137,16 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
       .then(() => sendResponse({ ok: true }))
       .catch(err => {
         console.error('[Funil Tracker] erro ao atualizar back-redirect no Supabase:', err);
+        sendResponse({ ok: false, erro: String(err) });
+      });
+    return true;
+  }
+
+  if (msg.tipo === 'atualizar_backredirect_por_origem') {
+    atualizarBackredirectPorOrigem(msg.urlOrigem, msg.urlDestino)
+      .then(id => sendResponse({ ok: true, id }))
+      .catch(err => {
+        console.error('[Funil Tracker] erro ao atualizar back-redirect por origem:', err);
         sendResponse({ ok: false, erro: String(err) });
       });
     return true;

@@ -10,26 +10,20 @@
       é confirmação, não suspeita.
    c) Painel visual fixo no canto inferior direito.
    d) Envio automático (INSERT) após 8s ou no unload, via mensagem para
-      o background.js (service worker — não afetado pelo CSP da
-      página). Isso é suficiente para o caso comum, mas não para o
-      back-redirect real: nesse caso a própria página costuma navegar
-      embora (location.href = destino) tão rápido que o content script
-      é destruído antes de chrome.runtime.sendMessage conseguir
-      entregar a mensagem — na prática, nenhum envio chega no
-      background. Por isso o popstate real usa um mecanismo à parte:
-      navigator.sendBeacon pra uma Edge Function do Supabase
-      (registrar-backredirect, ver supabase/functions/), a única API
-      do navegador com garantia de sobreviver ao descarte da página.
-      Essa function foi deployada com --no-verify-jwt e usa a service
-      role key internamente, então o cliente não precisa mandar
-      nenhuma credencial — o que também deixa o corpo como
-      text/plain (comportamento padrão do sendBeacon com uma string),
-      uma requisição CORS "simples" que não depende de um preflight
-      correndo a tempo antes da página descarregar.
-      (Tentativa anterior: sendBeacon direto pro REST do PostgREST com
-      apikey na query string. Não persistiu em teste real — o registro
-      dos 8s existia, mas backredirect_confirmado nunca chegava a
-      true — por isso a migração pra Edge Function.)
+      o background.js (service worker — não afetado pelo CSP da página).
+   e) Confirmação de back-redirect — mecanismo principal: a página de
+      DESTINO se identifica via performance.getEntriesByType('navigation')
+      (type === 'back_forward') + sessionStorage, e avisa o background
+      pra fazer o PATCH no registro da página de ORIGEM (ver bloco logo
+      no início do IIFE, abaixo). O listener de popstate (item b) e o
+      envio via sendBeacon pra Edge Function continuam existindo como
+      caminho secundário/complementar — ver histórico deste arquivo pra
+      detalhes de por que a comparação de location.href antes/depois do
+      próprio popstate não é confiável como mecanismo principal (a
+      navegação real é assíncrona: no instante do evento a página ainda
+      não navegou de verdade, e segundos depois ela morre e uma nova
+      carrega do zero, sem nenhuma relação com a execução anterior do
+      script).
    ============================================================ */
 
 (function () {
@@ -37,6 +31,64 @@
 
   if (window.__funilTrackerInjetado) return;
   window.__funilTrackerInjetado = true;
+
+  // ── Detecção de back-redirect a partir da página de DESTINO ──────────
+  // A estratégia de comparar location.href antes/depois do popstate (na
+  // mesma execução do script) está fundamentalmente quebrada: a navegação
+  // real é assíncrona, então no instante do evento a página ainda não
+  // navegou de verdade — a comparação sempre dava "não mudou". Segundos
+  // depois a página antiga morre e uma nova carrega do zero, sem nenhuma
+  // relação com a execução anterior do script (confirmado pelos dados
+  // reais: a url_original de um registro batia com o destino esperado do
+  // registro anterior). A confirmação de verdade, portanto, vem da
+  // PRÓXIMA página, que sabe de onde veio através do sessionStorage
+  // (compartilhado com a página desde que seja o mesmo domínio/origem —
+  // não funciona se o back-redirect pular pra um domínio diferente).
+  const CHAVE_ORIGEM_PENDENTE = 'funilTracker_origemPendente';
+
+  const navEntries        = performance.getEntriesByType('navigation');
+  const tipoNavegacao      = navEntries.length ? navEntries[0].type : null;
+  const origemPendente     = sessionStorage.getItem(CHAVE_ORIGEM_PENDENTE);
+  const vaiConfirmar       = tipoNavegacao === 'back_forward' && Boolean(origemPendente);
+
+  // eslint-disable-next-line no-console
+  console.log(
+    '[Funil Tracker] tipo de navegação:', tipoNavegacao,
+    '| origem pendente no sessionStorage:', origemPendente,
+    '| vai confirmar back-redirect?', vaiConfirmar
+  );
+
+  if (vaiConfirmar) {
+    confirmarBackredirectNaOrigem(origemPendente, window.location.href);
+    sessionStorage.removeItem(CHAVE_ORIGEM_PENDENTE);
+  }
+
+  // Sempre grava a própria URL, independente do caso acima — se o usuário
+  // voltar de novo a partir desta página, a próxima precisa saber de onde
+  // veio (a origem "pendente" agora passa a ser esta página).
+  sessionStorage.setItem(CHAVE_ORIGEM_PENDENTE, window.location.href);
+
+  // Página já carregou por completo e está estável — sem risco de morrer
+  // no meio do processo, então dá pra usar chrome.runtime.sendMessage
+  // normal (não precisa de sendBeacon aqui).
+  function confirmarBackredirectNaOrigem(urlOrigem, urlDestino) {
+    try {
+      chrome.runtime.sendMessage(
+        {
+          tipo: 'atualizar_backredirect_por_origem',
+          urlOrigem,
+          urlDestino,
+        },
+        resposta => {
+          void chrome.runtime.lastError;
+          // eslint-disable-next-line no-console
+          console.log('[Funil Tracker] confirmação de back-redirect por origem — resposta do background:', resposta);
+        }
+      );
+    } catch (err) {
+      console.error('[Funil Tracker] erro ao enviar confirmação de back-redirect por origem:', err);
+    }
+  }
 
   // URL conhecida no instante do carregamento, comparada a cada popstate
   // real (ver listener mais abaixo) pra decidir se a navegação por history
