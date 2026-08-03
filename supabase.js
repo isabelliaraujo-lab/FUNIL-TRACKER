@@ -37,7 +37,6 @@ const SupabaseStorage = (() => {
       anuncios:         Array.isArray(f.anuncios) ? f.anuncios : [],
       views_historico:  Array.isArray(f.viewsHistorico) ? f.viewsHistorico : [],
       tag_lateral:      f.tagLateral || '',
-      analise_extensao: f.analiseExtensao || null,
     };
   }
 
@@ -67,7 +66,6 @@ const SupabaseStorage = (() => {
       anuncios:       r.anuncios || [],
       viewsHistorico: r.views_historico || [],
       tagLateral:     r.tag_lateral || '',
-      analiseExtensao: r.analise_extensao || null,
     };
   }
 
@@ -224,22 +222,5 @@ const SupabaseStorage = (() => {
     return { historico: data?.historico || [], adsAtivos: data?.ads_ativos || 0 };
   }
 
-  // ── Análises da extensão de navegador ────────────────────────────────
-  // Busca a análise mais recente (exit intent / back-redirect) gravada
-  // pela funil-tracker-extension para um domínio final específico.
-
-  async function buscarAnaliseExtensao(domFinal) {
-    if (!domFinal) return null;
-    const { data, error } = await db
-      .from('analises_extensao')
-      .select('exit_intent_detectado,backredirect_detectado,backredirect_confirmado,backredirect_url')
-      .eq('dom_final', domFinal)
-      .order('created_at', { ascending: false })
-      .limit(1)
-      .maybeSingle();
-    if (error) { console.error('Error loading analise_extensao:', error); return null; }
-    return data || null;
-  }
-
-  return { loadFunnels, syncFunnels, migrarLocalStorage, loadMonitoradas, saveMonitorada, deleteMonitorada, loadDominiosBiblioteca, salvarAdsAtivos, getHistoricoDominio, buscarAnaliseExtensao };
+  return { loadFunnels, syncFunnels, migrarLocalStorage, loadMonitoradas, saveMonitorada, deleteMonitorada, loadDominiosBiblioteca, salvarAdsAtivos, getHistoricoDominio };
 })();
