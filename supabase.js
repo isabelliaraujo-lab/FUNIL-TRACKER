@@ -111,9 +111,23 @@ const SupabaseStorage = (() => {
   async function syncFunnels(newFunnels, deletedIds = []) {
     const ops = [];
 
-    if (newFunnels.length) {
+    // Proteção defensiva: nunca enviar dois itens com o mesmo id no mesmo
+    // comando de upsert (o Postgres rejeita o batch inteiro nesse caso:
+    // "ON CONFLICT DO UPDATE command cannot affect row a second time").
+    const porId = new Map();
+    newFunnels.forEach(f => porId.set(f.id, f));
+    const deduplicados = Array.from(porId.values());
+
+    if (deduplicados.length !== newFunnels.length) {
+      console.warn(
+        `syncFunnels: ${newFunnels.length - deduplicados.length} id(s) duplicado(s) removido(s) antes do upsert.`,
+        newFunnels.length, '→', deduplicados.length
+      );
+    }
+
+    if (deduplicados.length) {
       ops.push(
-        db.from('funis').upsert(newFunnels.map(toRow), { onConflict: 'id' })
+        db.from('funis').upsert(deduplicados.map(toRow), { onConflict: 'id' })
       );
     }
 
