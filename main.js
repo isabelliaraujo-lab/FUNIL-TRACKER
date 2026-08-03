@@ -33,23 +33,6 @@ const NICHO_COLORS = {
   PA:'#14B8A6', CP:'#F59E0B'
 };
 
-// Badges vindos da análise da funil-tracker-extension (extensão de
-// navegador), quando existir uma correspondência por dom_final.
-function badgesAnaliseExtensao(analise) {
-  if (!analise) return '';
-  const esc = Storage.escHtml;
-  const badges = [];
-  if (analise.backredirect_confirmado) {
-    badges.push(`<span title="${esc(analise.backredirect_url || '')}" style="background:#002a1a;color:#00c47a;border-radius:8px;padding:4px 10px;font-size:11px;font-weight:700">🔙 BR confirmado</span>`);
-  } else if (analise.backredirect_detectado) {
-    badges.push(`<span style="background:#2a1400;color:#f59e0b;border-radius:8px;padding:4px 10px;font-size:11px;font-weight:700">🔙 BR suspeita</span>`);
-  }
-  if (analise.exit_intent_detectado) {
-    badges.push(`<span style="background:#2a1400;color:#f59e0b;border-radius:8px;padding:4px 10px;font-size:11px;font-weight:700">🚪 Exit intent</span>`);
-  }
-  return badges.join('');
-}
-
 function abrirDetalhe(id) {
   const f = funnels.find(x => x.id === id);
   if (!f) return;
@@ -82,8 +65,6 @@ function abrirDetalhe(id) {
     </div>
   ` : '';
 
-  const analiseExtensaoHtml = badgesAnaliseExtensao(f.analiseExtensao);
-
   document.getElementById('mfd2-conteudo').innerHTML = `
     <div style="display:flex;align-items:center;gap:10px;margin-bottom:20px;padding-bottom:16px;border-bottom:0.5px solid var(--border)">
       <span style="background:${NICHO_COLORS[f.nicho]||'#888'};color:#fff;border-radius:8px;padding:4px 10px;font-size:12px;font-weight:800">${esc(f.nicho||'—')}</span>
@@ -91,7 +72,6 @@ function abrirDetalhe(id) {
         <div style="font-size:16px;font-weight:700">${esc(f.conta||'—')}</div>
         <div style="font-size:12px;color:var(--text-muted)">${esc(f.data||'—')}</div>
       </div>
-      ${analiseExtensaoHtml}
     </div>
 
     ${vslHtml}
@@ -286,26 +266,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (!document.getElementById('tab-escalada').hidden) Escalada.refresh();
   }
 
-  // Consulta `analises_extensao` (gravada pela funil-tracker-extension) pelo
-  // dom_final do funil recém-criado e, se houver correspondência, anexa um
-  // resumo em f.analiseExtensao — usado só para exibir badges extras
-  // (tabela.js / abrirDetalhe), sem alterar nenhum campo já existente.
-  async function tentarAnexarAnaliseExtensao(f) {
-    const dom = (f.domFinal || '').split('\n')[0].trim();
-    if (!dom) return;
-    try {
-      const analise = await SupabaseStorage.buscarAnaliseExtensao(dom);
-      if (analise) {
-        f.analiseExtensao = {
-          exit_intent_detectado:   analise.exit_intent_detectado,
-          backredirect_detectado:  analise.backredirect_detectado,
-          backredirect_confirmado: analise.backredirect_confirmado,
-          backredirect_url:        analise.backredirect_url,
-        };
-      }
-    } catch (e) { console.error('Erro ao buscar análise da extensão:', e); }
-  }
-
   let _toastTimer = null;
   function showToast(msg, duration = 2500) {
     const el = document.getElementById('toast');
@@ -416,13 +376,12 @@ document.addEventListener('DOMContentLoaded', async () => {
     _parsed = null;
   });
 
-  document.getElementById('btn-confirm-parsed').addEventListener('click', async () => {
+  document.getElementById('btn-confirm-parsed').addEventListener('click', () => {
     if (!_parsed) return;
     _parsed.data  = document.getElementById('preview-data').value  || _parsed.data;
     _parsed.moeda = document.getElementById('preview-moeda').value || 'BRL';
     _parsed.hora  = new Date().toTimeString().slice(0, 5);
     _parsed.id    = Storage.genId();
-    await tentarAnexarAnaliseExtensao(_parsed);
     funnels.unshift(_parsed);
     saveFunnels(funnels);
     Tabela.renderTable();
@@ -436,7 +395,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   document.getElementById('m-data').value = new Date().toISOString().slice(0, 10);
   document.getElementById('m-hora').value = new Date().toTimeString().slice(0, 5);
 
-  document.getElementById('manual-form').addEventListener('submit', async e => {
+  document.getElementById('manual-form').addEventListener('submit', e => {
     e.preventDefault();
     const v = id => document.getElementById(id).value.trim();
     const conta   = v('m-conta');
@@ -468,7 +427,6 @@ document.addEventListener('DOMContentLoaded', async () => {
       domFinal, domFinalFull, split: splitVal, obs: v('m-obs'),
       gasto: null, conversao: null, moeda: 'BRL',
     };
-    await tentarAnexarAnaliseExtensao(funnel);
     funnels.unshift(funnel);
     saveFunnels(funnels);
     Tabela.renderTable();
@@ -607,7 +565,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     const resultado = await pedirDataImport(novos, duplicados);
     if (resultado === null) return;
     novos.forEach(f => { f.id = Storage.genId(); f.data = resultado.data; f.hora = resultado.hora; });
-    await Promise.all(novos.map(f => tentarAnexarAnaliseExtensao(f)));
     funnels = [...novos, ...funnels];
     saveFunnels(funnels);
     Tabela.renderTable();
