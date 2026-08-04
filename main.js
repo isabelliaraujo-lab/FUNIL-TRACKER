@@ -469,39 +469,63 @@ document.addEventListener('DOMContentLoaded', async () => {
     this.value = '';
   });
 
-  function pedirDataImport(novos, duplicados) {
+  // Duplicata = mesma conta + mesma URL de anúncio + mesma data. O mesmo
+  // anúncio minerado em dias diferentes é um registro legítimo e distinto.
+  const chaveDuplicata = (f, data) =>
+    `${(f.conta || '').trim().toUpperCase()}|${(f.urlAnuncio || '').trim().toLowerCase()}|${data || ''}`;
+
+  function pedirDataImport(parsed) {
     return new Promise(resolve => {
       const hoje = new Date().toISOString().slice(0, 10);
       const esc  = Storage.escHtml;
-      document.getElementById('import-count-novos').textContent = novos.length;
-      document.getElementById('import-count-dup').textContent   = duplicados.length;
-      document.getElementById('import-btn-count').textContent   = novos.length;
-      document.getElementById('import-modal-date').value        = hoje;
+      const dataInput  = document.getElementById('import-modal-date');
       const btnConfirm = document.getElementById('btn-confirm-import-text');
-      btnConfirm.disabled = novos.length === 0;
       const dupSection = document.getElementById('import-lista-duplicados');
-      dupSection.style.display = duplicados.length ? 'block' : 'none';
-      document.getElementById('import-dup-items').innerHTML = duplicados.map(f =>
-        `<div style="font-size:12px;color:#555;padding:4px 0;border-bottom:1px solid #1a1a1a">
-          ${esc(f.conta || '—')} — ${esc(f.produto || '—')}</div>`
-      ).join('');
-      document.getElementById('import-new-items').innerHTML = novos.length
-        ? novos.map(f =>
-            `<div style="font-size:12px;color:#ccc;padding:4px 0;border-bottom:1px solid #1a1a1a">
-              ${esc(f.conta || '—')} — ${esc(f.produto || '—')}</div>`
-          ).join('')
-        : '<div style="font-size:12px;color:#555;padding:4px 0">Nenhum funil novo encontrado.</div>';
+      dataInput.value = hoje;
+
+      function classificar(data) {
+        const chavesExistentes = new Set(funnels.map(f => chaveDuplicata(f, f.data)));
+        const novos = [], duplicados = [];
+        parsed.forEach(f => (chavesExistentes.has(chaveDuplicata(f, data)) ? duplicados : novos).push(f));
+        return { novos, duplicados };
+      }
+
+      function atualizarListas() {
+        const data = dataInput.value || hoje;
+        const { novos, duplicados } = classificar(data);
+        document.getElementById('import-count-novos').textContent = novos.length;
+        document.getElementById('import-count-dup').textContent   = duplicados.length;
+        document.getElementById('import-btn-count').textContent   = novos.length;
+        btnConfirm.disabled = novos.length === 0;
+        dupSection.style.display = duplicados.length ? 'block' : 'none';
+        document.getElementById('import-dup-items').innerHTML = duplicados.map(f =>
+          `<div style="font-size:12px;color:#555;padding:4px 0;border-bottom:1px solid #1a1a1a">
+            ${esc(f.conta || '—')} — ${esc(f.produto || '—')}</div>`
+        ).join('');
+        document.getElementById('import-new-items').innerHTML = novos.length
+          ? novos.map(f =>
+              `<div style="font-size:12px;color:#ccc;padding:4px 0;border-bottom:1px solid #1a1a1a">
+                ${esc(f.conta || '—')} — ${esc(f.produto || '—')}</div>`
+            ).join('')
+          : '<div style="font-size:12px;color:#555;padding:4px 0">Nenhum funil novo encontrado.</div>';
+      }
+
+      atualizarListas();
+      dataInput.addEventListener('input', atualizarListas);
+
       const modal = document.getElementById('import-text-modal');
       modal.hidden = false;
       function onConfirm() {
-        const data = document.getElementById('import-modal-date').value || hoje;
+        const data = dataInput.value || hoje;
         const hora = document.getElementById('import-modal-janela').value || '09:00';
-        modal.hidden = true; btnConfirm.disabled = false; cleanup(); resolve({ data, hora });
+        const { novos, duplicados } = classificar(data);
+        modal.hidden = true; btnConfirm.disabled = false; cleanup(); resolve({ data, hora, novos, duplicados });
       }
       function onCancel() {
         modal.hidden = true; btnConfirm.disabled = false; cleanup(); resolve(null);
       }
       function cleanup() {
+        dataInput.removeEventListener('input', atualizarListas);
         btnConfirm.removeEventListener('click', onConfirm);
         document.getElementById('btn-cancel-import-text').removeEventListener('click', onCancel);
         modal.removeEventListener('click', onOverlay);
@@ -569,15 +593,10 @@ document.addEventListener('DOMContentLoaded', async () => {
       const parsed = blocos.map(b => Parser.parse(b, linkMap)).filter(f => f.conta || f.urlAnuncio);
       if (!parsed.length) { showToast('Não foi possível extrair nenhum funil válido.'); return; }
 
-      const chaveDuplicata = f => `${(f.conta || '').trim().toUpperCase()}|${(f.urlAnuncio || '').trim().toLowerCase()}`;
-      const chavesExistentes = new Set(funnels.map(chaveDuplicata));
-      const novos      = [];
-      const duplicados = [];
-      parsed.forEach(f => (chavesExistentes.has(chaveDuplicata(f)) ? duplicados : novos).push(f));
-
-      const resultado = await pedirDataImport(novos, duplicados);
+      const resultado = await pedirDataImport(parsed);
       if (resultado === null) return;
-      novos.forEach(f => { f.id = Storage.genId(); f.data = resultado.data; f.hora = resultado.hora; });
+      const { novos, duplicados, data, hora } = resultado;
+      novos.forEach(f => { f.id = Storage.genId(); f.data = data; f.hora = hora; });
       funnels = [...novos, ...funnels];
       saveFunnels(funnels);
       Tabela.renderTable();
