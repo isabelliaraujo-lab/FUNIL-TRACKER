@@ -882,11 +882,15 @@ const Criativos = (() => {
 
     const funis = getFunnelsFn ? getFunnelsFn() : Storage.load();
     if (funis && funis.length) {
-      const existingUrls = new Set(_ads.map(a => a.urlAnuncio).filter(Boolean));
+      const existingKeys = new Set(
+        _ads.filter(a => a.urlAnuncio).map(a => `${a.urlAnuncio}|${a.data || ''}`)
+      );
       let imported = 0;
       funis.forEach(funil => {
-        if (!funil.urlAnuncio || existingUrls.has(funil.urlAnuncio)) return;
-        existingUrls.add(funil.urlAnuncio);
+        if (!funil.urlAnuncio) return;
+        const key = `${funil.urlAnuncio}|${funil.data || ''}`;
+        if (existingKeys.has(key)) return;
+        existingKeys.add(key);
         _ads.push({
           id:              Storage.genId(),
           data:            funil.data    || null,
