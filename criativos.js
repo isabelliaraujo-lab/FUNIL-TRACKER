@@ -5,7 +5,6 @@
 const Criativos = (() => {
 
   const KEY     = 'funil-tracker-criativos-v1';
-  const COL_KEY = 'funil-tracker-criativos-colunas';
 
   // ── Storage próprio ───────────────────────────────────────────────────
 
@@ -32,43 +31,9 @@ const Criativos = (() => {
     if (alterou) Storage.save(updated);
   }
 
-  // ── Colunas visíveis ──────────────────────────────────────────────────
-
-  const COLUMNS = [
-    { key: 'data',       label: 'Data',                     default: true  },
-    { key: 'nicho',      label: 'Nicho',                    default: true  },
-    { key: 'produto',    label: 'Produto',                  default: true  },
-    { key: 'conta',      label: 'Conta',                    default: true  },
-    { key: 'hook',       label: 'Hook',                     default: true  },
-    { key: 'angulo',     label: 'Ângulo',                   default: true  },
-    { key: 'formato',    label: 'Formato',                  default: false },
-    { key: 'views',      label: 'Views',                    default: true  },
-    { key: 'contas',     label: 'Contas c/ mesmo criativo', default: false },
-    { key: 'destaque',   label: 'Destaque',                 default: false },
-    { key: 'tagLateral', label: 'Tag lateral',              default: true  },
-    { key: 'urlAnuncio', label: 'Link do anúncio',          default: true  },
-  ];
-
-  function loadCols() {
-    try {
-      const saved = JSON.parse(localStorage.getItem(COL_KEY));
-      if (saved && typeof saved === 'object') {
-        const defaults = Object.fromEntries(COLUMNS.map(c => [c.key, c.default]));
-        return Object.assign(defaults, saved);
-      }
-    } catch {}
-    return Object.fromEntries(COLUMNS.map(c => [c.key, c.default]));
-  }
-
-  function saveCols(cols) {
-    localStorage.setItem(COL_KEY, JSON.stringify(cols));
-  }
-
   let _ads         = loadAds();
   let _showToast   = null;
   let _currentDups = [];
-  let _cols        = loadCols();
-  let _closeColsDd = null;
   let _crPage       = 1;
   let _crPerPage    = 25;
   let _crTotalPages = 1;
@@ -181,19 +146,21 @@ const Criativos = (() => {
   // ── Inline editing ────────────────────────────────────────────────────
 
   function rerenderRow(id) {
-    const tr = document.querySelector(`#cr-table tr[data-id="${CSS.escape(id)}"]`);
-    if (!tr) return;
+    const el = document.querySelector(`#cr-grid [data-id="${CSS.escape(id)}"]`);
+    if (!el) return;
     const ad = _ads.find(a => a.id === id);
     if (!ad) return;
-    const tmp = document.createElement('tbody');
-    tmp.innerHTML = renderRow(ad, _currentDups);
-    tr.replaceWith(tmp.firstElementChild);
+    const tmp = document.createElement('div');
+    tmp.innerHTML = renderCard(ad, _currentDups);
+    const newEl = tmp.firstElementChild;
+    el.replaceWith(newEl);
+    setupVideoLazyLoad(newEl);
   }
 
   function makeEditable(td) {
     if (td.querySelector('input, select, textarea')) return;
-    const tr = td.closest('tr');
-    const id = tr?.dataset.id;
+    const card = td.closest('[data-id]');
+    const id = card?.dataset.id;
     if (!id) return;
     const field = td.dataset.field;
     if (!field) return;
@@ -342,22 +309,6 @@ const Criativos = (() => {
           <option value="">Todos os ângulos</option>
           ${ANGULOS.map(a => `<option value="${esc(a)}" ${a===anguloAtual?'selected':''}>${esc(a)}</option>`).join('')}
         </select>
-        <div style="position:relative" id="cr-cols-wrapper">
-          <button class="btn btn-secondary btn-sm" id="cr-cols-btn" style="white-space:nowrap">⊞ Colunas</button>
-          <div id="cr-cols-dropdown" style="display:none;position:absolute;top:calc(100% + 4px);right:0;
-            z-index:200;background:var(--surface2);border:1px solid var(--border);border-radius:8px;
-            padding:10px 14px;min-width:220px;box-shadow:0 6px 24px rgba(0,0,0,.5)">
-            ${COLUMNS.map(c => `
-              <label style="display:flex;align-items:center;gap:8px;padding:5px 0;cursor:pointer;
-                font-size:13px;color:var(--text);user-select:none">
-                <input type="checkbox" data-col-toggle="${esc(c.key)}"
-                  ${_cols[c.key] !== false ? 'checked' : ''}
-                  style="accent-color:var(--accent);width:14px;height:14px;cursor:pointer">
-                ${esc(c.label)}
-              </label>
-            `).join('')}
-          </div>
-        </div>
         <button class="btn btn-primary btn-sm" id="cr-btn-novo" style="margin-left:auto">+ Novo</button>
         <button class="btn btn-secondary btn-sm" id="cr-btn-export">↓ CSV</button>
       </div>
@@ -412,40 +363,19 @@ const Criativos = (() => {
       <!-- Ranking por ângulo -->
       ${renderAnguloChart(ads)}
 
-      <!-- Tabela de criativos -->
+      <!-- Grid de criativos -->
       ${pgHtml}
-      <div class="table-wrapper">
-        <table id="cr-table">
-          <thead>
-            <tr>
-              ${_cols['data']       !== false ? '<th>Data</th>'                                  : ''}
-              ${_cols['nicho']      !== false ? '<th style="width:44px">Nicho</th>'                : ''}
-              ${_cols['produto']    !== false ? '<th style="min-width:100px">Produto</th>'       : ''}
-              ${_cols['conta']      !== false ? '<th>Conta</th>'                                 : ''}
-              ${_cols['hook']       !== false ? '<th>Hook</th>'                                  : ''}
-              ${_cols['angulo']     !== false ? '<th>Ângulo</th>'                                : ''}
-              ${_cols['formato']    !== false ? '<th>Formato</th>'                               : ''}
-              ${_cols['views']      !== false ? '<th style="text-align:right">Views</th>'        : ''}
-              ${_cols['contas']     !== false ? '<th style="text-align:center">Lateral.</th>'    : ''}
-              ${_cols['destaque']   !== false ? '<th style="text-align:center">⭐</th>'          : ''}
-              ${_cols['tagLateral'] !== false ? '<th>Tag lateral</th>'                          : ''}
-              ${_cols['urlAnuncio'] !== false ? '<th style="text-align:center">Link</th>'        : ''}
-              <th style="width:52px"></th>
-            </tr>
-          </thead>
-          <tbody>
-            ${ads.length === 0 ? `
-              <tr><td colspan="${COLUMNS.filter(c => _cols[c.key] !== false).length + 1}">
-                <div class="empty-state">
-                  <div class="empty-icon">🎬</div>
-                  <h3>Nenhum criativo cadastrado</h3>
-                  <p>Clique em "+ Novo" para começar a registrar os ads da semana.</p>
-                </div>
-              </td></tr>
-            ` : pageAds.map(ad => renderRow(ad, dups)).join('')}
-          </tbody>
-        </table>
-      </div>
+      ${ads.length === 0 ? `
+        <div class="empty-state">
+          <div class="empty-icon">🎬</div>
+          <h3>Nenhum criativo cadastrado</h3>
+          <p>Clique em "+ Novo" para começar a registrar os ads da semana.</p>
+        </div>
+      ` : `
+        <div id="cr-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:16px">
+          ${pageAds.map(ad => renderCard(ad, dups)).join('')}
+        </div>
+      `}
       ${pgHtml}
     `;
 
@@ -460,32 +390,9 @@ const Criativos = (() => {
     document.getElementById('cr-btn-novo').addEventListener('click', () => openModal(null));
     document.getElementById('cr-btn-export').addEventListener('click', exportCSV);
 
-    // Seletor de colunas
-    if (_closeColsDd) { document.removeEventListener('click', _closeColsDd); _closeColsDd = null; }
-    const colsBtn = document.getElementById('cr-cols-btn');
-    const colsDd  = document.getElementById('cr-cols-dropdown');
-    colsBtn.addEventListener('click', e => {
-      e.stopPropagation();
-      colsDd.style.display = colsDd.style.display === 'none' ? 'block' : 'none';
-    });
-    colsDd.addEventListener('click', e => {
-      e.stopPropagation();
-      const cb = e.target.closest('input[data-col-toggle]');
-      if (!cb) return;
-      _cols[cb.dataset.colToggle] = cb.checked;
-      saveCols(_cols);
-      render();
-      const dd = document.getElementById('cr-cols-dropdown');
-      if (dd) dd.style.display = 'block';
-    });
-    _closeColsDd = () => {
-      const dd = document.getElementById('cr-cols-dropdown');
-      if (dd) dd.style.display = 'none';
-    };
-    document.addEventListener('click', _closeColsDd);
-
-    // Delegação de eventos na tabela
-    document.getElementById('cr-table')?.addEventListener('click', e => {
+    // Delegação de eventos no grid
+    const grid = document.getElementById('cr-grid');
+    grid?.addEventListener('click', e => {
       if (e.target.matches('input, select, textarea')) return;
       if (e.target.closest('a[href]')) return;
 
@@ -501,8 +408,31 @@ const Criativos = (() => {
         return;
       }
 
-      const td = e.target.closest('td[data-field]');
-      if (td) makeEditable(td);
+      const field = e.target.closest('[data-field]');
+      if (field) makeEditable(field);
+    });
+
+    setupVideoLazyLoad(grid);
+  }
+
+  // ── Lazy load dos players de vídeo ────────────────────────────────────
+
+  function setupVideoLazyLoad(root) {
+    if (!root) return;
+    if (!('IntersectionObserver' in window)) {
+      if (window.FB) FB.XFBML.parse(root);
+      return;
+    }
+    root.querySelectorAll('.fb-video').forEach(videoEl => {
+      const card = videoEl.closest('.cr-card') || videoEl;
+      const observer = new IntersectionObserver(entries => {
+        entries.forEach(entry => {
+          if (!entry.isIntersecting) return;
+          if (window.FB) FB.XFBML.parse(card);
+          observer.disconnect();
+        });
+      }, { rootMargin: '200px' });
+      observer.observe(videoEl);
     });
   }
 
@@ -540,99 +470,107 @@ const Criativos = (() => {
     `;
   }
 
-  // ── Linha da tabela ───────────────────────────────────────────────────
+  // ── Card do criativo ──────────────────────────────────────────────────
 
-  function renderRow(ad, dups) {
+  function renderCard(ad, dups) {
     const isLateral    = dups.some(g => g.length > 1 && g.some(a => a.id === ad.id));
     const needsHook    = ad._importado && !ad.hook;
-    const rowStyle     = ad.destaque ? 'background:rgba(255,200,0,0.07)'
+    const cardStyle    = ad.destaque ? 'background:rgba(255,200,0,0.07)'
                        : needsHook   ? 'background:rgba(255,160,0,0.05)'
                        : '';
     const cleanedConta = cleanConta(ad.conta);
-    const hookText     = (ad.hook || '').slice(0, 50);
-    const hookTrunc    = (ad.hook || '').length > 50;
+    const hookText      = (ad.hook || '').slice(0, 80);
+    const hookTrunc     = (ad.hook || '').length > 80;
 
-    const show = k => _cols[k] !== false;
+    const funilId = (window._funnelsGlobal || []).find(f => f.urlAnuncio && f.urlAnuncio === ad.urlAnuncio)?.id;
+    const funil   = funilId ? (window._funnelsGlobal || []).find(f => f.id === funilId) : null;
+    const tag     = funil?.tagLateral || '';
+
+    const histBtn = funilId
+      ? `<span onclick="event.stopPropagation();abrirHistoricoViews('${funilId}')" title="Ver histórico" style="cursor:pointer;font-size:11px;opacity:0.6;margin-left:4px">📋</span>`
+      : '';
+
+    const videoHtml = ad.urlAnuncio
+      ? `<div class="fb-video" data-href="${esc(ad.urlAnuncio)}" data-width="auto" data-allowfullscreen="false" data-show-text="false"></div>`
+      : `<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;
+          height:200px;background:var(--bg-card);border-radius:8px;color:var(--text-muted);gap:6px">
+          <span style="font-size:28px">🎬</span><span style="font-size:12px">Sem vídeo</span>
+        </div>`;
+
     return `
-      <tr data-id="${esc(ad.id)}"${needsHook ? ' class="cr-needs-hook"' : ''}${rowStyle ? ` style="${rowStyle}"` : ''}>
-        ${show('data') ? `<td data-field="data">${formatDateShort(ad.data)}</td>` : ''}
-        ${show('nicho') ? `<td data-field="nicho">
-          ${ad.nicho ? nichoBadge(ad.nicho) : '<span style="color:var(--text-muted)">—</span>'}
-        </td>` : ''}
-        ${show('produto') ? `<td data-field="produto" style="min-width:100px">
-          ${(ad.produtoDesconhecido || Storage.isProdutoDesconhecido(ad.produto))
-            ? '<em style="color:var(--text-muted);font-style:italic">—</em>'
-            : `<span style="font-weight:500">${esc(ad.produto)}</span>`}
-        </td>` : ''}
-        ${show('conta') ? `<td data-field="conta" style="font-size:12px">
-          ${cleanedConta ? esc(cleanedConta) : '<span style="color:var(--text-muted)">—</span>'}
-        </td>` : ''}
-        ${show('hook') ? `<td data-field="hook" class="cr-hook-cell">
+      <div class="cr-card${needsHook ? ' cr-needs-hook' : ''}" data-id="${esc(ad.id)}"
+        style="border:0.5px solid var(--border);border-radius:10px;padding:12px;background:var(--surface2);${cardStyle}">
+        ${videoHtml}
+
+        <div style="display:flex;align-items:center;justify-content:space-between;gap:6px;margin-top:10px">
+          <div style="display:flex;align-items:center;gap:6px;min-width:0">
+            ${ad.nicho ? nichoBadge(ad.nicho) : ''}
+            <span style="font-size:11px;color:var(--text-muted)">${formatDateShort(ad.data)}</span>
+            ${isLateral ? `<span title="Rodando em múltiplas contas" style="color:#D85A30;font-size:12px;font-weight:600">🔄</span>` : ''}
+          </div>
+          <button class="btn btn-sm" data-action="star" data-id="${esc(ad.id)}"
+            title="${ad.destaque ? 'Remover destaque' : 'Marcar como destaque'}"
+            style="font-size:15px;border:none;background:none;cursor:pointer;padding:2px 4px;line-height:1;flex-shrink:0">
+            ${ad.destaque ? '⭐' : '☆'}
+          </button>
+        </div>
+
+        <div data-field="views" style="text-align:right;font-weight:500;font-size:12px;margin-top:6px">
+          ${formatViews(ad.views)}${histBtn}
+        </div>
+
+        <div data-field="hook" class="cr-hook-cell" style="margin-top:6px;font-size:12px;min-height:34px">
           ${needsHook
             ? `<span style="color:#BA7517;font-size:11px;font-weight:600">⚠ preencher</span>`
             : ad.hook
               ? `<span title="${esc(ad.hook)}">${esc(hookText)}${hookTrunc ? '…' : ''}</span>`
               : '<span style="color:var(--text-muted)">—</span>'}
-        </td>` : ''}
-        ${show('angulo') ? `<td data-field="angulo">
-          ${ad.angulo
-            ? `<span style="background:var(--bg-card);border:0.5px solid var(--border);
-                border-radius:20px;padding:2px 7px;font-size:11px">${esc(ad.angulo)}</span>`
-            : '<span style="color:var(--text-muted)">—</span>'}
-        </td>` : ''}
-        ${show('formato') ? `<td data-field="formato">
-          ${ad.formato
-            ? `<span style="background:var(--bg-card);border:0.5px solid var(--border);
-                border-radius:20px;padding:2px 7px;font-size:11px">${esc(ad.formato)}</span>`
-            : '<span style="color:var(--text-muted)">—</span>'}
-        </td>` : ''}
-        ${show('views') ? (() => {
-          const funilId = (window._funnelsGlobal || []).find(f => f.urlAnuncio && f.urlAnuncio === ad.urlAnuncio)?.id;
-          const histBtn = funilId
-            ? `<span onclick="event.stopPropagation();abrirHistoricoViews('${funilId}')" title="Ver histórico" style="cursor:pointer;font-size:11px;opacity:0.6;margin-left:4px">📋</span>`
-            : '';
-          return `<td data-field="views" style="text-align:right;font-weight:500">${formatViews(ad.views)}${histBtn}</td>`;
-        })() : ''}
-        ${show('contas') ? `<td style="text-align:center">
-          ${isLateral
-            ? `<span style="color:#D85A30;font-size:12px;font-weight:600">🔄</span>`
-            : '<span style="color:var(--text-muted);font-size:12px">—</span>'}
-        </td>` : ''}
-        ${show('destaque') ? `<td style="text-align:center">
-          <button class="btn btn-sm" data-action="star" data-id="${esc(ad.id)}"
-            title="${ad.destaque ? 'Remover destaque' : 'Marcar como destaque'}"
-            style="font-size:15px;border:none;background:none;cursor:pointer;padding:2px 4px;line-height:1">
-            ${ad.destaque ? '⭐' : '☆'}
-          </button>
-        </td>` : ''}
-        ${show('tagLateral') ? (() => {
-          const funilId = (window._funnelsGlobal || []).find(f => f.urlAnuncio && f.urlAnuncio === ad.urlAnuncio)?.id;
-          const funil = funilId ? (window._funnelsGlobal || []).find(f => f.id === funilId) : null;
-          const tag = funil?.tagLateral || '';
-          return `<td>${tag
-            ? `<span class="tag-lateral" onclick="editarTagLateral('${funilId}')" title="Clique para editar">${esc(tag)}</span>`
-            : (funilId ? `<button class="btn-add-lateral" onclick="editarTagLateral('${funilId}')">+</button>` : '<span style="color:var(--text-muted)">—</span>')
-          }</td>`;
-        })() : ''}
-        ${show('urlAnuncio') ? `<td data-field="urlAnuncio" style="text-align:center">
-          ${ad.urlAnuncio
-            ? `<a href="${esc(ad.urlAnuncio)}" target="_blank" rel="noopener"
-                style="font-size:15px;color:var(--accent);text-decoration:none;line-height:1"
-                title="${esc(ad.urlAnuncio)}">↗</a>`
-            : '<span style="color:var(--text-muted)">—</span>'}
-        </td>` : ''}
-        <td>
-          <div class="cr-actions" style="display:flex;gap:2px;justify-content:flex-end">
-            ${(() => { const funilId = (window._funnelsGlobal || []).find(f => f.urlAnuncio && f.urlAnuncio === ad.urlAnuncio)?.id; return funilId ? `<button class="btn btn-sm btn-secondary" onclick="abrirDetalhe('${funilId}')" title="Ver funil">🔗 funil</button>` : ''; })()}
-            <button data-action="edit" data-id="${esc(ad.id)}" title="Editar"
-              style="border:none;background:none;color:var(--text-muted);padding:3px 5px;
-                font-size:13px;cursor:pointer;line-height:1;border-radius:4px">✏</button>
-            <button data-action="delete" data-id="${esc(ad.id)}" title="Excluir"
-              style="border:none;background:none;color:#c44;padding:3px 5px;
-                font-size:13px;cursor:pointer;line-height:1;border-radius:4px">✕</button>
+        </div>
+
+        <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:6px">
+          <span data-field="angulo">
+            ${ad.angulo
+              ? `<span style="background:var(--bg-card);border:0.5px solid var(--border);
+                  border-radius:20px;padding:2px 7px;font-size:11px">${esc(ad.angulo)}</span>`
+              : '<span style="color:var(--text-muted);font-size:11px">Ângulo —</span>'}
+          </span>
+          <span data-field="formato">
+            ${ad.formato
+              ? `<span style="background:var(--bg-card);border:0.5px solid var(--border);
+                  border-radius:20px;padding:2px 7px;font-size:11px">${esc(ad.formato)}</span>`
+              : '<span style="color:var(--text-muted);font-size:11px">Formato —</span>'}
+          </span>
+        </div>
+
+        <div data-field="conta" style="font-size:12px;margin-top:6px">
+          ${cleanedConta ? esc(cleanedConta) : '<span style="color:var(--text-muted)">—</span>'}
+        </div>
+
+        <div data-field="produto" style="font-size:12px;margin-top:2px;min-width:100px">
+          ${(ad.produtoDesconhecido || Storage.isProdutoDesconhecido(ad.produto))
+            ? '<em style="color:var(--text-muted);font-style:italic">—</em>'
+            : `<span style="font-weight:500">${esc(ad.produto)}</span>`}
+        </div>
+
+        ${tag || funilId ? `
+          <div style="margin-top:6px">
+            ${tag
+              ? `<span class="tag-lateral" onclick="editarTagLateral('${funilId}')" title="Clique para editar">${esc(tag)}</span>`
+              : `<button class="btn-add-lateral" onclick="editarTagLateral('${funilId}')">+</button>`}
           </div>
-        </td>
-      </tr>
+        ` : ''}
+
+        <div class="cr-actions" style="display:flex;gap:2px;justify-content:flex-end;margin-top:10px;
+          border-top:0.5px solid var(--border);padding-top:8px">
+          ${funilId ? `<button class="btn btn-sm btn-secondary" onclick="abrirDetalhe('${funilId}')" title="Ver funil">🔗 funil</button>` : ''}
+          <button data-action="edit" data-id="${esc(ad.id)}" title="Editar"
+            style="border:none;background:none;color:var(--text-muted);padding:3px 5px;
+              font-size:13px;cursor:pointer;line-height:1;border-radius:4px">✏</button>
+          <button data-action="delete" data-id="${esc(ad.id)}" title="Excluir"
+            style="border:none;background:none;color:#c44;padding:3px 5px;
+              font-size:13px;cursor:pointer;line-height:1;border-radius:4px">✕</button>
+        </div>
+      </div>
     `;
   }
 
@@ -843,12 +781,11 @@ const Criativos = (() => {
   function init(showToastFn, getFunnelsFn) {
     _showToast = showToastFn;
     _ads  = loadAds();
-    _cols = loadCols();
 
     const criativosTab = document.getElementById('tab-criativos');
     criativosTab.addEventListener('click', e => {
       const btn = e.target.closest('.pg-btn[data-pg]');
-      if (!btn || e.target.closest('#cr-table')) return;
+      if (!btn || e.target.closest('#cr-grid')) return;
       const action = btn.dataset.pg;
       if      (action === 'first') _crPage = 1;
       else if (action === 'prev')  _crPage = Math.max(1, _crPage - 1);
@@ -867,15 +804,13 @@ const Criativos = (() => {
       const s = document.createElement('style');
       s.id = 'cr-inline-styles';
       s.textContent = [
-        '#cr-table td[data-field]{cursor:pointer}',
-        '#cr-table td[data-field]:hover{background:rgba(0,212,255,.04)}',
-        '#cr-table tbody tr .cr-actions{visibility:hidden}',
-        '#cr-table tbody tr:hover .cr-actions{visibility:visible}',
-        '#cr-table tbody tr:nth-child(even){background:rgba(255,255,255,.018)}',
-        '#cr-table tbody td{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;vertical-align:middle}',
-        '#cr-table td.cr-hook-cell{white-space:normal;max-width:220px}',
-        '#cr-table tr.cr-needs-hook td:first-child{border-left:2px solid #BA7517}',
-        '#cr-table thead th{white-space:nowrap}',
+        '#cr-grid [data-field]{cursor:pointer;border-radius:4px}',
+        '#cr-grid [data-field]:hover{background:rgba(0,212,255,.06)}',
+        '.cr-card .cr-actions{visibility:hidden}',
+        '.cr-card:hover .cr-actions{visibility:visible}',
+        '.cr-card.cr-needs-hook{border-left:2px solid #BA7517}',
+        '.cr-hook-cell{overflow:hidden;text-overflow:ellipsis}',
+        '.fb-video{border-radius:8px;overflow:hidden;min-height:200px;background:var(--bg-card)}',
       ].join('');
       document.head.appendChild(s);
     }
