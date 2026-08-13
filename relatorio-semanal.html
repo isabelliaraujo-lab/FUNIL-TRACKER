@@ -228,6 +228,14 @@ select option{background:#1a1a24}
     <button class="daily-copy-btn" onclick="copyDaily()">⎘ Copiar para WhatsApp / ClickUp</button>
     <button id="btn-salvar-diario" class="daily-copy-btn" style="border-color:var(--accent2);color:var(--accent2)" onclick="salvarDiario()">💾 Salvar no histórico</button>
   </div>
+
+  <!-- Ads acima de 10K -->
+  <div id="ads-10k-output" style="display:none;margin-top:28px">
+    <div class="section-sub">🔥 Ads acima de 10K hoje</div>
+    <textarea id="ads-10k-text" class="daily-report-output" readonly
+      style="width:100%;box-sizing:border-box;min-height:90px;resize:vertical;outline:none"></textarea>
+    <button class="daily-copy-btn" onclick="copyAdsAcima10k()">📋 Copiar</button>
+  </div>
 </div>
 </div>
 
@@ -573,6 +581,8 @@ function generateDaily(){
   document.getElementById('daily-output').style.display='block';
   document.getElementById('daily-output').scrollIntoView({behavior:'smooth',block:'nearest'});
   resetBotaoSalvarDiario();
+
+  renderAdsAcima10k(data);
 }
 
 function copyDaily(){
@@ -588,6 +598,79 @@ function copyDaily(){
     window.getSelection().removeAllRanges();
     window.getSelection().addRange(range);
     document.execCommand('copy');
+    window.getSelection().removeAllRanges();
+  });
+}
+
+// ── Ads acima de 10K (criativos do dia) ────────────────────────────────────
+
+function fmtViewsAds10k(v){
+  const n=Number(v)||0;
+  if(n>=1000000)return(n/1000000).toFixed(1)+'M';
+  if(n>=1000)return(n/1000).toFixed(1)+'K';
+  return String(n);
+}
+
+function fmtDateCurtaAds10k(dataStr){
+  if(!dataStr)return'—';
+  const p=dataStr.split('-');
+  return p.length===3?`${p[2]}/${p[1]}`:dataStr;
+}
+
+function renderAdsAcima10k(dataStr){
+  const out=document.getElementById('ads-10k-output');
+  const textEl=document.getElementById('ads-10k-text');
+  if(!out||!textEl)return;
+
+  let ads=[];
+  try{ads=JSON.parse(localStorage.getItem('funil-tracker-criativos-v1')||'[]');}catch{ads=[];}
+
+  let funnels=[];
+  try{funnels=JSON.parse(localStorage.getItem('funil-tracker-v1')||'[]');}catch{funnels=[];}
+
+  let libCounts={};
+  try{libCounts=JSON.parse(localStorage.getItem('funil-tracker-ads-library-counts')||'{}');}catch{libCounts={};}
+
+  const adsDoDia=ads.filter(a=>a.data===dataStr&&Number(a.views)>10000);
+
+  if(!adsDoDia.length){
+    textEl.value='Nenhum ad acima de 10K hoje.';
+    out.style.display='block';
+    return;
+  }
+
+  const blocos=adsDoDia.map(ad=>{
+    const linha1=`${ad.nicho||'—'} - ${fmtViewsAds10k(ad.views)} - ${fmtDateCurtaAds10k(ad.data)}`;
+
+    const funil=ad.urlAnuncio?funnels.find(f=>f.urlAnuncio&&f.urlAnuncio===ad.urlAnuncio):null;
+    const dom=funil&&funil.domAnuncio?String(funil.domAnuncio).trim():'';
+    const contagem=dom&&libCounts[dom]>0?libCounts[dom]:null;
+    const linha2=dom
+      ?`${dom} (${contagem!=null?contagem+' ads ativos cadastrados no histórico':'sem contagem registrada'})`
+      :'(sem contagem registrada)';
+
+    const linha3=ad.urlAnuncio||'';
+
+    return[linha1,linha2,linha3].join('\n');
+  });
+
+  textEl.value=blocos.join('\n\n');
+  out.style.display='block';
+}
+
+function copyAdsAcima10k(){
+  const el=document.getElementById('ads-10k-text');
+  const text=el.value;
+  navigator.clipboard.writeText(text).then(()=>{
+    const btn=document.querySelector('#ads-10k-output .daily-copy-btn');
+    const orig=btn.textContent;
+    btn.textContent='✓ Copiado!';
+    setTimeout(()=>btn.textContent=orig,2000);
+  }).catch(()=>{
+    el.removeAttribute('readonly');
+    el.select();
+    document.execCommand('copy');
+    el.setAttribute('readonly','');
     window.getSelection().removeAllRanges();
   });
 }
