@@ -764,31 +764,44 @@ const Analise = (() => {
         `<span class="tag" style="font-size:10px">${esc(p)}</span>`
       ).join('');
       const verFunisIds = v.ids.join(',');
-      const cdns = v.urlVsl.split('\n').map(s => s.trim()).filter(Boolean);
-      const cdnPrincipal = cdns[0] || v.urlVsl;
-      return `
-        <div class="rank-item" style="align-items:flex-start;gap:14px;padding:14px 0">
-          <span class="rank-pos ${globalIdx < 3 ? 'top' : ''}">#${globalIdx + 1}</span>
-          <div style="flex-shrink:0;width:160px;height:90px;background:#000;border-radius:8px;overflow:hidden;position:relative"
-               data-vsl-url="${esc(cdnPrincipal)}">
+
+      // Split (2+ URLs finais) grava as CDNs da VSL juntas em v.urlVsl,
+      // separadas por \n — extrai cada uma pra ter sua própria preview/link,
+      // mas todas seguem agrupadas neste mesmo card (mesmo "v", mesmo funil).
+      const cdns = v.urlVsl.split('\n').map(u => u.trim()).filter(Boolean);
+      const isSplit = cdns.length > 1;
+
+      const previews = cdns.map((cdn, ci) => `
+        <div style="flex-shrink:0">
+          ${isSplit ? `<div style="font-size:9px;color:var(--text-muted);margin-bottom:3px;text-transform:uppercase;letter-spacing:.06em">CDN ${ci + 1}</div>` : ''}
+          <div style="width:160px;height:90px;background:#000;border-radius:8px;overflow:hidden;position:relative"
+               data-vsl-url="${esc(cdn)}">
             <canvas style="width:100%;height:100%;display:none"></canvas>
             <div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:#ffffff66;font-size:10px;font-family:monospace">carregando...</div>
           </div>
+        </div>
+      `).join('');
+
+      const links = cdns.map((cdn, ci) => `
+        <a href="${esc(cdn)}" target="_blank"
+           style="font-family:monospace;font-size:10px;color:var(--accent);word-break:break-all;max-width:300px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;display:block"
+           title="${esc(cdn)}">${isSplit ? `CDN ${ci + 1}: ` : ''}${esc(cdn)}</a>
+      `).join('');
+
+      return `
+        <div class="rank-item" style="align-items:flex-start;gap:14px;padding:14px 0">
+          <span class="rank-pos ${globalIdx < 3 ? 'top' : ''}">#${globalIdx + 1}</span>
+          <div style="display:flex;gap:8px;flex-wrap:wrap;flex-shrink:0">${previews}</div>
           <div style="flex:1;min-width:0">
             <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:6px">
               ${nichoTags}
+              ${isSplit ? `<span class="tag" style="font-size:10px">🔀 split · ${cdns.length} CDNs</span>` : ''}
               <span style="font-family:monospace;font-size:10px;color:var(--text-muted)">${v.funis} funil(s)</span>
               <span style="font-family:monospace;font-size:10px;color:#a78bfa">${fmtViews(v.views)} views</span>
             </div>
             ${prodTags ? `<div style="display:flex;flex-wrap:wrap;gap:4px;margin-bottom:8px">${prodTags}</div>` : ''}
             <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
-              <div style="display:flex;flex-direction:column;gap:2px">
-                ${cdns.map((url, idx) => `
-                  <a href="${esc(url)}" target="_blank"
-                     style="font-family:monospace;font-size:10px;color:var(--accent);word-break:break-all;max-width:300px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;display:block"
-                     title="${esc(url)}">${cdns.length > 1 ? `CDN ${idx + 1}: ` : ''}${esc(url)}</a>
-                `).join('')}
-              </div>
+              <div style="display:flex;flex-direction:column;gap:2px">${links}</div>
               <button class="btn btn-sm btn-secondary" style="flex-shrink:0;font-size:11px"
                 onclick="analiseVerFunisVsl('${esc(verFunisIds)}')">Ver funis</button>
             </div>
