@@ -634,7 +634,23 @@ function encontrarFunilAds10k(ad, funnels){
     (!maisRecente||(f.data||'')>(maisRecente.data||''))?f:maisRecente, null);
 }
 
-function renderAdsAcima10k(dataStr){
+// Ads ativos na biblioteca vêm do Supabase (tabela dominios_biblioteca,
+// coluna ads_ativos) — funil-tracker-ads-library-counts nunca é escrito,
+// é só um fallback morto de analise.js. Busca igual a injetarHistoricosDominios().
+async function carregarContagensBibliotecaAds10k(){
+  try{
+    const {data,error}=await _sb.from('dominios_biblioteca').select('dominio,ads_ativos');
+    if(error) throw error;
+    const map={};
+    (data||[]).forEach(r=>{ if(r.dominio) map[r.dominio]=r.ads_ativos||0; });
+    return map;
+  }catch(e){
+    console.warn('[ads10k] Não foi possível carregar dominios_biblioteca do Supabase:', e);
+    return {};
+  }
+}
+
+async function renderAdsAcima10k(dataStr){
   const out=document.getElementById('ads-10k-output');
   const textEl=document.getElementById('ads-10k-text');
   if(!out||!textEl)return;
@@ -644,9 +660,6 @@ function renderAdsAcima10k(dataStr){
 
   const funnels=(window._funnelsGlobal||[]).filter(Boolean);
 
-  let libCounts={};
-  try{libCounts=JSON.parse(localStorage.getItem('funil-tracker-ads-library-counts')||'{}');}catch{libCounts={};}
-
   const adsDoDia=ads.filter(a=>a&&a.data===dataStr&&Number(a.views)>10000);
 
   if(!adsDoDia.length){
@@ -655,12 +668,21 @@ function renderAdsAcima10k(dataStr){
     return;
   }
 
+  textEl.value='Carregando…';
+  out.style.display='block';
+
+  const libCounts=await carregarContagensBibliotecaAds10k();
+  const contagemPorDominio=dom=>{
+    const c=libCounts[dom.toUpperCase()]!=null?libCounts[dom.toUpperCase()]:libCounts[dom];
+    return c>0?c:null;
+  };
+
   const blocos=adsDoDia.map(ad=>{
     const linha1=`${ad.nicho||'—'} - ${fmtViewsAds10k(ad.views)} - ${fmtDateCurtaAds10k(ad.data)}`;
 
     const funil=encontrarFunilAds10k(ad, funnels);
     const dom=funil&&funil.domAnuncio?String(funil.domAnuncio).trim():'';
-    const contagem=dom&&libCounts[dom]>0?libCounts[dom]:null;
+    const contagem=dom?contagemPorDominio(dom):null;
 
     // DEBUG temporário — remover depois de confirmar o match conta+produto+data
     console.log('[ads10k] criativo:', ad, '-> funil encontrado (conta+produto+data):', funil, '-> domAnuncio:', dom||null, '-> contagem:', contagem);
