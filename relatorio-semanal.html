@@ -619,14 +619,19 @@ function fmtDateCurtaAds10k(dataStr){
   return p.length===3?`${p[2]}/${p[1]}`:dataStr;
 }
 
-// Normaliza URL de anúncio pra comparação tolerante a diferenças de
-// protocolo (http/https), www., trailing slash e caixa.
-function normUrlAds10k(u){
-  if(!u)return'';
-  return String(u).trim().toLowerCase()
-    .replace(/^https?:\/\//,'')
-    .replace(/^www\./,'')
-    .replace(/\/+$/,'');
+// Funis (window._funnelsGlobal) não têm urlAnuncio na maioria dos casos —
+// o match é feito por conta+produto+data (exato) e, na ausência de match
+// exato, por conta+produto só, ficando com o mais recente (maior data).
+function encontrarFunilAds10k(ad, funnels){
+  const exatos=funnels.filter(f=>f.conta===ad.conta&&f.produto===ad.produto&&f.data===ad.data);
+  if(exatos.length===1) return exatos[0];
+
+  const porContaProduto=funnels.filter(f=>f.conta===ad.conta&&f.produto===ad.produto);
+  if(!porContaProduto.length) return null;
+  if(porContaProduto.length===1) return porContaProduto[0];
+
+  return porContaProduto.reduce((maisRecente,f)=>
+    (!maisRecente||(f.data||'')>(maisRecente.data||''))?f:maisRecente, null);
 }
 
 function renderAdsAcima10k(dataStr){
@@ -637,9 +642,7 @@ function renderAdsAcima10k(dataStr){
   let ads=[];
   try{ads=JSON.parse(localStorage.getItem('funil-tracker-criativos-v1')||'[]');}catch{ads=[];}
 
-  let funnels=[];
-  try{funnels=JSON.parse(localStorage.getItem('funil-tracker-v1')||'[]');}catch{funnels=[];}
-  funnels=funnels.filter(Boolean);
+  const funnels=(window._funnelsGlobal||[]).filter(Boolean);
 
   let libCounts={};
   try{libCounts=JSON.parse(localStorage.getItem('funil-tracker-ads-library-counts')||'{}');}catch{libCounts={};}
@@ -652,27 +655,19 @@ function renderAdsAcima10k(dataStr){
     return;
   }
 
-  // DEBUG temporário — remover depois de confirmar o match de urlAnuncio
-  console.log('[ads10k] criativos >10k do dia', dataStr, ':', adsDoDia.map(a=>a.urlAnuncio));
-  console.log('[ads10k] urlAnuncio de todos os funis:', funnels.map(f=>f.urlAnuncio));
-
   const blocos=adsDoDia.map(ad=>{
     const linha1=`${ad.nicho||'—'} - ${fmtViewsAds10k(ad.views)} - ${fmtDateCurtaAds10k(ad.data)}`;
 
-    let funil=ad.urlAnuncio?funnels.find(f=>f.urlAnuncio&&f.urlAnuncio===ad.urlAnuncio):null;
-    if(!funil&&ad.urlAnuncio){
-      const alvo=normUrlAds10k(ad.urlAnuncio);
-      funil=funnels.find(f=>f.urlAnuncio&&normUrlAds10k(f.urlAnuncio)===alvo)||null;
-    }
-
-    // DEBUG temporário — remover depois de confirmar o match de urlAnuncio
-    console.log('[ads10k] criativo', ad.urlAnuncio, '-> funil encontrado:', funil);
-
+    const funil=encontrarFunilAds10k(ad, funnels);
     const dom=funil&&funil.domAnuncio?String(funil.domAnuncio).trim():'';
     const contagem=dom&&libCounts[dom]>0?libCounts[dom]:null;
+
+    // DEBUG temporário — remover depois de confirmar o match conta+produto+data
+    console.log('[ads10k] criativo:', ad, '-> funil encontrado (conta+produto+data):', funil, '-> domAnuncio:', dom||null, '-> contagem:', contagem);
+
     const linha2=dom
       ?`${dom} (${contagem!=null?contagem+' ads ativos cadastrados no histórico':'sem contagem registrada'})`
-      :'(sem contagem registrada)';
+      :'(sem domínio vinculado)';
 
     const linha3=ad.urlAnuncio||'';
 
