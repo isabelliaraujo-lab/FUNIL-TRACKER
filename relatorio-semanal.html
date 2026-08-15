@@ -617,6 +617,16 @@ function fmtDateCurtaAds10k(dataStr){
   return p.length===3?`${p[2]}/${p[1]}`:dataStr;
 }
 
+// Normaliza URL de anúncio pra comparação tolerante a diferenças de
+// protocolo (http/https), www., trailing slash e caixa.
+function normUrlAds10k(u){
+  if(!u)return'';
+  return String(u).trim().toLowerCase()
+    .replace(/^https?:\/\//,'')
+    .replace(/^www\./,'')
+    .replace(/\/+$/,'');
+}
+
 function renderAdsAcima10k(dataStr){
   const out=document.getElementById('ads-10k-output');
   const textEl=document.getElementById('ads-10k-text');
@@ -627,11 +637,12 @@ function renderAdsAcima10k(dataStr){
 
   let funnels=[];
   try{funnels=JSON.parse(localStorage.getItem('funil-tracker-v1')||'[]');}catch{funnels=[];}
+  funnels=funnels.filter(Boolean);
 
   let libCounts={};
   try{libCounts=JSON.parse(localStorage.getItem('funil-tracker-ads-library-counts')||'{}');}catch{libCounts={};}
 
-  const adsDoDia=ads.filter(a=>a.data===dataStr&&Number(a.views)>10000);
+  const adsDoDia=ads.filter(a=>a&&a.data===dataStr&&Number(a.views)>10000);
 
   if(!adsDoDia.length){
     textEl.value='Nenhum ad acima de 10K hoje.';
@@ -639,10 +650,22 @@ function renderAdsAcima10k(dataStr){
     return;
   }
 
+  // DEBUG temporário — remover depois de confirmar o match de urlAnuncio
+  console.log('[ads10k] criativos >10k do dia', dataStr, ':', adsDoDia.map(a=>a.urlAnuncio));
+  console.log('[ads10k] urlAnuncio de todos os funis:', funnels.map(f=>f.urlAnuncio));
+
   const blocos=adsDoDia.map(ad=>{
     const linha1=`${ad.nicho||'—'} - ${fmtViewsAds10k(ad.views)} - ${fmtDateCurtaAds10k(ad.data)}`;
 
-    const funil=ad.urlAnuncio?funnels.find(f=>f.urlAnuncio&&f.urlAnuncio===ad.urlAnuncio):null;
+    let funil=ad.urlAnuncio?funnels.find(f=>f.urlAnuncio&&f.urlAnuncio===ad.urlAnuncio):null;
+    if(!funil&&ad.urlAnuncio){
+      const alvo=normUrlAds10k(ad.urlAnuncio);
+      funil=funnels.find(f=>f.urlAnuncio&&normUrlAds10k(f.urlAnuncio)===alvo)||null;
+    }
+
+    // DEBUG temporário — remover depois de confirmar o match de urlAnuncio
+    console.log('[ads10k] criativo', ad.urlAnuncio, '-> funil encontrado:', funil);
+
     const dom=funil&&funil.domAnuncio?String(funil.domAnuncio).trim():'';
     const contagem=dom&&libCounts[dom]>0?libCounts[dom]:null;
     const linha2=dom
