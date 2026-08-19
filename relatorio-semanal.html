@@ -12,7 +12,7 @@
   --text:#f0f0f5;--muted:#707088;
   --accent:#c8ff57;--accent2:#7c6fff;--danger:#ff5757;--gold:#fbbf24;
   --wl:#378ADD;--db:#639922;--mm:#7F77DD;--pt:#BA7517;
-  --da:#1D9E75;--ed:#E24B4A;--nr:#D85A30;--vl:#D4537E;--rj:#888780;--pa:#14B8A6;--cp:#F59E0B;
+  --da:#1D9E75;--ed:#E24B4A;--nr:#D85A30;--vl:#D4537E;--rj:#888780;--pa:#14B8A6;--cp:#F59E0B;--lf:#8B5CF6;
 }
 *{box-sizing:border-box;margin:0;padding:0}
 body{font-family:'Syne',sans-serif;background:var(--bg);color:var(--text);min-height:100vh}
@@ -58,6 +58,7 @@ select option{background:#1a1a24}
 .nicho-btn[data-nicho=RJ].active{background:var(--rj)}
 .nicho-btn[data-nicho=PA].active{background:var(--pa)}
 .nicho-btn[data-nicho=CP].active{background:var(--cp)}
+.nicho-btn[data-nicho=LF].active{background:var(--lf)}
 
 /* ── NICHO SECTION (semanal) ── */
 .nicho-section{background:var(--bg2);border:0.5px solid var(--border2);border-radius:14px;padding:22px;margin-bottom:18px}
@@ -298,6 +299,7 @@ select option{background:#1a1a24}
       <button class="nicho-btn" data-nicho="RJ">RJ</button>
       <button class="nicho-btn" data-nicho="PA">PA</button>
       <button class="nicho-btn" data-nicho="CP">CP</button>
+      <button class="nicho-btn" data-nicho="LF">LF</button>
     </div>
 
     <div id="nicho-sections"></div>
@@ -341,9 +343,9 @@ console.log('Script relatorio-semanal carregado');
 console.log('window.supabase:', typeof window.supabase);
 
 // ── UTILS ─────────────────────────────────────────────────────────────────
-const NICHO_COLORS={WL:'#378ADD',MM:'#7F77DD',DB:'#639922',PT:'#BA7517',DA:'#1D9E75',ED:'#E24B4A',NR:'#D85A30',VL:'#D4537E',RJ:'#888780',PA:'#14B8A6',CP:'#F59E0B'};
-const NICHO_NAMES={WL:'Weight Loss',MM:'Memória',DB:'Diabetes',PT:'Próstata',DA:'Dores',ED:'Disfunção Erétil',NR:'Nerve Pain',VL:'Visão',RJ:'Rejuvenescimento',PA:'Pressão Arterial',CP:'Constipação'};
-const ALL_NICHOS=['WL','MM','DB','PT','DA','NR','ED','VL','RJ','PA','CP'];
+const NICHO_COLORS={WL:'#378ADD',MM:'#7F77DD',DB:'#639922',PT:'#BA7517',DA:'#1D9E75',ED:'#E24B4A',NR:'#D85A30',VL:'#D4537E',RJ:'#888780',PA:'#14B8A6',CP:'#F59E0B',LF:'#8B5CF6'};
+const NICHO_NAMES={WL:'Weight Loss',MM:'Memória',DB:'Diabetes',PT:'Próstata',DA:'Dores',ED:'Disfunção Erétil',NR:'Nerve Pain',VL:'Visão',RJ:'Rejuvenescimento',PA:'Pressão Arterial',CP:'Constipação',LF:'Lipedema'};
+const ALL_NICHOS=['WL','MM','DB','PT','DA','NR','ED','VL','RJ','PA','CP','LF'];
 
 const SUPABASE_URL = 'https://dworzfcetqllydpnzsbi.supabase.co';
 const SUPABASE_KEY = 'sb_publishable_SSDXOOiqFFL-VvMwJLSK6A_YLHhS6zP';
