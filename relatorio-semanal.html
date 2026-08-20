@@ -947,7 +947,7 @@ function renderLinks(nicho,type){
 function addFunilDestaque(nicho){
   const id='fd-'+Math.random().toString(36).slice(2,10);
   if(!nichoData[nicho].funisDestaque) nichoData[nicho].funisDestaque=[];
-  nichoData[nicho].funisDestaque.push({id,titulo:'',dominios:[{domAnuncio:'',cdn:''}],urlFinal:'',headline:''});
+  nichoData[nicho].funisDestaque.push({id,titulo:'',dominios:[{domAnuncio:'',cdn:''}],urlFinal:'',headline:'',print_trafego:''});
   renderFunisDestaque(nicho);
   salvarRascunho();
 }
@@ -962,6 +962,79 @@ function removeFunilDestaque(nicho,id){
 function setFunilDestaqueField(nicho,id,field,value){
   const fd=nichoData[nicho].funisDestaque.find(f=>f.id===id);
   if(fd) fd[field]=value;
+  salvarRascunho();
+}
+
+// Print Tráfego (SEMrush/SimilarWeb) — upload isolado para Supabase Storage.
+// Campo opcional: qualquer falha aqui é reportada ao usuário mas nunca
+// impede o preenchimento/salvamento do restante do relatório semanal.
+const PRINT_TRAFEGO_BUCKET='prints-trafego';
+const PRINT_TRAFEGO_TIPOS=['image/png','image/jpeg','image/jpg','image/webp'];
+
+function renderPrintTrafegoPreview(fd,nicho){
+  if(!fd.print_trafego) return '';
+  return `
+    <div style="position:relative;display:inline-block">
+      <img src="${esc(fd.print_trafego)}" alt="Print Tráfego"
+        title="Clique para abrir em tamanho maior"
+        style="width:160px;height:auto;max-height:120px;object-fit:cover;border-radius:8px;border:1px solid var(--border2);cursor:pointer;display:block"
+        onclick="window.open('${esc(fd.print_trafego)}','_blank')"/>
+      <button type="button" onclick="removerPrintTrafego('${nicho}','${fd.id}')"
+        style="position:absolute;top:-8px;right:-8px;width:22px;height:22px;border-radius:50%;background:var(--danger);color:#fff;border:none;cursor:pointer;font-size:12px;line-height:1">✕</button>
+    </div>
+  `;
+}
+
+async function uploadPrintTrafego(file,path){
+  let up=await _sb.storage.from(PRINT_TRAFEGO_BUCKET).upload(path,file,{upsert:true,contentType:file.type});
+  if(up.error){
+    // Bucket pode não existir ainda — tenta criar e refaz o upload uma vez.
+    await _sb.storage.createBucket(PRINT_TRAFEGO_BUCKET,{public:true}).catch(()=>{});
+    up=await _sb.storage.from(PRINT_TRAFEGO_BUCKET).upload(path,file,{upsert:true,contentType:file.type});
+  }
+  if(up.error) throw up.error;
+  const {data}=_sb.storage.from(PRINT_TRAFEGO_BUCKET).getPublicUrl(path);
+  return data.publicUrl;
+}
+
+async function handlePrintTrafegoChange(nicho,fdId,inputEl){
+  const file=inputEl.files&&inputEl.files[0];
+  if(!file) return;
+  const previewEl=document.getElementById(`print-trafego-preview-${fdId}`);
+
+  if(!PRINT_TRAFEGO_TIPOS.includes(file.type)){
+    alert('Formato de imagem não suportado. Use PNG, JPG ou WEBP.');
+    inputEl.value='';
+    return;
+  }
+
+  const fd=(nichoData[nicho]?.funisDestaque||[]).find(f=>f.id===fdId);
+  if(!fd){inputEl.value='';return;}
+
+  const localUrl=URL.createObjectURL(file);
+  if(previewEl) previewEl.innerHTML=`<div style="font-size:11px;color:var(--muted);display:flex;align-items:center;gap:8px"><img src="${localUrl}" style="width:60px;height:auto;border-radius:6px;opacity:.6"/>Enviando...</div>`;
+
+  try{
+    const ext=(file.name.split('.').pop()||'png').toLowerCase().replace(/[^a-z0-9]/g,'')||'png';
+    const path=`${nicho}/${fdId}-${Date.now()}.${ext}`;
+    fd.print_trafego=await uploadPrintTrafego(file,path);
+    salvarRascunho();
+  }catch(e){
+    console.error('Erro ao enviar print de tráfego:',e);
+    alert('Não foi possível enviar o print de tráfego. O restante do relatório pode ser salvo normalmente.');
+  }finally{
+    URL.revokeObjectURL(localUrl);
+    inputEl.value='';
+    if(previewEl) previewEl.innerHTML=renderPrintTrafegoPreview(fd,nicho);
+  }
+}
+
+function removerPrintTrafego(nicho,fdId){
+  const fd=(nichoData[nicho]?.funisDestaque||[]).find(f=>f.id===fdId);
+  if(!fd) return;
+  fd.print_trafego='';
+  const previewEl=document.getElementById(`print-trafego-preview-${fdId}`);
+  if(previewEl) previewEl.innerHTML=renderPrintTrafegoPreview(fd,nicho);
   salvarRascunho();
 }
 
@@ -1241,6 +1314,12 @@ function renderFunisDestaque(nicho){
           value="${esc(fd.headline)}"
           onchange="setFunilDestaqueField('${nicho}','${fd.id}','headline',this.value)"/>
       </div>
+      <div class="field-group" style="margin-top:12px">
+        <label class="field-label">Print Tráfego (SEMrush/SimilarWeb)</label>
+        <input type="file" accept="image/png,image/jpeg,image/webp"
+          onchange="handlePrintTrafegoChange('${nicho}','${fd.id}',this)"/>
+        <div id="print-trafego-preview-${fd.id}" style="margin-top:8px">${renderPrintTrafegoPreview(fd,nicho)}</div>
+      </div>
     </div>
   `).join('');
 
@@ -1408,7 +1487,7 @@ function montarHtmlNicho(n){
   // Funis em destaque que de fato serão exibidos (com algum conteúdo preenchido)
   const funisDestaque=(d.funisDestaque||[]).filter(fd=>{
     const temDominio=(fd.dominios&&fd.dominios.some(dm=>dm.domAnuncio))||fd.domAnuncio;
-    return fd.titulo||temDominio||fd.urlFinal||fd.headline;
+    return fd.titulo||temDominio||fd.urlFinal||fd.headline||fd.print_trafego;
   });
   const funisDestaqueIds=new Set(funisDestaque.map(fd=>fd.id));
 
@@ -1456,6 +1535,7 @@ function montarHtmlNicho(n){
       });
       if(fd.headline) html+=`<div class="report-funil-label">Headline campeã</div><div class="report-headline">"${esc(fd.headline)}"</div>`;
       if(fd.urlFinal) html+=`<div class="report-link-row"><span class="report-link-label">URL Final</span><a href="${esc(fd.urlFinal)}" class="report-link" target="_blank">${esc(fd.urlFinal)}</a></div>`;
+      if(fd.print_trafego) html+=`<div class="report-funil-label" style="margin-top:10px">Print Tráfego</div><a href="${esc(fd.print_trafego)}" target="_blank" rel="noopener" style="display:inline-block"><img src="${esc(fd.print_trafego)}" alt="Print Tráfego" style="width:180px;height:auto;border-radius:8px;border:1px solid var(--border2);display:block;cursor:pointer"/></a>`;
 
       const adsDoFunil=adsPorFunil[fd.id]||[];
       if(adsDoFunil.length){
