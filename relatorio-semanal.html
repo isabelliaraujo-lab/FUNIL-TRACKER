@@ -233,7 +233,7 @@ select option{background:#1a1a24}
 
   <!-- Ads acima de 10K -->
   <div id="ads-10k-output" style="display:none;margin-top:28px">
-    <div class="section-sub">🔥 Ads acima de 10K hoje</div>
+    <div class="section-sub" id="ads-10k-title">🔥 Ads acima de 10K hoje</div>
     <textarea id="ads-10k-text" class="daily-report-output" readonly
       style="width:100%;box-sizing:border-box;min-height:90px;resize:vertical;outline:none"></textarea>
     <button class="daily-copy-btn" onclick="copyAdsAcima10k()">📋 Copiar</button>
@@ -655,6 +655,7 @@ async function carregarContagensBibliotecaAds10k(){
 async function renderAdsAcima10k(dataStr){
   const out=document.getElementById('ads-10k-output');
   const textEl=document.getElementById('ads-10k-text');
+  const titleEl=document.getElementById('ads-10k-title');
   if(!out||!textEl)return;
 
   let ads=[];
@@ -662,10 +663,20 @@ async function renderAdsAcima10k(dataStr){
 
   const funnels=(window._funnelsGlobal||[]).filter(Boolean);
 
-  const adsDoDia=ads.filter(a=>a&&a.data===dataStr&&Number(a.views)>10000);
+  const todosDoDia=ads.filter(a=>a&&a.data===dataStr);
+  const acima10k=todosDoDia.filter(a=>Number(a.views)>10000);
+
+  let adsDoDia;
+  if(acima10k.length){
+    adsDoDia=acima10k;
+    if(titleEl)titleEl.textContent='🔥 Ads acima de 10K hoje';
+  }else{
+    adsDoDia=[...todosDoDia].sort((a,b)=>(Number(b.views)||0)-(Number(a.views)||0)).slice(0,3);
+    if(titleEl)titleEl.textContent='📊 Top 3 ads do dia (nenhum acima de 10K)';
+  }
 
   if(!adsDoDia.length){
-    textEl.value='Nenhum ad acima de 10K hoje.';
+    textEl.value='Nenhum criativo registrado hoje.';
     out.style.display='block';
     return;
   }
