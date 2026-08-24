@@ -1123,7 +1123,7 @@ function carregarThumbnailBloco(input){
   const irmaosCdn=cdnsContainer?[...cdnsContainer.children].filter(el=>el.classList.contains('cdn-bloco')):[];
   const ci=irmaosCdn.indexOf(bloco);
 
-  preview.innerHTML=`<div id="vsl-cont-${fdId}-${di}-${ci}" data-vsl-url="${esc(url)}" style="width:160px;height:90px;background:#000;border-radius:8px;overflow:hidden;position:relative"><canvas style="width:100%;height:100%;display:none"></canvas><div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:#ffffff66;font-size:10px">carregando...</div></div>`;
+  preview.innerHTML=`<a href="${esc(url)}" target="_blank" rel="noopener noreferrer" style="display:block;width:160px"><div id="vsl-cont-${fdId}-${di}-${ci}" data-vsl-url="${esc(url)}" style="width:160px;height:90px;background:#000;border-radius:8px;overflow:hidden;position:relative;cursor:pointer"><canvas style="width:100%;height:100%;display:none"></canvas><div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:#ffffff66;font-size:10px">carregando...</div></div></a>`;
   const c=preview.querySelector('[data-vsl-url]');
   if(c){ c.dataset.vslLoaded='1'; capturarFrameRelatorio(url,c); }
 }
@@ -1140,7 +1140,7 @@ function renderCdnsContainer(cdns,fdId,nicho,di){
         onchange="setFunilCdnField('${nicho}','${fdId}',${di},${ci},this.value)"
         onblur="carregarThumbnailBloco(this)"/>
       <div class="cdn-preview-container" style="margin-top:8px">
-        ${cdn?`<div id="vsl-cont-${fdId}-${di}-${ci}" data-vsl-url="${esc(cdn)}" style="width:160px;height:90px;background:#000;border-radius:8px;overflow:hidden;position:relative"><canvas style="width:100%;height:100%;display:none"></canvas><div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:#ffffff66;font-size:10px">carregando...</div></div>`:''}
+        ${cdn?`<a href="${esc(cdn)}" target="_blank" rel="noopener noreferrer" style="display:block;width:160px"><div id="vsl-cont-${fdId}-${di}-${ci}" data-vsl-url="${esc(cdn)}" style="width:160px;height:90px;background:#000;border-radius:8px;overflow:hidden;position:relative;cursor:pointer"><canvas style="width:100%;height:100%;display:none"></canvas><div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:#ffffff66;font-size:10px">carregando...</div></div></a>`:''}
       </div>
     </div>`).join('');
   return items+`<button onclick="adicionarCdn('${nicho}','${fdId}',${di})" style="font-size:12px;color:var(--muted);border:1px dashed var(--border2);border-radius:8px;padding:5px 12px;background:transparent;cursor:pointer;width:100%;margin-top:4px">+ Adicionar CDN</button>`;
@@ -1216,18 +1216,33 @@ function filtrarFunisNoPeriodo(funis){
   });
 }
 
+function _normalizarDominio(d){
+  return String(d||'')
+    .trim()
+    .toLowerCase()
+    .replace(/^https?:\/\//,'')
+    .replace(/^www\./,'')
+    .replace(/\/+$/,'');
+}
+
 function _renderContasEl(containerEl, dominio){
   const todos=window._funnelsGlobal||[];
   const funis=filtrarFunisNoPeriodo(todos);
-  const domBusca=dominio.toUpperCase().trim();
-  console.log('[contas] Buscando para domínio:', domBusca);
+  const domBusca=_normalizarDominio(dominio);
+  console.log('[contas] Buscando para domínio (normalizado):', domBusca);
   console.log('[contas] Total de funis disponíveis:', todos.length, '/ no período:', funis.length);
   console.log('[contas] Funis com domAnuncio:', funis.filter(f=>f.domAnuncio).length);
-  const matched=funis.filter(f=>{
-    const domFunil=(f.domAnuncio||'').toUpperCase().trim();
-    return domFunil===domBusca||domFunil.includes(domBusca)||domBusca.includes(domFunil);
-  });
-  console.log('[contas] Matches encontrados:', matched.length);
+  let matched=[];
+  if(domBusca){
+    matched=funis.filter(f=>{
+      if(!f.domAnuncio) return false;
+      const domFunil=_normalizarDominio(f.domAnuncio);
+      if(!domFunil) return false;
+      return domFunil===domBusca;
+    });
+  }
+  console.log('[contas] Domínios comparados:', funis.map(f=>_normalizarDominio(f.domAnuncio)).filter(Boolean));
+  console.log('[contas] Matches encontrados:', matched.length, matched.map(f=>f.domAnuncio));
   if(!matched.length){
     containerEl.innerHTML='<div style="font-size:11px;color:#555;margin-top:8px">Nenhuma conta cadastrada com este domínio.</div>';
     return;
@@ -1343,7 +1358,7 @@ function renderVslThumbnail(fdId,url){
   const wrap=document.getElementById(`vsl-thumb-${fdId}`);
   if(!wrap)return;
   if(!url){wrap.innerHTML='';return;}
-  wrap.innerHTML=`<div id="vsl-container-${fdId}" data-vsl-url="${esc(url)}" style="width:160px;height:90px;background:#000;border-radius:8px;overflow:hidden;position:relative"><canvas style="width:100%;height:100%;display:none"></canvas><div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:#ffffff66;font-size:10px">carregando...</div></div>`;
+  wrap.innerHTML=`<a href="${esc(url)}" target="_blank" rel="noopener noreferrer" style="display:block;width:160px"><div id="vsl-container-${fdId}" data-vsl-url="${esc(url)}" style="width:160px;height:90px;background:#000;border-radius:8px;overflow:hidden;position:relative;cursor:pointer"><canvas style="width:100%;height:100%;display:none"></canvas><div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:#ffffff66;font-size:10px">carregando...</div></div></a>`;
   const c=document.getElementById(`vsl-container-${fdId}`);
   if(c) capturarFrameRelatorio(url,c);
 }
@@ -1530,7 +1545,7 @@ function montarHtmlNicho(n){
           html+=`<div data-contas-dominio="${esc(dom.domAnuncio)}" class="funil-contas-container"><div style="font-size:11px;color:#555">Carregando contas...</div></div>`;
         }
         (dom.cdns||[dom.cdn||'']).filter(Boolean).forEach(cdn=>{
-          html+=`<div style="margin:10px 0"><div data-vsl-url="${esc(cdn)}" style="width:160px;height:90px;background:#000;border-radius:8px;overflow:hidden;position:relative"><canvas style="width:100%;height:100%;display:none"></canvas><div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:#ffffff66;font-size:10px">carregando...</div></div></div>`;
+          html+=`<div style="margin:10px 0"><a href="${esc(cdn)}" target="_blank" rel="noopener noreferrer" style="display:block;width:160px"><div data-vsl-url="${esc(cdn)}" style="width:160px;height:90px;background:#000;border-radius:8px;overflow:hidden;position:relative;cursor:pointer"><canvas style="width:100%;height:100%;display:none"></canvas><div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:#ffffff66;font-size:10px">carregando...</div></div></a></div>`;
         });
       });
       if(fd.headline) html+=`<div class="report-funil-label">Headline campeã</div><div class="report-headline">"${esc(fd.headline)}"</div>`;
