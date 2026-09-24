@@ -232,10 +232,10 @@ const Parser = (() => {
     const result = { adId, data, conta, nicho, produto, urlAnuncio, urlAnuncioFull, views, famoso,
              domAnuncio, domAnuncioFull, domFinal, domFinalFull, split, obs, gasto, conversao, moeda, urlVsl };
 
-    // FORMATO B — sobrescreve apenas domAnuncio e urlNativa
+    // FORMATO B — sobrescreve apenas domAnuncio e domAnuncioFull
     if (urlNativaB !== null) {
-      result.domAnuncio = extrairDominioDaNativa(urlNativaB);
-      result.urlNativa  = urlNativaB;
+      result.domAnuncio     = extrairDominioDaNativa(urlNativaB);
+      result.domAnuncioFull = urlNativaB;
     }
 
     return result;
