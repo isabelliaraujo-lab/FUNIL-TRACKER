@@ -81,6 +81,16 @@ const Parser = (() => {
     return null;
   }
 
+  // Formato B — domínio no anúncio extraído do parâmetro `u` da URL nativa
+  function extrairDominioDaNativa(urlNativa) {
+    try {
+      const u = new URL(urlNativa.trim()).searchParams.get('u');
+      if (u) return new URL(u).hostname.toUpperCase();
+    } catch (e) {}
+    const m = urlNativa.match(/[?&]u=https?%3A%2F%2F([^%&\/]+)/i);
+    return m ? decodeURIComponent(m[1]).toUpperCase() : '';
+  }
+
   // ── Main parser ────────────────────────────────────────────────────────
   function parse(raw, linkMap = {}) {
     // REGRA 0 — pré-processamento
@@ -99,6 +109,18 @@ const Parser = (() => {
       } else {
         lines.push(linha);
       }
+    }
+
+    // FORMATO B — URL nativa colada como texto (l.facebook.com/l.php) e sem
+    // linha de domínio visível. Guarda a linha e a remove antes das regras atuais.
+    let urlNativaB = null;
+    const temDominioVisivel = lines.slice(1).some(l =>
+      !isUrlLine(l) && /^[A-Z0-9][A-Z0-9\-]*\.[A-Z]{2,}/i.test(l.split(/\s+/)[0])
+    );
+    const idxNativa = lines.findIndex(l => /^https:\/\/l\.facebook\.com\/l\.php/i.test(l));
+    if (idxNativa > 0 && !temDominioVisivel) {
+      urlNativaB = lines[idxNativa];
+      lines.splice(idxNativa, 1);
     }
 
     let adId = null, data = new Date().toISOString().slice(0, 10);
@@ -207,8 +229,16 @@ const Parser = (() => {
       split        = true;
     }
 
-    return { adId, data, conta, nicho, produto, urlAnuncio, urlAnuncioFull, views, famoso,
+    const result = { adId, data, conta, nicho, produto, urlAnuncio, urlAnuncioFull, views, famoso,
              domAnuncio, domAnuncioFull, domFinal, domFinalFull, split, obs, gasto, conversao, moeda, urlVsl };
+
+    // FORMATO B — sobrescreve apenas domAnuncio e domAnuncioFull
+    if (urlNativaB !== null) {
+      result.domAnuncio     = extrairDominioDaNativa(urlNativaB);
+      result.domAnuncioFull = urlNativaB;
+    }
+
+    return result;
   }
 
   // ── Preview dos campos extraídos ───────────────────────────────────────
