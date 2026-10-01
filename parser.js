@@ -143,6 +143,7 @@ const Parser = (() => {
     }
 
     // REGRA 3 — domínio no anúncio (primeira linha que bata, exceto linha 0 e URL lines)
+    let domNativaVisivel = null;
     for (let i = 1; i < lines.length; i++) {
       const line = lines[i];
       if (isUrlLine(line)) continue;
@@ -151,6 +152,14 @@ const Parser = (() => {
         if (/^[A-Z0-9][A-Z0-9\-]*\.[A-Z]{2,}/i.test(token)) {
           domAnuncio     = token.toUpperCase();
           domAnuncioFull = 'https://' + token.toLowerCase();
+
+          // URL nativa (l.facebook.com/l.php) não é domínio visível: domínio vem do parâmetro `u`
+          const limpa = stripInvisible(line).replace(/^_+|_+$/g, '').trim();
+          if (/l\.facebook\.com\/l\.php/i.test(limpa)) {
+            const href = linkMap[domAnuncio] || linkMap[line.toUpperCase()];
+            const nativa = /^https?:\/\//i.test(limpa) ? limpa : 'https://' + limpa;
+            domNativaVisivel = (href && extrairDominioDaNativa(href)) || extrairDominioDaNativa(nativa);
+          }
         }
       }
     }
@@ -228,6 +237,10 @@ const Parser = (() => {
       domFinalFull = finalUrls.join('\n');
       split        = true;
     }
+
+    // REGRA 3 (cont.) — domAnuncio da URL nativa aceita como domínio visível.
+    // Aplicado só aqui para a REGRA 3B continuar usando a chave original no linkMap.
+    if (domNativaVisivel !== null) domAnuncio = domNativaVisivel;
 
     const result = { adId, data, conta, nicho, produto, urlAnuncio, urlAnuncioFull, views, famoso,
              domAnuncio, domAnuncioFull, domFinal, domFinalFull, split, obs, gasto, conversao, moeda, urlVsl };
