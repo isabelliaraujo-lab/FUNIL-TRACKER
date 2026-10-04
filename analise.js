@@ -114,8 +114,20 @@ const Analise = (() => {
         <div class="analysis-metric" style="border-top:2px solid #00c47a">
           <div class="analysis-metric__val" style="color:#00c47a">${fmt(t.conversao)}</div>
           <div class="analysis-metric__lbl">conversão total ${esc(moeda)}</div>
-        </div>`;
+        </div>
+        ${roasCardHtml(t, moeda)}`;
     }).join('');
+  }
+
+  // ROAS consolidado da moeda: soma conversão ÷ soma gasto (nunca média de ROAS)
+  function roasCardHtml(t, moeda) {
+    const roas = Storage.calcRoas(t.gasto, t.conversao);
+    const cor  = Storage.corRoas(roas);
+    return `
+        <div class="analysis-metric" style="border-top:2px solid ${cor}">
+          <div class="analysis-metric__val" style="color:${cor}">${Storage.fmtRoas(roas)}</div>
+          <div class="analysis-metric__lbl">ROAS ${esc(moeda)}</div>
+        </div>`;
   }
 
   function renderTotaisPerf(funis) {
@@ -134,7 +146,7 @@ const Analise = (() => {
     const s   = SIMBOLOS[f.moeda || 'BRL'] || 'R$';
     const fmt = v => fmtMoeda(s, parseFloat(v));
     let txt;
-    if (f.gasto != null && f.conversao != null) txt = `${fmt(f.gasto)} / ${fmt(f.conversao)}`;
+    if (f.gasto != null && f.conversao != null) txt = `${fmt(f.gasto)} / ${fmt(f.conversao)} · ${Storage.fmtRoas(Storage.calcRoas(f.gasto, f.conversao))}`;
     else if (f.gasto != null)                   txt = `${fmt(f.gasto)} gasto`;
     else                                         txt = `${fmt(f.conversao)} conv.`;
     return `<span class="af-perf-individual">${esc(txt)}</span>`;
@@ -179,6 +191,8 @@ const Analise = (() => {
     const fmt = v => v != null
       ? `${s} ${parseFloat(v).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`
       : '—';
+    const roas        = Storage.calcRoas(f.gasto, f.conversao);
+    const janelasHtml = janelasCurtasHtml(f);
 
     const urlA  = f.urlAnuncioFull || f.urlAnuncio || '';
     const urlDA = f.domAnuncioFull || '';
@@ -239,6 +253,14 @@ const Analise = (() => {
           <span class="mfd-label">Conversão</span>
           <span class="mfd-valor mfd-conv">${esc(fmt(f.conversao))}</span>
         </div>
+        <div class="mfd-campo">
+          <span class="mfd-label">ROAS</span>
+          <span class="mfd-valor" style="color:${Storage.corRoas(roas)};font-weight:700">${Storage.fmtRoas(roas)}</span>
+        </div>
+        ${janelasHtml ? `<div class="mfd-campo mfd-campo--full">
+          <span class="mfd-label">Janelas</span>
+          ${janelasHtml}
+        </div>` : ''}
         ${f.obs ? `<div class="mfd-campo mfd-campo--full">
           <span class="mfd-label">Obs.</span>
           <span class="mfd-valor">${esc(f.obs)}</span>

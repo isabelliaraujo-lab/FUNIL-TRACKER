@@ -243,7 +243,8 @@ const Parser = (() => {
     if (domNativaVisivel !== null) domAnuncio = domNativaVisivel;
 
     const result = { adId, data, conta, nicho, produto, urlAnuncio, urlAnuncioFull, views, famoso,
-             domAnuncio, domAnuncioFull, domFinal, domFinalFull, split, obs, gasto, conversao, moeda, urlVsl };
+             domAnuncio, domAnuncioFull, domFinal, domFinalFull, split, obs, gasto, conversao, moeda, urlVsl,
+             gasto7d: null, conversao7d: null, gasto14d: null, conversao14d: null };
 
     // FORMATO B — sobrescreve apenas domAnuncio e domAnuncioFull
     if (urlNativaB !== null) {

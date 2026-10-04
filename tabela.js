@@ -124,20 +124,21 @@ const Tabela = (() => {
 
   // ── Célula de performance ─────────────────────────────────────────────
   function perfCellContent(f) {
-    const hasPerf = f.gasto != null || f.conversao != null;
-    if (!hasPerf) {
+    const janelas = Storage.janelasPerf(f).filter(j => j.gasto != null || j.conversao != null);
+    if (!janelas.length) {
       return `<button class="perf-add-btn" data-perf-id="${esc(f.id)}" type="button">
                 + adicionar
               </button>`;
     }
     const moeda = f.moeda || 'BRL';
-    const g = f.gasto     != null
-      ? `<span class="tag tag-gasto"     data-perf-id="${esc(f.id)}">${esc(Storage.formatCurrency(f.gasto,     moeda))}</span>`
-      : '';
-    const cv = f.conversao != null
-      ? `<span class="tag tag-conversao" data-perf-id="${esc(f.id)}">${esc(Storage.formatCurrency(f.conversao, moeda))}</span>`
-      : '';
-    return `<div class="perf-tags">${g}${cv}</div>`;
+    const tags = janelas.map(j => {
+      const roas  = Storage.calcRoas(j.gasto, j.conversao);
+      const fmt   = v => v != null ? Storage.formatCurrency(v, moeda) : '—';
+      const title = `Gasto ${fmt(j.gasto)} · Conv ${fmt(j.conversao)} · ROI ${Storage.fmtRoi(Storage.calcRoi(j.gasto, j.conversao))}`;
+      return `<span class="tag tag-roas" data-perf-id="${esc(f.id)}" title="${esc(title)}" style="color:${Storage.corRoas(roas)}">` +
+               `<span class="tag-roas__janela">${j.label}</span>${Storage.fmtRoas(roas)}</span>`;
+    }).join('');
+    return `<div class="perf-tags">${tags}</div>`;
   }
 
   // ── Status column ─────────────────────────────────────────────────────
@@ -426,33 +427,58 @@ const Tabela = (() => {
     _perfModalId = null;
   }
 
+  const PERF_JANELAS = [
+    { sufixo: '7d',  gasto: 'gasto7d',  conv: 'conversao7d'  },
+    { sufixo: '14d', gasto: 'gasto14d', conv: 'conversao14d' },
+    { sufixo: '30d', gasto: 'gasto',    conv: 'conversao'    },
+  ];
+
+  const PERF_INPUT_IDS = PERF_JANELAS.flatMap(j => [`perf-modal-gasto-${j.sufixo}`, `perf-modal-conv-${j.sufixo}`]);
+
+  function atualizarRoasModal(sufixo) {
+    const g    = document.getElementById(`perf-modal-gasto-${sufixo}`).value;
+    const c    = document.getElementById(`perf-modal-conv-${sufixo}`).value;
+    const roas = Storage.calcRoas(g, c);
+    const el   = document.getElementById(`perf-roas-${sufixo}`);
+    el.textContent = Storage.fmtRoas(roas);
+    el.style.color = Storage.corRoas(roas);
+  }
+
   function openPerfModal(id) {
     const f = _getFunnels().find(x => x.id === id);
     if (!f) return;
 
-    document.getElementById('perf-modal-moeda').value = f.moeda    || 'BRL';
-    document.getElementById('perf-modal-gasto').value = f.gasto    != null ? f.gasto    : '';
-    document.getElementById('perf-modal-conv').value  = f.conversao != null ? f.conversao : '';
-    document.getElementById('perf-modal-id').value    = id;
+    document.getElementById('perf-modal-moeda').value = f.moeda || 'BRL';
+    PERF_JANELAS.forEach(j => {
+      document.getElementById(`perf-modal-gasto-${j.sufixo}`).value = f[j.gasto] != null ? f[j.gasto] : '';
+      document.getElementById(`perf-modal-conv-${j.sufixo}`).value  = f[j.conv]  != null ? f[j.conv]  : '';
+      atualizarRoasModal(j.sufixo);
+    });
+    document.getElementById('perf-modal-id').value = id;
 
     _perfModalId = id;
     document.getElementById('modal-performance').hidden = false;
-    setTimeout(() => document.getElementById('perf-modal-gasto').focus(), 30);
+    setTimeout(() => document.getElementById('perf-modal-gasto-7d').focus(), 30);
   }
 
   function savePerfModal() {
     const id    = document.getElementById('perf-modal-id').value;
     const moeda = document.getElementById('perf-modal-moeda').value;
-    const gasto = document.getElementById('perf-modal-gasto').value;
-    const conv  = document.getElementById('perf-modal-conv').value;
 
     const funnels = _getFunnels();
     const f = funnels.find(x => x.id === id);
     if (!f) return;
 
-    f.moeda     = moeda;
-    f.gasto     = gasto !== '' ? parseFloat(gasto) : null;
-    f.conversao = conv  !== '' ? parseFloat(conv)  : null;
+    const num = inputId => {
+      const v = document.getElementById(inputId).value;
+      return v !== '' ? parseFloat(v) : null;
+    };
+
+    f.moeda = moeda;
+    PERF_JANELAS.forEach(j => {
+      f[j.gasto] = num(`perf-modal-gasto-${j.sufixo}`);
+      f[j.conv]  = num(`perf-modal-conv-${j.sufixo}`);
+    });
 
     _saveFunnels(funnels);
     closePerfModal();
@@ -607,10 +633,15 @@ const Tabela = (() => {
     document.getElementById('modal-performance').addEventListener('click', e => {
       if (e.target === document.getElementById('modal-performance')) closePerfModal();
     });
-    ['perf-modal-gasto', 'perf-modal-conv'].forEach(id => {
+    PERF_INPUT_IDS.forEach(id => {
       document.getElementById(id).addEventListener('keydown', e => {
         if (e.key === 'Enter')  savePerfModal();
         if (e.key === 'Escape') closePerfModal();
+      });
+    });
+    PERF_JANELAS.forEach(j => {
+      [`perf-modal-gasto-${j.sufixo}`, `perf-modal-conv-${j.sufixo}`].forEach(id => {
+        document.getElementById(id).addEventListener('input', () => atualizarRoasModal(j.sufixo));
       });
     });
 

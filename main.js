@@ -42,11 +42,16 @@ function abrirDetalhe(id) {
   const repetido = Storage.isRepeated(f, domCounts);
 
   let roiHtml = '';
-  if (f.gasto != null && f.conversao != null && parseFloat(f.gasto) > 0) {
-    const roi = ((parseFloat(f.conversao) - parseFloat(f.gasto)) / parseFloat(f.gasto)) * 100;
+  const roi = Storage.calcRoi(f.gasto, f.conversao);
+  if (roi != null) {
     const cor = roi >= 0 ? '#00c47a' : '#ff4d4d';
     roiHtml = `<span style="color:${cor};font-weight:700">${roi >= 0 ? '+' : ''}${roi.toFixed(1)}%</span>`;
   }
+  const roas = Storage.calcRoas(f.gasto, f.conversao);
+  const roasHtml = roas != null
+    ? `<span style="color:${Storage.corRoas(roas)};font-weight:700">${Storage.fmtRoas(roas)}</span>`
+    : '';
+  const janelasHtml = janelasCurtasHtml(f);
 
   const vslCdns = f.urlVsl ? f.urlVsl.split('\n').map(s => s.trim()).filter(Boolean) : [];
   const vslCdnPrincipal = vslCdns[0] || '';
@@ -107,8 +112,14 @@ function abrirDetalhe(id) {
       <div>
         <div style="font-size:11px;color:var(--text-muted);text-transform:uppercase;letter-spacing:.08em;margin-bottom:4px">ROI</div>
         <div style="font-size:13px">${roiHtml || '—'}</div>
+      </div>
+      <div>
+        <div style="font-size:11px;color:var(--text-muted);text-transform:uppercase;letter-spacing:.08em;margin-bottom:4px">ROAS</div>
+        <div style="font-size:13px">${roasHtml || '—'}</div>
       </div>` : ''}
     </div>
+
+    ${janelasHtml ? `<div style="margin:-8px 0 20px">${janelasHtml}</div>` : ''}
 
     ${f.urlAnuncio ? `
     <div style="margin-bottom:14px">
@@ -134,6 +145,23 @@ function abrirDetalhe(id) {
   };
   document.getElementById('mfd2-btn-fechar').onclick = () => { modal.hidden = true; };
   modal.addEventListener('click', e => { if (e.target === modal) modal.hidden = true; }, { once: true });
+}
+
+// Linhas pequenas com as janelas 7d / 14d (só as preenchidas):
+// "7d · $ 500,00 gasto · 2.35x · +135,0%". Compartilhado com analise.js.
+function janelasCurtasHtml(f) {
+  const janelas = Storage.janelasPerf(f)
+    .filter(j => j.key !== 'd30' && (j.gasto != null || j.conversao != null));
+  if (!janelas.length) return '';
+  const linhas = janelas.map(j => {
+    const roas  = Storage.calcRoas(j.gasto, j.conversao);
+    const gasto = j.gasto != null ? Storage.formatCurrency(j.gasto, f.moeda) : '—';
+    return `<div style="font-size:12px;color:var(--text-muted)">` +
+      `<strong style="color:var(--text)">${j.label}</strong> · ${Storage.escHtml(gasto)} gasto · ` +
+      `<span style="color:${Storage.corRoas(roas)};font-weight:700">${Storage.fmtRoas(roas)}</span> · ` +
+      `${Storage.fmtRoi(Storage.calcRoi(j.gasto, j.conversao))}</div>`;
+  }).join('');
+  return `<div style="display:flex;flex-direction:column;gap:3px">${linhas}</div>`;
 }
 
 function capturarFrameVsl(url) {
@@ -426,6 +454,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       famoso: v('m-famoso') || null, domAnuncio, domAnuncioFull,
       domFinal, domFinalFull, split: splitVal, obs: v('m-obs'),
       gasto: null, conversao: null, moeda: 'BRL',
+      gasto7d: null, conversao7d: null, gasto14d: null, conversao14d: null,
     };
     funnels.unshift(funnel);
     saveFunnels(funnels);
