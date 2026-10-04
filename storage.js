@@ -71,6 +71,47 @@ const Storage = (() => {
     return `${symbol} ${formatted}`;
   }
 
+  // ── Performance: ROAS / ROI / janelas ────────────────────────────────
+  // As colunas `gasto` / `conversao` representam a janela de 30 dias.
+  // 7d e 14d ficam em campos próprios (gasto7d, conversao7d, ...).
+
+  const ROAS_LIMITES = { ruim: 1, bom: 2 };
+
+  function calcRoas(gasto, conversao) {
+    const g = parseFloat(gasto), c = parseFloat(conversao);
+    if (!(g > 0) || isNaN(c)) return null;
+    return c / g;
+  }
+
+  function calcRoi(gasto, conversao) {
+    const g = parseFloat(gasto), c = parseFloat(conversao);
+    if (!(g > 0) || isNaN(c)) return null;
+    return ((c - g) / g) * 100;
+  }
+
+  function fmtRoas(v) { return v == null ? '—' : v.toFixed(2) + 'x'; }
+
+  function fmtRoi(v) {
+    if (v == null) return '—';
+    return (v >= 0 ? '+' : '') + v.toLocaleString('pt-BR', { minimumFractionDigits: 1, maximumFractionDigits: 1 }) + '%';
+  }
+
+  function corRoas(v) {
+    if (v == null) return 'var(--text-muted)';
+    if (v < ROAS_LIMITES.ruim) return '#ff4d4d';
+    if (v < ROAS_LIMITES.bom)  return '#f59e0b';
+    return '#00c47a';
+  }
+
+  // Retorna [{ key:'d7', label:'7d', gasto, conversao }, ...] na ordem 7d, 14d, 30d
+  function janelasPerf(f) {
+    return [
+      { key: 'd7',  label: '7d',  gasto: f.gasto7d  ?? null, conversao: f.conversao7d  ?? null },
+      { key: 'd14', label: '14d', gasto: f.gasto14d ?? null, conversao: f.conversao14d ?? null },
+      { key: 'd30', label: '30d', gasto: f.gasto    ?? null, conversao: f.conversao    ?? null },
+    ];
+  }
+
   // ── CSV Export ────────────────────────────────────────────────────────
 
   const CSV_HEADERS = [
@@ -90,8 +131,12 @@ const Storage = (() => {
     'Split',
     'Obs',
     'Moeda',
-    'Gasto total',
-    'Valor conversão',
+    'Gasto 7d',
+    'Conversão 7d',
+    'Gasto 14d',
+    'Conversão 14d',
+    'Gasto 30d',
+    'Conversão 30d',
   ];
 
   function csvCell(val) {
@@ -118,8 +163,12 @@ const Storage = (() => {
       f.split ? 'sim' : 'não',
       f.obs ?? '',
       f.moeda ?? 'BRL',
-      f.gasto  ?? '',
-      f.conversao ?? '',
+      f.gasto7d      ?? '',
+      f.conversao7d  ?? '',
+      f.gasto14d     ?? '',
+      f.conversao14d ?? '',
+      f.gasto        ?? '',
+      f.conversao    ?? '',
     ].map(csvCell).join(','));
 
     const csv  = [CSV_HEADERS.join(','), ...rows].join('\r\n');
@@ -192,10 +241,19 @@ const Storage = (() => {
     const iSplit     = col(h => h === 'split');
     const iObs       = col(h => h === 'obs');
     const iMoeda     = col(h => h === 'moeda');
-    const iGasto     = col(h => h.includes('gasto'));
-    const iConv      = col(h => h.includes('convers'));
+    // Performance por janela: match exato ('gasto 7d', ...). Para 30d, cai
+    // no formato antigo ('Gasto total' / 'Valor conversão') se não achar.
+    const iGasto7    = col(h => h === 'gasto 7d');
+    const iConv7     = col(h => h === 'conversao 7d');
+    const iGasto14   = col(h => h === 'gasto 14d');
+    const iConv14    = col(h => h === 'conversao 14d');
+    const iGasto30   = col(h => h === 'gasto 30d');
+    const iConv30    = col(h => h === 'conversao 30d');
+    const iGasto     = iGasto30 >= 0 ? iGasto30 : col(h => h === 'gasto total');
+    const iConv      = iConv30  >= 0 ? iConv30  : col(h => h === 'valor conversao');
 
     const get = (row, i) => (i >= 0 && i < row.length ? row[i].trim() : '');
+    const getNum = (row, i) => { const v = get(row, i); return v ? (parseFloat(v) || null) : null; };
 
     const funnels = [];
     let errors    = 0;
@@ -208,8 +266,6 @@ const Storage = (() => {
         const domAnuncio = get(row, iDomAn);
         const splitVal   = get(row, iSplit).toLowerCase() === 'sim';
         const viewsStr   = get(row, iViews);
-        const gastoStr   = get(row, iGasto);
-        const convStr    = get(row, iConv);
 
         funnels.push({
           id:            genId(),
@@ -230,8 +286,12 @@ const Storage = (() => {
           split:         splitVal,
           obs:           get(row, iObs),
           moeda:         get(row, iMoeda) || 'BRL',
-          gasto:         gastoStr ? (parseFloat(gastoStr)  || null) : null,
-          conversao:     convStr  ? (parseFloat(convStr)   || null) : null,
+          gasto:         getNum(row, iGasto),
+          conversao:     getNum(row, iConv),
+          gasto7d:       getNum(row, iGasto7),
+          conversao7d:   getNum(row, iConv7),
+          gasto14d:      getNum(row, iGasto14),
+          conversao14d:  getNum(row, iConv14),
         });
       } catch {
         errors++;
@@ -269,6 +329,13 @@ const Storage = (() => {
     getDomainCounts,
     isRepeated,
     formatCurrency,
+    ROAS_LIMITES,
+    calcRoas,
+    calcRoi,
+    fmtRoas,
+    fmtRoi,
+    corRoas,
+    janelasPerf,
     exportCSV,
     importCSV,
     escHtml,

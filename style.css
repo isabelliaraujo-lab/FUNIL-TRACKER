@@ -852,6 +852,72 @@ tbody tr.row-repeated:hover td {
   gap:            4px;
 }
 
+.tag-roas {
+  background:  #1a1a1a;
+  border:      1px solid currentColor;
+  cursor:      pointer;
+  white-space: nowrap;
+}
+.tag-roas:hover { background: #242424; }
+.tag-roas__janela { color: var(--text-muted); margin-right: 4px; font-weight: 500; }
+
+/* Grade de janelas (7d / 14d / 30d) no modal de performance */
+.perf-grid {
+  display:        flex;
+  flex-direction: column;
+  gap:            8px;
+  margin-top:     4px;
+}
+
+.perf-grid__head,
+.perf-grid__row {
+  display:               grid;
+  grid-template-columns: 64px 1fr 1fr 64px;
+  gap:                   10px;
+  align-items:           center;
+}
+
+.perf-grid__head .field-label { margin-bottom: 0; }
+
+.perf-grid__janela {
+  font-size:      11px;
+  font-weight:    600;
+  text-transform: uppercase;
+  letter-spacing: .5px;
+  color:          var(--text-muted);
+  white-space:    nowrap;
+}
+
+.perf-grid__mlabel { display: none; }
+
+.perf-grid__roas {
+  font-size:   14px;
+  font-weight: 700;
+  color:       var(--text-muted);
+  text-align:  right;
+  white-space: nowrap;
+}
+
+@media (max-width: 479px) {
+  .perf-grid__head { display: none; }
+
+  .perf-grid__row {
+    grid-template-columns: 1fr 1fr;
+    grid-template-areas:
+      "janela roas"
+      "gasto  conv";
+    padding:       10px;
+    border:        1px solid var(--border);
+    border-radius: 12px;
+  }
+
+  .perf-grid__janela               { grid-area: janela; }
+  .perf-grid__roas                 { grid-area: roas; }
+  .perf-grid__cell:nth-of-type(2)  { grid-area: gasto; }
+  .perf-grid__cell:nth-of-type(3)  { grid-area: conv; }
+  .perf-grid__mlabel               { display: block; }
+}
+
 
 /* ============================================================
    ANALYSIS TAB

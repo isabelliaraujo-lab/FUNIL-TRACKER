@@ -27,6 +27,12 @@ const Escalada = (() => {
     return (roi >= 0 ? '+' : '') + roi.toFixed(1) + '%';
   }
 
+  // ROAS consolidado (soma conv ÷ soma gasto), exibido ao lado do ROI
+  function roasHTML(roas) {
+    if (roas == null) return '';
+    return ` · <span style="color:${Storage.corRoas(roas)}">${Storage.fmtRoas(roas)}</span>`;
+  }
+
   function fmtMoeda(val, moeda = 'BRL') {
     const s = { BRL: 'R$', USD: '$', INR: '₹' }[moeda] || 'R$';
     return `${s} ${val.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`;
@@ -60,7 +66,7 @@ const Escalada = (() => {
     });
     return Object.values(map)
       .filter(p => p.gasto > 0)
-      .map(p => ({ ...p, roi: ((p.conversao - p.gasto) / p.gasto) * 100 }))
+      .map(p => ({ ...p, roi: Storage.calcRoi(p.gasto, p.conversao), roas: Storage.calcRoas(p.gasto, p.conversao) }))
       .sort((a, b) => b.roi - a.roi)
       .slice(0, 10);
   }
@@ -78,7 +84,7 @@ const Escalada = (() => {
     });
     return Object.values(map)
       .filter(c => c.gasto > 0)
-      .map(c => ({ ...c, roi: ((c.conversao - c.gasto) / c.gasto) * 100 }))
+      .map(c => ({ ...c, roi: Storage.calcRoi(c.gasto, c.conversao), roas: Storage.calcRoas(c.gasto, c.conversao) }))
       .sort((a, b) => b.roi - a.roi);
   }
 
@@ -101,7 +107,7 @@ const Escalada = (() => {
       .map(([produto, doms]) => ({
         produto,
         dominios: Object.values(doms)
-          .map(d => ({ ...d, roi: d.gasto > 0 ? ((d.conversao - d.gasto) / d.gasto) * 100 : null }))
+          .map(d => ({ ...d, roi: Storage.calcRoi(d.gasto, d.conversao), roas: Storage.calcRoas(d.gasto, d.conversao) }))
           .sort((a, b) => (b.roi ?? -Infinity) - (a.roi ?? -Infinity)),
       }))
       .sort((a, b) => a.produto.localeCompare(b.produto));
@@ -155,7 +161,7 @@ const Escalada = (() => {
           </div>
         </div>
         <div style="text-align:right;white-space:nowrap;flex-shrink:0;margin-left:8px">
-          <div style="font-weight:700;color:${cor};font-size:14px">${fmtROI(p.roi)}</div>
+          <div style="font-weight:700;color:${cor};font-size:14px">${fmtROI(p.roi)}${roasHTML(p.roas)}</div>
           <div style="font-size:11px;color:var(--text-muted)">${p.funis} funil(s)</div>
         </div>
       </div>`;
@@ -191,7 +197,7 @@ const Escalada = (() => {
           ${nichoTags ? `<div style="display:flex;flex-wrap:wrap;gap:3px">${nichoTags}</div>` : ''}
         </div>
         <div style="font-weight:700;color:${cor};font-size:16px;white-space:nowrap;flex-shrink:0;padding-top:1px">
-          ${fmtROI(c.roi)}
+          ${fmtROI(c.roi)}${roasHTML(c.roas)}
         </div>
       </div>`;
     }).join('');
@@ -234,7 +240,7 @@ const Escalada = (() => {
             </div>
           </div>
           <div style="font-weight:700;font-size:15px;color:${cor};white-space:nowrap;flex-shrink:0;padding-top:1px">
-            ${roiTxt || '—'}
+            ${roiTxt ? roiTxt + roasHTML(d.roas) : '—'}
           </div>
         </div>`;
       }).join('');
@@ -300,10 +306,10 @@ const Escalada = (() => {
       if (comPerf.length) {
         const g = comPerf.reduce((s, f) => s + (parseFloat(f.gasto)     || 0), 0);
         const c = comPerf.reduce((s, f) => s + (parseFloat(f.conversao) || 0), 0);
-        if (g > 0) {
-          const roi = ((c - g) / g) * 100;
+        const roi = Storage.calcRoi(g, c);
+        if (roi != null) {
           const cor = roi >= 0 ? '#00c47a' : '#ff4d4d';
-          roiHtml = `<span style="color:${cor};font-weight:700;font-size:13px;margin-left:10px">${fmtROI(roi)}</span>`;
+          roiHtml = `<span style="color:${cor};font-weight:700;font-size:13px;margin-left:10px">${fmtROI(roi)}${roasHTML(Storage.calcRoas(g, c))}</span>`;
         }
       }
 
