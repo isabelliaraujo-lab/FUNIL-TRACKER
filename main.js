@@ -410,6 +410,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     _parsed.moeda = document.getElementById('preview-moeda').value || 'BRL';
     _parsed.hora  = new Date().toTimeString().slice(0, 5);
     _parsed.id    = Storage.genId();
+    delete _parsed.urlPoster;
     funnels.unshift(_parsed);
     saveFunnels(funnels);
     Tabela.renderTable();
@@ -586,6 +587,225 @@ document.addEventListener('DOMContentLoaded', async () => {
     return blocos.filter(b => ehInicioDeFunil(b.split('\n').find(l => l.trim()) || ''));
   }
 
+  // ── Imagens dos criativos (thumb) ─────────────────────────────────────
+
+  // Normaliza URL de anúncio para casar imagem ↔ funil (usar dos dois lados).
+  // Mantém apenas os parâmetros que identificam o post (ex.: watch/?v=123),
+  // senão URLs diferentes colapsariam na mesma chave.
+  function normUrlAnuncio(u) {
+    if (!u) return '';
+    let s = String(u).trim().replace(/_+$/, '').toLowerCase();
+    if (!s) return '';
+    s = s.replace(/#.*$/, '');
+    let ids = '';
+    const qi = s.indexOf('?');
+    if (qi >= 0) {
+      const params = new URLSearchParams(s.slice(qi + 1));
+      ids = ['v', 'id', 'fbid', 'story_fbid']
+        .filter(k => params.get(k))
+        .map(k => `${k}=${params.get(k)}`)
+        .join('&');
+      s = s.slice(0, qi);
+    }
+    s = s.replace(/\/+$/, '');
+    s = s.replace(/^(https?:\/\/)?(www\.|m\.)/, '$1');
+    return ids ? `${s}?${ids}` : s;
+  }
+
+  function urlAnuncioValidaParaImagem(url) {
+    if (!url) return false;
+    if (/l\.facebook\.com\/l\.php/i.test(url)) return false;
+    try {
+      const host = new URL(url).hostname.toLowerCase();
+      if (host.endsWith('fbcdn.net') || host.endsWith('cdninstagram.com')) return false;
+      return host === 'facebook.com' || host.endsWith('.facebook.com') ||
+             host === 'instagram.com' || host.endsWith('.instagram.com');
+    } catch { return false; }
+  }
+
+  // Percorre o HTML do mammoth em ordem: vale a PRIMEIRA imagem relevante
+  // (>= 5 KB) depois de cada URL de anúncio.
+  function montarImageMap(doc) {
+    const imageMap = new Map();
+    let ultimaUrl = null;
+    const walker = document.createTreeWalker(doc.body, NodeFilter.SHOW_ELEMENT | NodeFilter.SHOW_TEXT);
+    let node;
+    while ((node = walker.nextNode())) {
+      const urls = [];
+      if (node.nodeType === Node.TEXT_NODE) {
+        (node.nodeValue.match(/https?:\/\/[^\s<>"']+/gi) || []).forEach(u => urls.push(u));
+      } else if (node.tagName === 'A') {
+        const href = node.getAttribute('href');
+        if (href) urls.push(href);
+      } else if (node.tagName === 'IMG') {
+        const src = node.getAttribute('src') || '';
+        if (!/^data:image\/(png|jpeg|jpg|gif|webp)[;,]/i.test(src)) continue;
+        if (src.length * 0.75 < 5 * 1024) continue;
+        if (ultimaUrl && !imageMap.has(ultimaUrl)) imageMap.set(ultimaUrl, src);
+        continue;
+      }
+      urls.forEach(u => {
+        const limpa = u.trim().replace(/_+$/, '');
+        if (urlAnuncioValidaParaImagem(limpa)) ultimaUrl = normUrlAnuncio(limpa);
+      });
+    }
+    return imageMap;
+  }
+
+  // Redimensiona (máx. 400px de largura) e comprime em JPEG. Qualquer falha → null
+  // (poster expirado/bloqueado é esperado: o link do fbcdn expira em poucos dias).
+  async function comprimirImagem(src) {
+    try {
+      const img = new Image();
+      img.crossOrigin = 'anonymous';
+      const carregou = await new Promise(resolve => {
+        const timer = setTimeout(() => resolve(false), 15000);
+        img.onload  = () => { clearTimeout(timer); resolve(true); };
+        img.onerror = () => { clearTimeout(timer); resolve(false); };
+        img.src = src;
+      });
+      if (!carregou || !img.naturalWidth || !img.naturalHeight) return null;
+      const w = Math.min(400, img.naturalWidth);
+      const h = Math.round(img.naturalHeight * w / img.naturalWidth);
+      const canvas = document.createElement('canvas');
+      canvas.width  = w;
+      canvas.height = h;
+      canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+      return await new Promise(resolve => {
+        try { canvas.toBlob(b => resolve(b || null), 'image/jpeg', 0.75); }
+        catch (e) { resolve(null); }
+      });
+    } catch (e) {
+      console.warn('[img] falha ao comprimir imagem', e);
+      return null;
+    }
+  }
+
+  const IMGS_PENDENTES_KEY = 'funil-tracker-imgs-pendentes';
+
+  function lerImgsPendentes() {
+    try {
+      const obj = JSON.parse(localStorage.getItem(IMGS_PENDENTES_KEY) || '{}');
+      return obj && typeof obj === 'object' ? obj : {};
+    } catch { return {}; }
+  }
+
+  function gravarImgsPendentes(obj) {
+    try {
+      if (Object.keys(obj).length) localStorage.setItem(IMGS_PENDENTES_KEY, JSON.stringify(obj));
+      else localStorage.removeItem(IMGS_PENDENTES_KEY);
+    } catch (e) { console.error('[img] não foi possível gravar pendentes', e); }
+  }
+
+  function blobParaDataUrl(blob) {
+    return new Promise(resolve => {
+      try {
+        const r = new FileReader();
+        r.onload  = () => resolve(r.result);
+        r.onerror = () => resolve(null);
+        r.readAsDataURL(blob);
+      } catch { resolve(null); }
+    });
+  }
+
+  function dataUrlParaBlob(dataUrl) {
+    const [meta, b64] = dataUrl.split(',');
+    const tipo = (meta.match(/^data:([^;]+)/) || [])[1] || 'image/jpeg';
+    const bin  = atob(b64);
+    const arr  = new Uint8Array(bin.length);
+    for (let i = 0; i < bin.length; i++) arr[i] = bin.charCodeAt(i);
+    return new Blob([arr], { type: tipo });
+  }
+
+  // Aplica { id → url } de uma vez sobre o estado ATUAL dos funis.
+  function aplicarImgsCriativos(resultados) {
+    const mapa = new Map(resultados.map(r => [r.id, r.url]));
+    if (mapa.size) saveFunnels(funnels.map(f => mapa.has(f.id) ? { ...f, imgCriativo: mapa.get(f.id) } : f));
+    if (mapa.size && !document.getElementById('tab-criativos').hidden) Criativos.refresh();
+  }
+
+  async function processarImagensCriativos(jobs) {
+    try {
+      if (!jobs || !jobs.length) return;
+      showToast(`Processando ${jobs.length} imagem(ns)...`, 3000);
+      console.log('[img] processando', jobs.length, 'imagem(ns)');
+
+      const resultados = [];
+      const pendentes  = {};
+      let falhas = 0;
+
+      const fila = jobs.slice();
+      async function worker() {
+        while (fila.length) {
+          const job = fila.shift();
+          try {
+            const src  = job.dataUrl || job.posterUrl;
+            const blob = await comprimirImagem(src);
+            if (!blob) {
+              falhas++;
+              console.warn('[img] não foi possível baixar/comprimir', job.id, job.dataUrl ? '(imagem colada)' : '(poster)');
+              continue;
+            }
+            const url = await SupabaseStorage.uploadImagemCriativo(job.id, blob);
+            if (url) {
+              resultados.push({ id: job.id, url });
+            } else {
+              const dataUrl = await blobParaDataUrl(blob);
+              if (dataUrl) pendentes[job.id] = dataUrl;
+              else falhas++;
+            }
+          } catch (e) {
+            falhas++;
+            console.error('[img] erro ao processar', job.id, e);
+          }
+        }
+      }
+      await Promise.all([worker(), worker(), worker()]);
+
+      const qtdPendentes = Object.keys(pendentes).length;
+      if (qtdPendentes) gravarImgsPendentes({ ...lerImgsPendentes(), ...pendentes });
+
+      aplicarImgsCriativos(resultados);
+
+      let msg = `${resultados.length} imagem(ns) salva(s)`;
+      if (falhas)       msg += ` · ${falhas} não puderam ser baixadas (link do poster expirado?)`;
+      if (qtdPendentes) msg += ` · ${qtdPendentes} serão reenviadas depois`;
+      console.log('[img]', msg);
+      showToast(msg, 4000);
+    } catch (e) {
+      console.error('[img] erro inesperado no processamento de imagens', e);
+    }
+  }
+
+  async function reenviarImagensPendentes() {
+    try {
+      const pend = lerImgsPendentes();
+      const ids  = Object.keys(pend);
+      if (!ids.length) return;
+      console.log('[img] reenviando', ids.length, 'imagem(ns) pendente(s)');
+
+      const resultados = [];
+      for (const id of ids) {
+        const funil = funnels.find(f => f.id === id);
+        if (!funil || funil.imgCriativo) { delete pend[id]; continue; }
+        try {
+          const url = await SupabaseStorage.uploadImagemCriativo(id, dataUrlParaBlob(pend[id]));
+          if (url) { resultados.push({ id, url }); delete pend[id]; }
+        } catch (e) { console.error('[img] reenvio falhou', id, e); }
+      }
+
+      // Relê a chave para não perder pendentes gravados enquanto reenviava
+      const atual = lerImgsPendentes();
+      ids.forEach(id => { if (!(id in pend)) delete atual[id]; });
+      gravarImgsPendentes(atual);
+
+      aplicarImgsCriativos(resultados);
+      if (resultados.length) console.log('[img]', resultados.length, 'imagem(ns) pendente(s) reenviada(s)');
+    } catch (e) {
+      console.error('[img] erro ao reenviar pendentes', e);
+    }
+  }
+
   let _importandoEmAndamento = false;
 
   document.getElementById('input-import-text').addEventListener('change', async function (e) {
@@ -600,6 +820,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     try {
       let texto = '';
       let linkMap = {};
+      let imageMap = new Map();
       try {
         if (file.name.toLowerCase().endsWith('.docx')) {
           const arrayBuffer = await file.arrayBuffer();
@@ -610,6 +831,13 @@ document.addEventListener('DOMContentLoaded', async () => {
             const label = a.textContent.trim().toUpperCase();
             if (href && label) linkMap[label] = href;
           });
+          try {
+            imageMap = montarImageMap(doc);
+            console.log('[img] imagens encontradas no docx:', imageMap.size);
+          } catch (err) {
+            imageMap = new Map();
+            console.error('[img] erro ao procurar imagens no docx', err);
+          }
           const textResult = await mammoth.extractRawText({ arrayBuffer });
           texto = textResult.value;
         } else {
@@ -626,12 +854,26 @@ document.addEventListener('DOMContentLoaded', async () => {
       if (resultado === null) return;
       const { novos, duplicados, data, hora } = resultado;
       novos.forEach(f => { f.id = Storage.genId(); f.data = data; f.hora = hora; });
+      const jobs = [];
+      try {
+        novos.forEach(f => {
+          const dataUrl   = imageMap.get(normUrlAnuncio(f.urlAnuncio)) || null;
+          const posterUrl = f.urlPoster || null;
+          if (dataUrl || posterUrl) jobs.push({ id: f.id, dataUrl, posterUrl });
+        });
+      } catch (err) { console.error('[img] erro ao associar imagens', err); }
+      parsed.forEach(f => { delete f.urlPoster; });
       funnels = [...novos, ...funnels];
       saveFunnels(funnels);
+      try {
+        Criativos.sincronizarComFunis(funnels);
+        if (!document.getElementById('tab-criativos').hidden) Criativos.refresh();
+      } catch (err) { console.error('Erro ao sincronizar criativos:', err); }
       Tabela.renderTable();
       const parts = [`${novos.length} funil(s) importado(s) com sucesso!`];
       if (duplicados.length) parts.push(`${duplicados.length} duplicado(s) ignorado(s).`);
       showToast(parts.join(' '), 3500);
+      processarImagensCriativos(jobs);
     } finally {
       _importandoEmAndamento = false;
     }
@@ -673,6 +915,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   Tabela.init(getFunnels, saveFunnels, showToast, getMonitoradas, toggleMonitorar);
   Analise.init(getFunnels);
   Criativos.init(showToast, getFunnels);
+  reenviarImagensPendentes();
 
   // Migração única: funis são fonte de verdade para views em criativos existentes
   {
