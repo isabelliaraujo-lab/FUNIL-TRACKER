@@ -6,6 +6,7 @@ const Criativos = (() => {
 
   const KEY     = 'funil-tracker-criativos-v1';
   const COL_KEY = 'funil-tracker-criativos-colunas';
+  const VIEW_KEY = 'funil-tracker-criativos-view';
 
   // ── Storage próprio ───────────────────────────────────────────────────
 
@@ -64,6 +65,15 @@ const Criativos = (() => {
     localStorage.setItem(COL_KEY, JSON.stringify(cols));
   }
 
+  function loadView() {
+    try { return localStorage.getItem(VIEW_KEY) === 'grade' ? 'grade' : 'lista'; }
+    catch { return 'lista'; }
+  }
+
+  function saveView(v) {
+    try { localStorage.setItem(VIEW_KEY, v); } catch {}
+  }
+
   let _ads         = loadAds();
   let _showToast   = null;
   let _currentDups = [];
@@ -72,6 +82,7 @@ const Criativos = (() => {
   let _crPage       = 1;
   let _crPerPage    = 25;
   let _crTotalPages = 1;
+  let _view         = loadView();
 
   // ── Constantes ────────────────────────────────────────────────────────
 
@@ -183,7 +194,16 @@ const Criativos = (() => {
 
   function rerenderRow(id) {
     const tr = document.querySelector(`#cr-table tr[data-id="${CSS.escape(id)}"]`);
-    if (!tr) return;
+    if (!tr) {
+      const card = document.querySelector(`#cr-grid .cr-card[data-id="${CSS.escape(id)}"]`);
+      if (!card) return;
+      const adCard = _ads.find(a => a.id === id);
+      if (!adCard) return;
+      const tmpCard = document.createElement('div');
+      tmpCard.innerHTML = renderCard(adCard, _currentDups);
+      card.replaceWith(tmpCard.firstElementChild);
+      return;
+    }
     const ad = _ads.find(a => a.id === id);
     if (!ad) return;
     const tmp = document.createElement('tbody');
@@ -193,7 +213,7 @@ const Criativos = (() => {
 
   function makeEditable(td) {
     if (td.querySelector('input, select, textarea')) return;
-    const tr = td.closest('tr');
+    const tr = td.closest('[data-id]');
     const id = tr?.dataset.id;
     if (!id) return;
     const field = td.dataset.field;
@@ -359,6 +379,12 @@ const Criativos = (() => {
             `).join('')}
           </div>
         </div>
+        <div style="display:flex;gap:4px" id="cr-view-toggle">
+          ${[['lista', '☰ Lista'], ['grade', '▦ Grade']].map(([v, label]) => `
+            <button class="btn btn-secondary btn-sm" data-view="${v}" style="white-space:nowrap${_view === v
+              ? ';border-color:var(--accent);color:var(--accent)' : ''}">${label}</button>
+          `).join('')}
+        </div>
         <button class="btn btn-primary btn-sm" id="cr-btn-novo" style="margin-left:auto">+ Novo</button>
         <button class="btn btn-secondary btn-sm" id="cr-btn-export">↓ CSV</button>
       </div>
@@ -415,6 +441,7 @@ const Criativos = (() => {
 
       <!-- Tabela de criativos -->
       ${pgHtml}
+      ${_view === 'grade' ? renderGrid(ads, pageAds, dups) : `
       <div class="table-wrapper">
         <table id="cr-table">
           <thead>
@@ -447,6 +474,7 @@ const Criativos = (() => {
           </tbody>
         </table>
       </div>
+      `}
       ${pgHtml}
     `;
 
@@ -485,26 +513,37 @@ const Criativos = (() => {
     };
     document.addEventListener('click', _closeColsDd);
 
-    // Delegação de eventos na tabela
-    document.getElementById('cr-table')?.addEventListener('click', e => {
-      if (e.target.matches('input, select, textarea')) return;
-      if (e.target.closest('a[href]')) return;
-
-      const btn = e.target.closest('[data-action]');
-      if (btn) {
-        const id = btn.dataset.id;
-        if (btn.dataset.action === 'edit')   openModal(id);
-        if (btn.dataset.action === 'delete') confirmDelete(id);
-        if (btn.dataset.action === 'star') {
-          const ad = _ads.find(a => a.id === id);
-          if (ad) { ad.destaque = !ad.destaque; saveAds(_ads); rerenderRow(id); }
-        }
-        return;
-      }
-
-      const td = e.target.closest('td[data-field]');
-      if (td) makeEditable(td);
+    // Alternância Lista / Grade
+    document.getElementById('cr-view-toggle').addEventListener('click', e => {
+      const b = e.target.closest('[data-view]');
+      if (!b || b.dataset.view === _view) return;
+      _view = b.dataset.view === 'grade' ? 'grade' : 'lista';
+      saveView(_view);
+      render();
     });
+
+    // Delegação de eventos na tabela / grade
+    document.getElementById(_view === 'grade' ? 'cr-grid' : 'cr-table')?.addEventListener('click', onListClick);
+  }
+
+  function onListClick(e) {
+    if (e.target.matches('input, select, textarea')) return;
+    if (e.target.closest('a[href]')) return;
+
+    const btn = e.target.closest('[data-action]');
+    if (btn) {
+      const id = btn.dataset.id;
+      if (btn.dataset.action === 'edit')   openModal(id);
+      if (btn.dataset.action === 'delete') confirmDelete(id);
+      if (btn.dataset.action === 'star') {
+        const ad = _ads.find(a => a.id === id);
+        if (ad) { ad.destaque = !ad.destaque; saveAds(_ads); rerenderRow(id); }
+      }
+      return;
+    }
+
+    const td = e.target.closest('td[data-field], .cr-card [data-field]');
+    if (td) makeEditable(td);
   }
 
   // ── Gráfico de ângulos ────────────────────────────────────────────────
@@ -634,6 +673,121 @@ const Criativos = (() => {
           </div>
         </td>
       </tr>
+    `;
+  }
+
+  // ── Modo Grade ────────────────────────────────────────────────────────
+
+  // Thumb mora no funil (sincroniza com o Supabase), nunca no registro do criativo.
+  function getImgCriativo(ad) {
+    if (!ad.urlAnuncio) return null;
+    let best = null;
+    (window._funnelsGlobal || []).forEach(f => {
+      if (f.urlAnuncio !== ad.urlAnuncio || !f.imgCriativo) return;
+      if (!best || (f.data || '') > (best.data || '')) best = f;
+    });
+    return best ? best.imgCriativo : null;
+  }
+
+  function renderGrid(ads, pageAds, dups) {
+    return `
+      <div id="cr-grid">
+        ${ads.length === 0 ? `
+          <div style="grid-column:1/-1">
+            <div class="empty-state">
+              <div class="empty-icon">🎬</div>
+              <h3>Nenhum criativo cadastrado</h3>
+              <p>Clique em "+ Novo" para começar a registrar os ads da semana.</p>
+            </div>
+          </div>
+        ` : pageAds.map(ad => renderCard(ad, dups)).join('')}
+      </div>
+    `;
+  }
+
+  function renderCard(ad, dups) {
+    const isLateral    = dups.some(g => g.length > 1 && g.some(a => a.id === ad.id));
+    const needsHook    = ad._importado && !ad.hook;
+    const cleanedConta = cleanConta(ad.conta);
+    const funilId      = (window._funnelsGlobal || []).find(f => f.urlAnuncio && f.urlAnuncio === ad.urlAnuncio)?.id;
+    const funil        = funilId ? (window._funnelsGlobal || []).find(f => f.id === funilId) : null;
+    const img          = getImgCriativo(ad);
+    const muted        = '<span style="color:var(--text-muted)">—</span>';
+    const pill = v => `<span style="background:var(--bg-card, var(--surface));border:0.5px solid var(--border);
+      border-radius:20px;padding:2px 7px;font-size:11px">${esc(v)}</span>`;
+
+    const placeholder = `<div class="cr-card-ph"${img ? ' style="display:none"' : ''}>
+        <span style="font-size:28px">🎬</span><span style="font-size:11px">sem imagem</span></div>`;
+    const thumbInner = (img
+      ? `<img src="${esc(img)}" loading="lazy" alt=""
+          onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">`
+      : '') + placeholder;
+    const thumb = ad.urlAnuncio
+      ? `<a class="cr-card-thumb" href="${esc(ad.urlAnuncio)}" target="_blank" rel="noopener" title="Abrir anúncio">${thumbInner}</a>`
+      : `<div class="cr-card-thumb">${thumbInner}</div>`;
+
+    const show = k => _cols[k] !== false;
+    const cls  = 'cr-card' + (needsHook ? ' cr-needs-hook' : '') + (ad.destaque ? ' cr-destaque' : '');
+
+    const histBtn = funilId
+      ? `<span onclick="event.stopPropagation();abrirHistoricoViews('${funilId}')" title="Ver histórico" style="cursor:pointer;font-size:11px;opacity:0.6;margin-left:4px">📋</span>`
+      : '';
+    const tag = funil?.tagLateral || '';
+
+    return `
+      <div class="${cls}" data-id="${esc(ad.id)}">
+        ${thumb}
+        <div class="cr-actions">
+          ${funilId ? `<button class="btn btn-sm btn-secondary" onclick="abrirDetalhe('${funilId}')" title="Ver funil">🔗 funil</button>` : ''}
+          <button data-action="edit" data-id="${esc(ad.id)}" title="Editar"
+            style="border:none;background:none;color:var(--text);padding:3px 5px;
+              font-size:13px;cursor:pointer;line-height:1;border-radius:4px">✏</button>
+          <button data-action="delete" data-id="${esc(ad.id)}" title="Excluir"
+            style="border:none;background:none;color:#c44;padding:3px 5px;
+              font-size:13px;cursor:pointer;line-height:1;border-radius:4px">✕</button>
+        </div>
+        <div class="cr-card-body">
+          ${show('nicho') || show('data') ? `<div class="cr-card-row">
+            ${show('nicho') ? `<div data-field="nicho">${ad.nicho ? nichoBadge(ad.nicho) : muted}</div>` : ''}
+            ${show('data') ? `<div data-field="data" style="font-size:12px;color:var(--text-muted)">${formatDateShort(ad.data)}</div>` : ''}
+          </div>` : ''}
+          ${show('produto') ? `<div data-field="produto">
+            ${(ad.produtoDesconhecido || Storage.isProdutoDesconhecido(ad.produto))
+              ? '<em style="color:var(--text-muted);font-style:italic">—</em>'
+              : `<span style="font-weight:500">${esc(ad.produto)}</span>`}
+          </div>` : ''}
+          ${show('conta') ? `<div data-field="conta" style="font-size:12px">
+            ${cleanedConta ? esc(cleanedConta) : muted}
+          </div>` : ''}
+          ${show('hook') ? `<div data-field="hook" class="cr-card-hook">
+            ${needsHook
+              ? `<span style="color:#BA7517;font-size:11px;font-weight:600">⚠ preencher</span>`
+              : ad.hook ? `<span title="${esc(ad.hook)}">${esc(ad.hook)}</span>` : muted}
+          </div>` : ''}
+          ${show('angulo') || show('formato') ? `<div class="cr-card-row">
+            ${show('angulo') ? `<div data-field="angulo">${ad.angulo ? pill(ad.angulo) : muted}</div>` : ''}
+            ${show('formato') ? `<div data-field="formato">${ad.formato ? pill(ad.formato) : muted}</div>` : ''}
+          </div>` : ''}
+          <div class="cr-card-row">
+            ${show('views') ? `<div data-field="views" style="font-weight:500">${formatViews(ad.views)}${histBtn}</div>` : ''}
+            ${show('contas') && isLateral ? `<span style="color:#D85A30;font-size:12px;font-weight:600" title="Lateralizado">🔄</span>` : ''}
+            ${show('tagLateral') ? `<div>${tag
+              ? `<span class="tag-lateral" onclick="editarTagLateral('${funilId}')" title="Clique para editar">${esc(tag)}</span>`
+              : (funilId ? `<button class="btn-add-lateral" onclick="editarTagLateral('${funilId}')">+</button>` : '')
+            }</div>` : ''}
+            <div style="margin-left:auto;display:flex;align-items:center;gap:6px">
+              ${show('destaque') ? `<button class="btn btn-sm" data-action="star" data-id="${esc(ad.id)}"
+                title="${ad.destaque ? 'Remover destaque' : 'Marcar como destaque'}"
+                style="font-size:15px;border:none;background:none;cursor:pointer;padding:2px 4px;line-height:1">
+                ${ad.destaque ? '⭐' : '☆'}
+              </button>` : ''}
+              ${show('urlAnuncio') && ad.urlAnuncio ? `<a href="${esc(ad.urlAnuncio)}" target="_blank" rel="noopener"
+                style="font-size:15px;color:var(--accent);text-decoration:none;line-height:1"
+                title="${esc(ad.urlAnuncio)}">↗</a>` : ''}
+            </div>
+          </div>
+        </div>
+      </div>
     `;
   }
 
@@ -849,7 +1003,7 @@ const Criativos = (() => {
     const criativosTab = document.getElementById('tab-criativos');
     criativosTab.addEventListener('click', e => {
       const btn = e.target.closest('.pg-btn[data-pg]');
-      if (!btn || e.target.closest('#cr-table')) return;
+      if (!btn || e.target.closest('#cr-table, #cr-grid')) return;
       const action = btn.dataset.pg;
       if      (action === 'first') _crPage = 1;
       else if (action === 'prev')  _crPage = Math.max(1, _crPage - 1);
@@ -877,14 +1031,38 @@ const Criativos = (() => {
         '#cr-table td.cr-hook-cell{white-space:normal;max-width:220px}',
         '#cr-table tr.cr-needs-hook td:first-child{border-left:2px solid #BA7517}',
         '#cr-table thead th{white-space:nowrap}',
+        '#cr-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:12px}',
+        '#cr-grid .cr-card{position:relative;background:var(--bg-card, var(--surface));border:0.5px solid var(--border);border-radius:10px;overflow:hidden;display:flex;flex-direction:column}',
+        '#cr-grid .cr-card.cr-needs-hook{border-left:2px solid #BA7517;background:rgba(255,160,0,0.05)}',
+        '#cr-grid .cr-card.cr-destaque{background:rgba(255,200,0,0.07);border-color:rgba(255,200,0,0.35)}',
+        '#cr-grid .cr-card-thumb{display:block;width:100%;aspect-ratio:4/5;background:var(--surface2);overflow:hidden}',
+        '#cr-grid .cr-card-thumb img{display:block;width:100%;height:100%;object-fit:cover}',
+        '#cr-grid .cr-card-ph{width:100%;height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;color:var(--text-muted);opacity:.6}',
+        '#cr-grid .cr-card-body{padding:8px 10px 10px;display:flex;flex-direction:column;gap:6px;font-size:13px;min-width:0}',
+        '#cr-grid .cr-card-row{display:flex;align-items:center;gap:6px;flex-wrap:wrap}',
+        '#cr-grid .cr-card-hook{font-size:12px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}',
+        '#cr-grid [data-field]{cursor:pointer;border-radius:4px}',
+        '#cr-grid [data-field]:hover{background:rgba(0,212,255,.04)}',
+        '#cr-grid .cr-actions{position:absolute;top:6px;right:6px;display:flex;gap:2px;align-items:center;background:rgba(0,0,0,.65);border-radius:6px;padding:2px;visibility:hidden}',
+        '#cr-grid .cr-card:hover .cr-actions{visibility:visible}',
       ].join('');
       document.head.appendChild(s);
     }
 
     const funis = getFunnelsFn ? getFunnelsFn() : Storage.load();
+    const imported = sincronizarComFunis(funis);
+    if (imported > 0) {
+      _showToast?.(`${imported} funil(s) importado(s) automaticamente para Criativos!`);
+    }
+  }
+
+  // Cria criativos (_importado) para funis cuja URL de anúncio ainda não existe.
+  // Retorna quantos foram criados.
+  function sincronizarComFunis(funis) {
+    _ads = loadAds();
+    let imported = 0;
     if (funis && funis.length) {
       const existingUrls = new Set(_ads.map(a => a.urlAnuncio).filter(Boolean));
-      let imported = 0;
       funis.forEach(funil => {
         if (!funil.urlAnuncio || existingUrls.has(funil.urlAnuncio)) return;
         existingUrls.add(funil.urlAnuncio);
@@ -910,9 +1088,9 @@ const Criativos = (() => {
       });
       if (imported > 0) {
         saveAds(_ads);
-        _showToast?.(`${imported} funil(s) importado(s) automaticamente para Criativos!`);
       }
     }
+    return imported;
   }
 
   function refresh() {
@@ -921,6 +1099,6 @@ const Criativos = (() => {
     render();
   }
 
-  return { init, refresh };
+  return { init, refresh, sincronizarComFunis };
 
 })();
