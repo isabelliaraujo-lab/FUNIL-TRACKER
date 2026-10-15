@@ -41,6 +41,7 @@ const SupabaseStorage = (() => {
       anuncios:         Array.isArray(f.anuncios) ? f.anuncios : [],
       views_historico:  Array.isArray(f.viewsHistorico) ? f.viewsHistorico : [],
       tag_lateral:      f.tagLateral || '',
+      img_criativo:     f.imgCriativo || null,
     };
   }
 
@@ -74,6 +75,7 @@ const SupabaseStorage = (() => {
       anuncios:       r.anuncios || [],
       viewsHistorico: r.views_historico || [],
       tagLateral:     r.tag_lateral || '',
+      imgCriativo:    r.img_criativo || null,
     };
   }
 
@@ -230,5 +232,15 @@ const SupabaseStorage = (() => {
     return { historico: data?.historico || [], adsAtivos: data?.ads_ativos || 0 };
   }
 
-  return { loadFunnels, syncFunnels, migrarLocalStorage, loadMonitoradas, saveMonitorada, deleteMonitorada, loadDominiosBiblioteca, salvarAdsAtivos, getHistoricoDominio };
+  // ── Imagem do criativo (Storage) ──────────────────────────────────────
+
+  async function uploadImagemCriativo(funilId, blob) {
+    const { error } = await db.storage
+      .from('criativos')
+      .upload(`${funilId}.jpg`, blob, { contentType: 'image/jpeg', upsert: true });
+    if (error) { console.error('[img] upload falhou', funilId, error); return null; }
+    return db.storage.from('criativos').getPublicUrl(`${funilId}.jpg`).data.publicUrl;
+  }
+
+  return { loadFunnels, syncFunnels, migrarLocalStorage, loadMonitoradas, saveMonitorada, deleteMonitorada, loadDominiosBiblioteca, salvarAdsAtivos, getHistoricoDominio, uploadImagemCriativo };
 })();
