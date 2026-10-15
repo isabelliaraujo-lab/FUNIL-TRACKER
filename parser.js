@@ -56,11 +56,24 @@ const Parser = (() => {
     return /__https?:\/\//i.test(line) || /^\s*https?:\/\//i.test(line);
   }
 
+  // URL do poster do vídeo (CDN do Facebook/Instagram), colada abaixo da URL do anúncio
+  function isPosterLine(line) {
+    if (!isUrlLine(line)) return false;
+    const url = extractUrl(line);
+    if (!url) return false;
+    try {
+      const host = new URL(url).hostname.toLowerCase();
+      return host.endsWith('fbcdn.net') || host.endsWith('cdninstagram.com');
+    } catch { return false; }
+  }
+
   function isFacebookLine(line) {
+    if (isPosterLine(line)) return false;
     return isUrlLine(line) && /facebook\.com/i.test(line);
   }
 
   function isInstagramLine(line) {
+    if (isPosterLine(line)) return false;
     return isUrlLine(line) && /instagram\.com/i.test(line);
   }
 
@@ -209,6 +222,7 @@ const Parser = (() => {
     // REGRA 4 — URLs finais (não Facebook, não Instagram, não ig_redirect)
     const finalLines = lines.filter(l =>
       isUrlLine(l) &&
+      !isPosterLine(l) &&
       !isFacebookLine(l) &&
       !isInstagramLine(l) &&
       !/ig_redirect/i.test(l) &&
@@ -242,9 +256,13 @@ const Parser = (() => {
     // Aplicado só aqui para a REGRA 3B continuar usando a chave original no linkMap.
     if (domNativaVisivel !== null) domAnuncio = domNativaVisivel;
 
+    // URL do poster do vídeo — campo TRANSITÓRIO (nunca persistido; main.js apaga antes de salvar)
+    const posterLine = lines.find(isPosterLine);
+    const urlPoster  = posterLine ? extractUrl(posterLine) : null;
+
     const result = { adId, data, conta, nicho, produto, urlAnuncio, urlAnuncioFull, views, famoso,
              domAnuncio, domAnuncioFull, domFinal, domFinalFull, split, obs, gasto, conversao, moeda, urlVsl,
-             gasto7d: null, conversao7d: null, gasto14d: null, conversao14d: null };
+             gasto7d: null, conversao7d: null, gasto14d: null, conversao14d: null, urlPoster };
 
     // FORMATO B — sobrescreve apenas domAnuncio e domAnuncioFull
     if (urlNativaB !== null) {
