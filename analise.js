@@ -27,6 +27,15 @@ const Analise = (() => {
     return _dominiosBibliotecaCache;
   }
 
+  async function recarregarDominios() {
+    // não re-renderiza se você estiver digitando num campo
+    if (document.activeElement?.classList.contains('dom-lib-input')) return;
+    try {
+      _dominiosBibliotecaCache = await SupabaseStorage.loadDominiosBiblioteca();
+      refreshDomAnuncioList(GlobalFilters.filter(_getFunnels()));
+    } catch (e) { console.error(e); }
+  }
+
   function getAdsLibraryCounts() {
     if (_dominiosBibliotecaCache) {
       const map = {};
@@ -994,6 +1003,12 @@ const Analise = (() => {
     // Pré-carregar dados do Supabase para ter ads_ativos disponíveis no primeiro render
     _ensureDominiosCache().then(() => refresh()).catch(console.error);
 
+    // Recarrega do banco ao voltar pra aba e a cada 1 minuto
+    document.addEventListener('visibilitychange', () => {
+      if (!document.hidden) recarregarDominios();
+    });
+    setInterval(recarregarDominios, 60000);
+
     document.getElementById('search-dom-anuncio')
       .addEventListener('input', () => { _pgDomAnuncio = 1; searchDomAnuncio(); });
     document.getElementById('search-dom-final')
@@ -1056,11 +1071,6 @@ const Analise = (() => {
         refreshVslList(GlobalFilters.filter(_getFunnels()));
         return;
       }
-      const inp = e.target.closest('.dom-lib-input');
-      if (!inp) return;
-      saveAdsLibraryCount(inp.dataset.dom, inp.value.trim());
-    });
-    intelEl.addEventListener('focusout', e => {
       const inp = e.target.closest('.dom-lib-input');
       if (!inp) return;
       saveAdsLibraryCount(inp.dataset.dom, inp.value.trim());
