@@ -21,31 +21,7 @@ const Criativos = (() => {
 
   // ── Ligação criativo ↔ funil (por link do anúncio) ────────────────────
 
-  // Parâmetros que identificam o post/anúncio; o resto (fbclid, mibextid,
-  // __cft__, __tn__, utm_*…) é rastreio e é descartado.
-  const URL_PARAMS_ID = ['v', 'id', 'fbid', 'story_fbid'];
-
-  // Normaliza o link do anúncio só para comparação (nunca é salvo).
-  function normUrl(u) {
-    if (!u) return '';
-    let s = String(u).trim().replace(/_+$/, '').replace(/#.*$/, '');
-    if (!s) return '';
-    let ids = '';
-    const qi = s.indexOf('?');
-    if (qi >= 0) {
-      const params = new URLSearchParams(s.slice(qi + 1));
-      ids = URL_PARAMS_ID
-        .filter(k => params.get(k))
-        .map(k => `${k}=${params.get(k).trim()}`)
-        .join('&');
-      s = s.slice(0, qi);
-    }
-    s = s.toLowerCase()
-      .replace(/^https?:\/\//, '')
-      .replace(/^(www|m|web|mbasic)\./, '')
-      .replace(/\/+$/, '');
-    return ids ? `${s}?${ids}` : s;
-  }
+  const normUrl = Storage.normUrl;
 
   // Funis carregados do Supabase; Storage.load() só como fallback.
   function getFunis() {
@@ -53,7 +29,8 @@ const Criativos = (() => {
     return Array.isArray(g) && g.length ? g : Storage.load();
   }
 
-  // Índice normUrl → funis, refeito quando a lista de funis muda.
+  // Índice normUrl → [{ funil, idx, url }] com todos os anúncios de cada
+  // funil (idx 0 = principal). Refeito quando a lista de funis muda.
   let _idxSrc = null;
   let _idx    = new Map();
   function funisIndex() {
@@ -61,11 +38,15 @@ const Criativos = (() => {
     if (funis !== _idxSrc) {
       _idxSrc = funis;
       _idx = new Map();
-      funis.forEach(f => {
-        const k = normUrl(f.urlAnuncio);
-        if (!k) return;
-        if (!_idx.has(k)) _idx.set(k, []);
-        _idx.get(k).push(f);
+      funis.forEach(funil => {
+        const vistos = new Set();
+        Storage.anunciosDoFunil(funil).forEach(({ idx, url }) => {
+          const k = normUrl(url);
+          if (vistos.has(k)) return;
+          vistos.add(k);
+          if (!_idx.has(k)) _idx.set(k, []);
+          _idx.get(k).push({ funil, idx, url });
+        });
       });
     }
     return _idx;
@@ -76,10 +57,17 @@ const Criativos = (() => {
     return k ? (funisIndex().get(k) || []) : [];
   }
 
-  // Funil do criativo: prefere link idêntico, senão o primeiro (mais recente).
+  // Funil do criativo: prefere link idêntico, depois anúncio principal,
+  // depois o primeiro (funis vêm do mais recente para o mais antigo).
+  function findMatch(ad) {
+    const ms = funisDoAnuncio(ad);
+    return ms.find(m => m.url === ad.urlAnuncio)
+        || ms.find(m => m.idx === 0)
+        || ms[0] || null;
+  }
+
   function findFunil(ad) {
-    const funis = funisDoAnuncio(ad);
-    return funis.find(f => f.urlAnuncio === ad.urlAnuncio) || funis[0] || null;
+    return findMatch(ad)?.funil || null;
   }
 
   function semFunilHtml(ad) {
@@ -87,19 +75,41 @@ const Criativos = (() => {
     return `<span style="color:var(--text-muted)" title="${motivo}">—</span>`;
   }
 
-  function syncViewsParaFunis(ad) {
-    if (!ad.urlAnuncio) return;
-    const funnels = Storage.load();
-    const key = normUrl(ad.urlAnuncio);
+  function comHistorico(historico, anterior, novo, dataBase) {
+    const h = Array.isArray(historico) ? [...historico] : [];
+    const hoje = new Date().toISOString().slice(0, 10);
+    if (h.length === 0 && anterior != null) h.push({ data: dataBase || hoje, views: anterior });
+    h.push({ data: hoje, views: novo });
+    return h;
+  }
+
+  // Leva views editadas no criativo para o funil de findFunil (com histórico).
+  // Só age quando o valor mudou em relação ao anterior do criativo.
+  function syncViewsParaFunis(ad, viewsAnterior) {
+    if (ad.views == null || ad.views === viewsAnterior) return;
+    if (!window._saveFunnelsGlobal) return;
+    const m = findMatch(ad);
+    if (!m) return;
+    const f = m.funil;
+    const novo = { ...f };
     let alterou = false;
-    const updated = funnels.map(f => {
-      if (f.urlAnuncio && normUrl(f.urlAnuncio) === key && f.views !== ad.views) {
-        alterou = true;
-        return { ...f, views: ad.views };
-      }
-      return f;
-    });
-    if (alterou) Storage.save(updated);
+
+    if (m.idx === 0 && f.views !== ad.views) {
+      novo.views = ad.views;
+      novo.viewsHistorico = comHistorico(f.viewsHistorico, f.views, ad.views, f.data);
+      alterou = true;
+    }
+    const an = Array.isArray(f.anuncios) ? f.anuncios[m.idx] : null;
+    if (an && an.views !== ad.views) {
+      novo.anuncios = f.anuncios.map((a, i) => i !== m.idx ? a : {
+        ...a,
+        views: ad.views,
+        viewsHistorico: comHistorico(a.viewsHistorico, a.views, ad.views, f.data),
+      });
+      alterou = true;
+    }
+    if (!alterou) return;
+    window._saveFunnelsGlobal(getFunis().map(x => x.id === f.id ? novo : x));
   }
 
   // ── Colunas visíveis ──────────────────────────────────────────────────
@@ -327,13 +337,7 @@ const Criativos = (() => {
       const viewsAnterior = field === 'views' ? ad.views : undefined;
       ad[field] = val;
       saveAds(_ads);
-      if (field === 'views') {
-        if (window.registrarViewsHistoricoFunil && ad.urlAnuncio) {
-          window.registrarViewsHistoricoFunil(ad.urlAnuncio, viewsAnterior, val);
-        }
-        syncViewsParaFunis(ad);
-        if (!document.getElementById('tab-escalada')?.hidden) Escalada.refresh();
-      }
+      if (field === 'views') syncViewsParaFunis(ad, viewsAnterior);
       rerenderRow(id);
     }
 
@@ -402,8 +406,12 @@ const Criativos = (() => {
     const semAtual    = container.dataset.semana || semanas[1] || 'Todas as semanas';
     const anguloAtual = container.dataset.angulo || '';
 
+    // "Sem funil" mostra todos os órfãos, ignorando semana/ângulo/filtro global.
+    const orfaos   = _ads.filter(a => !findFunil(a));
+    const semFunil = container.dataset.semFunil === '1';
+
     const gfPool = GlobalFilters.filter(_ads);
-    const ads    = filteredAds(gfPool, semAtual, anguloAtual);
+    const ads    = semFunil ? orfaos : filteredAds(gfPool, semAtual, anguloAtual);
     const dups = getDuplicates(ads);
     _currentDups = dups;
 
@@ -423,15 +431,21 @@ const Criativos = (() => {
 
       <!-- Filtros -->
       <div class="filters-bar" style="margin-bottom:16px;flex-wrap:wrap;gap:8px;align-items:center">
-        <select id="cr-filter-semana" class="filter-input" style="min-width:180px">
+        <select id="cr-filter-semana" class="filter-input" style="min-width:180px"${semFunil ? ' disabled' : ''}>
           ${semanas.map(s =>
             `<option value="${esc(s)}" ${s===semAtual?'selected':''}>${esc(s)}</option>`
           ).join('')}
         </select>
-        <select id="cr-filter-angulo" class="filter-input">
+        <select id="cr-filter-angulo" class="filter-input"${semFunil ? ' disabled' : ''}>
           <option value="">Todos os ângulos</option>
           ${ANGULOS.map(a => `<option value="${esc(a)}" ${a===anguloAtual?'selected':''}>${esc(a)}</option>`).join('')}
         </select>
+        ${orfaos.length || semFunil ? `
+          <button class="btn btn-secondary btn-sm" id="cr-btn-sem-funil"
+            title="${semFunil ? 'Voltar aos filtros normais' : 'Criativos sem funil correspondente (de todas as semanas): corrija o link ou exclua'}"
+            style="white-space:nowrap${semFunil ? ';border-color:#BA7517;color:#BA7517' : ''}">
+            ⚠ Sem funil: ${orfaos.length}${semFunil ? ' ✕' : ''}
+          </button>` : ''}
         <div style="position:relative" id="cr-cols-wrapper">
           <button class="btn btn-secondary btn-sm" id="cr-cols-btn" style="white-space:nowrap">⊞ Colunas</button>
           <div id="cr-cols-dropdown" style="display:none;position:absolute;top:calc(100% + 4px);right:0;
@@ -553,6 +567,10 @@ const Criativos = (() => {
     });
     document.getElementById('cr-filter-angulo').addEventListener('change', e => {
       container.dataset.angulo = e.target.value; _crPage = 1; render();
+    });
+
+    document.getElementById('cr-btn-sem-funil')?.addEventListener('click', () => {
+      container.dataset.semFunil = semFunil ? '' : '1'; _crPage = 1; render();
     });
 
     document.getElementById('cr-btn-novo').addEventListener('click', () => openModal(null));
@@ -750,8 +768,8 @@ const Criativos = (() => {
   // Thumb mora no funil (sincroniza com o Supabase), nunca no registro do criativo.
   function getImgCriativo(ad) {
     let best = null;
-    funisDoAnuncio(ad).forEach(f => {
-      if (!f.imgCriativo) return;
+    funisDoAnuncio(ad).forEach(({ funil: f, idx }) => {
+      if (idx !== 0 || !f.imgCriativo) return;
       if (!best || (f.data || '') > (best.data || '')) best = f;
     });
     return best ? best.imgCriativo : null;
@@ -1018,8 +1036,7 @@ const Criativos = (() => {
       }
 
       saveAds(_ads);
-      syncViewsParaFunis(record);
-      if (!document.getElementById('tab-escalada')?.hidden) Escalada.refresh();
+      syncViewsParaFunis(record, ad ? ad.views : null);
       close();
       render();
       _showToast?.(isEdit ? 'Criativo atualizado!' : 'Criativo salvo!');
@@ -1168,6 +1185,6 @@ const Criativos = (() => {
     render();
   }
 
-  return { init, refresh, sincronizarComFunis, normUrl };
+  return { init, refresh, sincronizarComFunis };
 
 })();

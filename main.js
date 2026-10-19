@@ -590,27 +590,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   // ── Imagens dos criativos (thumb) ─────────────────────────────────────
 
   // Normaliza URL de anúncio para casar imagem ↔ funil (usar dos dois lados).
-  // Mantém apenas os parâmetros que identificam o post (ex.: watch/?v=123),
-  // senão URLs diferentes colapsariam na mesma chave.
-  function normUrlAnuncio(u) {
-    if (!u) return '';
-    let s = String(u).trim().replace(/_+$/, '').toLowerCase();
-    if (!s) return '';
-    s = s.replace(/#.*$/, '');
-    let ids = '';
-    const qi = s.indexOf('?');
-    if (qi >= 0) {
-      const params = new URLSearchParams(s.slice(qi + 1));
-      ids = ['v', 'id', 'fbid', 'story_fbid']
-        .filter(k => params.get(k))
-        .map(k => `${k}=${params.get(k)}`)
-        .join('&');
-      s = s.slice(0, qi);
-    }
-    s = s.replace(/\/+$/, '');
-    s = s.replace(/^(https?:\/\/)?(www\.|m\.)/, '$1');
-    return ids ? `${s}?${ids}` : s;
-  }
+  const normUrlAnuncio = Storage.normUrl;
 
   function urlAnuncioValidaParaImagem(url) {
     if (!url) return false;
@@ -924,13 +904,18 @@ document.addEventListener('DOMContentLoaded', async () => {
     const CRIATIVOS_KEY = 'funil-tracker-criativos-v1';
     try {
       const criativos = JSON.parse(localStorage.getItem(CRIATIVOS_KEY) || '[]');
+      // link normalizado → views do anúncio (funil mais recente vence)
+      const viewsPorLink = new Map();
+      funnels.forEach(f => Storage.anunciosDoFunil(f).forEach(an => {
+        const k = Storage.normUrl(an.url);
+        if (!viewsPorLink.has(k)) viewsPorLink.set(k, an.views);
+      }));
       let migrou = false;
       const criativosAtualizados = criativos.map(a => {
-        if (!a.urlAnuncio) return a;
-        const funil = funnels.find(f => f.urlAnuncio && f.urlAnuncio === a.urlAnuncio);
-        if (funil && funil.views != null && funil.views !== a.views) {
+        const views = viewsPorLink.get(Storage.normUrl(a.urlAnuncio));
+        if (views != null && views !== a.views) {
           migrou = true;
-          return { ...a, views: funil.views };
+          return { ...a, views };
         }
         return a;
       });
@@ -949,29 +934,6 @@ function formatarDataBR(data) {
   const p = data.split('-');
   return p.length === 3 ? `${p[2]}/${p[1]}/${p[0]}` : data;
 }
-
-// Chamado pelo módulo Criativos ao salvar uma edição de views inline,
-// para registrar a entrada no histórico do funil correspondente.
-function registrarViewsHistoricoFunil(urlAnuncio, viewsAnterior, viewsNovo) {
-  if (viewsNovo == null || viewsNovo === viewsAnterior) return;
-  if (!window._saveFunnelsGlobal || !window._funnelsGlobal) return;
-  const hoje = new Date().toISOString().slice(0, 10);
-  let alterou = false;
-
-  const updated = (window._funnelsGlobal).map(f => {
-    if (f.urlAnuncio !== urlAnuncio) return f;
-    const historico = Array.isArray(f.viewsHistorico) ? [...f.viewsHistorico] : [];
-    if (historico.length === 0 && viewsAnterior != null) {
-      historico.push({ data: f.data || hoje, views: viewsAnterior });
-    }
-    historico.push({ data: hoje, views: viewsNovo });
-    alterou = true;
-    return { ...f, viewsHistorico: historico };
-  });
-
-  if (alterou) window._saveFunnelsGlobal(updated);
-}
-window.registrarViewsHistoricoFunil = registrarViewsHistoricoFunil;
 
 function abrirHistoricoViews(id) {
   const funil = funnels.find(f => f.id === id);

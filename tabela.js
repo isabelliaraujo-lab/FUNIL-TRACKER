@@ -356,14 +356,18 @@ const Tabela = (() => {
   // ── Sync views → criativos ────────────────────────────────────────────
   function syncViewsParaCriativos(funil) {
     const CRIATIVOS_KEY = 'funil-tracker-criativos-v1';
-    if (!funil.urlAnuncio) return;
+    const viewsPorLink = new Map(
+      Storage.anunciosDoFunil(funil).map(an => [Storage.normUrl(an.url), an.views])
+    );
+    if (!viewsPorLink.size) return;
     try {
       const ads = JSON.parse(localStorage.getItem(CRIATIVOS_KEY) || '[]');
       let alterou = false;
       const updated = ads.map(a => {
-        if (a.urlAnuncio && a.urlAnuncio === funil.urlAnuncio && a.views !== funil.views) {
+        const k = Storage.normUrl(a.urlAnuncio);
+        if (viewsPorLink.has(k) && a.views !== viewsPorLink.get(k)) {
           alterou = true;
-          return { ...a, views: funil.views };
+          return { ...a, views: viewsPorLink.get(k) };
         }
         return a;
       });
