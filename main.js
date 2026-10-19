@@ -915,6 +915,8 @@ document.addEventListener('DOMContentLoaded', async () => {
   Tabela.init(getFunnels, saveFunnels, showToast, getMonitoradas, toggleMonitorar);
   Analise.init(getFunnels);
   Criativos.init(showToast, getFunnels);
+  // Funis já carregados do Supabase: re-renderiza se a aba Criativos estiver aberta.
+  if (!document.getElementById('tab-criativos').hidden) Criativos.refresh();
   reenviarImagensPendentes();
 
   // Migração única: funis são fonte de verdade para views em criativos existentes

@@ -19,12 +19,81 @@ const Criativos = (() => {
     localStorage.setItem(KEY, JSON.stringify(ads));
   }
 
+  // ── Ligação criativo ↔ funil (por link do anúncio) ────────────────────
+
+  // Parâmetros que identificam o post/anúncio; o resto (fbclid, mibextid,
+  // __cft__, __tn__, utm_*…) é rastreio e é descartado.
+  const URL_PARAMS_ID = ['v', 'id', 'fbid', 'story_fbid'];
+
+  // Normaliza o link do anúncio só para comparação (nunca é salvo).
+  function normUrl(u) {
+    if (!u) return '';
+    let s = String(u).trim().replace(/_+$/, '').replace(/#.*$/, '');
+    if (!s) return '';
+    let ids = '';
+    const qi = s.indexOf('?');
+    if (qi >= 0) {
+      const params = new URLSearchParams(s.slice(qi + 1));
+      ids = URL_PARAMS_ID
+        .filter(k => params.get(k))
+        .map(k => `${k}=${params.get(k).trim()}`)
+        .join('&');
+      s = s.slice(0, qi);
+    }
+    s = s.toLowerCase()
+      .replace(/^https?:\/\//, '')
+      .replace(/^(www|m|web|mbasic)\./, '')
+      .replace(/\/+$/, '');
+    return ids ? `${s}?${ids}` : s;
+  }
+
+  // Funis carregados do Supabase; Storage.load() só como fallback.
+  function getFunis() {
+    const g = window._funnelsGlobal;
+    return Array.isArray(g) && g.length ? g : Storage.load();
+  }
+
+  // Índice normUrl → funis, refeito quando a lista de funis muda.
+  let _idxSrc = null;
+  let _idx    = new Map();
+  function funisIndex() {
+    const funis = getFunis();
+    if (funis !== _idxSrc) {
+      _idxSrc = funis;
+      _idx = new Map();
+      funis.forEach(f => {
+        const k = normUrl(f.urlAnuncio);
+        if (!k) return;
+        if (!_idx.has(k)) _idx.set(k, []);
+        _idx.get(k).push(f);
+      });
+    }
+    return _idx;
+  }
+
+  function funisDoAnuncio(ad) {
+    const k = normUrl(ad?.urlAnuncio);
+    return k ? (funisIndex().get(k) || []) : [];
+  }
+
+  // Funil do criativo: prefere link idêntico, senão o primeiro (mais recente).
+  function findFunil(ad) {
+    const funis = funisDoAnuncio(ad);
+    return funis.find(f => f.urlAnuncio === ad.urlAnuncio) || funis[0] || null;
+  }
+
+  function semFunilHtml(ad) {
+    const motivo = ad.urlAnuncio ? 'Nenhum funil com este link' : 'Criativo sem link do anúncio';
+    return `<span style="color:var(--text-muted)" title="${motivo}">—</span>`;
+  }
+
   function syncViewsParaFunis(ad) {
     if (!ad.urlAnuncio) return;
     const funnels = Storage.load();
+    const key = normUrl(ad.urlAnuncio);
     let alterou = false;
     const updated = funnels.map(f => {
-      if (f.urlAnuncio && f.urlAnuncio === ad.urlAnuncio && f.views !== ad.views) {
+      if (f.urlAnuncio && normUrl(f.urlAnuncio) === key && f.views !== ad.views) {
         alterou = true;
         return { ...f, views: ad.views };
       }
@@ -627,7 +696,7 @@ const Criativos = (() => {
             : '<span style="color:var(--text-muted)">—</span>'}
         </td>` : ''}
         ${show('views') ? (() => {
-          const funilId = (window._funnelsGlobal || []).find(f => f.urlAnuncio && f.urlAnuncio === ad.urlAnuncio)?.id;
+          const funilId = findFunil(ad)?.id;
           const histBtn = funilId
             ? `<span onclick="event.stopPropagation();abrirHistoricoViews('${funilId}')" title="Ver histórico" style="cursor:pointer;font-size:11px;opacity:0.6;margin-left:4px">📋</span>`
             : '';
@@ -646,12 +715,12 @@ const Criativos = (() => {
           </button>
         </td>` : ''}
         ${show('tagLateral') ? (() => {
-          const funilId = (window._funnelsGlobal || []).find(f => f.urlAnuncio && f.urlAnuncio === ad.urlAnuncio)?.id;
-          const funil = funilId ? (window._funnelsGlobal || []).find(f => f.id === funilId) : null;
+          const funil   = findFunil(ad);
+          const funilId = funil?.id;
           const tag = funil?.tagLateral || '';
           return `<td>${tag
             ? `<span class="tag-lateral" onclick="editarTagLateral('${funilId}')" title="Clique para editar">${esc(tag)}</span>`
-            : (funilId ? `<button class="btn-add-lateral" onclick="editarTagLateral('${funilId}')">+</button>` : '<span style="color:var(--text-muted)">—</span>')
+            : (funilId ? `<button class="btn-add-lateral" onclick="editarTagLateral('${funilId}')">+</button>` : semFunilHtml(ad))
           }</td>`;
         })() : ''}
         ${show('urlAnuncio') ? `<td data-field="urlAnuncio" style="text-align:center">
@@ -663,7 +732,7 @@ const Criativos = (() => {
         </td>` : ''}
         <td>
           <div class="cr-actions" style="display:flex;gap:2px;justify-content:flex-end">
-            ${(() => { const funilId = (window._funnelsGlobal || []).find(f => f.urlAnuncio && f.urlAnuncio === ad.urlAnuncio)?.id; return funilId ? `<button class="btn btn-sm btn-secondary" onclick="abrirDetalhe('${funilId}')" title="Ver funil">🔗 funil</button>` : ''; })()}
+            ${(() => { const funilId = findFunil(ad)?.id; return funilId ? `<button class="btn btn-sm btn-secondary" onclick="abrirDetalhe('${funilId}')" title="Ver funil">🔗 funil</button>` : ''; })()}
             <button data-action="edit" data-id="${esc(ad.id)}" title="Editar"
               style="border:none;background:none;color:var(--text-muted);padding:3px 5px;
                 font-size:13px;cursor:pointer;line-height:1;border-radius:4px">✏</button>
@@ -680,10 +749,9 @@ const Criativos = (() => {
 
   // Thumb mora no funil (sincroniza com o Supabase), nunca no registro do criativo.
   function getImgCriativo(ad) {
-    if (!ad.urlAnuncio) return null;
     let best = null;
-    (window._funnelsGlobal || []).forEach(f => {
-      if (f.urlAnuncio !== ad.urlAnuncio || !f.imgCriativo) return;
+    funisDoAnuncio(ad).forEach(f => {
+      if (!f.imgCriativo) return;
       if (!best || (f.data || '') > (best.data || '')) best = f;
     });
     return best ? best.imgCriativo : null;
@@ -709,8 +777,8 @@ const Criativos = (() => {
     const isLateral    = dups.some(g => g.length > 1 && g.some(a => a.id === ad.id));
     const needsHook    = ad._importado && !ad.hook;
     const cleanedConta = cleanConta(ad.conta);
-    const funilId      = (window._funnelsGlobal || []).find(f => f.urlAnuncio && f.urlAnuncio === ad.urlAnuncio)?.id;
-    const funil        = funilId ? (window._funnelsGlobal || []).find(f => f.id === funilId) : null;
+    const funil        = findFunil(ad);
+    const funilId      = funil?.id;
     const img          = getImgCriativo(ad);
     const muted        = '<span style="color:var(--text-muted)">—</span>';
     const pill = v => `<span style="background:var(--bg-card, var(--surface));border:0.5px solid var(--border);
@@ -773,7 +841,7 @@ const Criativos = (() => {
             ${show('contas') && isLateral ? `<span style="color:#D85A30;font-size:12px;font-weight:600" title="Lateralizado">🔄</span>` : ''}
             ${show('tagLateral') ? `<div>${tag
               ? `<span class="tag-lateral" onclick="editarTagLateral('${funilId}')" title="Clique para editar">${esc(tag)}</span>`
-              : (funilId ? `<button class="btn-add-lateral" onclick="editarTagLateral('${funilId}')">+</button>` : '')
+              : (funilId ? `<button class="btn-add-lateral" onclick="editarTagLateral('${funilId}')">+</button>` : semFunilHtml(ad))
             }</div>` : ''}
             <div style="margin-left:auto;display:flex;align-items:center;gap:6px">
               ${show('destaque') ? `<button class="btn btn-sm" data-action="star" data-id="${esc(ad.id)}"
@@ -1062,10 +1130,11 @@ const Criativos = (() => {
     _ads = loadAds();
     let imported = 0;
     if (funis && funis.length) {
-      const existingUrls = new Set(_ads.map(a => a.urlAnuncio).filter(Boolean));
+      const existingUrls = new Set(_ads.map(a => normUrl(a.urlAnuncio)).filter(Boolean));
       funis.forEach(funil => {
-        if (!funil.urlAnuncio || existingUrls.has(funil.urlAnuncio)) return;
-        existingUrls.add(funil.urlAnuncio);
+        const key = normUrl(funil.urlAnuncio);
+        if (!key || existingUrls.has(key)) return;
+        existingUrls.add(key);
         _ads.push({
           id:              Storage.genId(),
           data:            funil.data    || null,
@@ -1099,6 +1168,6 @@ const Criativos = (() => {
     render();
   }
 
-  return { init, refresh, sincronizarComFunis };
+  return { init, refresh, sincronizarComFunis, normUrl };
 
 })();
