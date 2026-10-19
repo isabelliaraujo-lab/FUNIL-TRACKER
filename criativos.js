@@ -86,6 +86,7 @@ const Criativos = (() => {
   // Leva views editadas no criativo para o funil de findFunil (com histórico).
   // Só age quando o valor mudou em relação ao anterior do criativo.
   function syncViewsParaFunis(ad, viewsAnterior) {
+    // Views apagadas (null) não vão para o funil: ele mantém o último número.
     if (ad.views == null || ad.views === viewsAnterior) return;
     if (!window._saveFunnelsGlobal) return;
     const m = findMatch(ad);
