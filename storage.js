@@ -311,6 +311,44 @@ const Storage = (() => {
     return isProdutoDesconhecido(produto) ? null : produto.trim().toUpperCase();
   }
 
+  // ── Link do anúncio ───────────────────────────────────────────────────
+
+  // Parâmetros que identificam o post/anúncio; o resto (fbclid, mibextid,
+  // __cft__, __tn__, utm_*…) é rastreio e é descartado.
+  const URL_PARAMS_ID = ['v', 'id', 'fbid', 'story_fbid'];
+
+  // Normaliza o link do anúncio só para comparação (nunca é salvo).
+  function normUrl(u) {
+    if (!u) return '';
+    let s = String(u).trim().replace(/_+$/, '').replace(/#.*$/, '');
+    if (!s) return '';
+    let ids = '';
+    const qi = s.indexOf('?');
+    if (qi >= 0) {
+      const params = new URLSearchParams(s.slice(qi + 1));
+      ids = URL_PARAMS_ID
+        .filter(k => params.get(k))
+        .map(k => `${k}=${params.get(k).trim().replace(/\/+$/, '')}`)
+        .join('&');
+      s = s.slice(0, qi);
+    }
+    s = s.toLowerCase()
+      .replace(/^https?:\/\//, '')
+      .replace(/^(www|m|web|mbasic)\./, '')
+      .replace(/\/+$/, '');
+    return ids ? `${s}?${ids}` : s;
+  }
+
+  // Anúncios de um funil: idx 0 = principal (urlAnuncio / anuncios[0]),
+  // idx 1..2 = anuncios extras. Só os que têm link.
+  function anunciosDoFunil(f) {
+    const lista = [{ idx: 0, url: f.urlAnuncio, views: f.views }];
+    if (Array.isArray(f.anuncios)) {
+      f.anuncios.forEach((a, i) => { if (i > 0) lista.push({ idx: i, url: a?.url, views: a?.views }); });
+    }
+    return lista.filter(a => normUrl(a.url));
+  }
+
   // ── Utilitário HTML ───────────────────────────────────────────────────
   // Centralizado aqui para ser compartilhado por tabela.js e analise.js
 
@@ -341,5 +379,7 @@ const Storage = (() => {
     escHtml,
     isProdutoDesconhecido,
     normalizeProduto,
+    normUrl,
+    anunciosDoFunil,
   };
 })();

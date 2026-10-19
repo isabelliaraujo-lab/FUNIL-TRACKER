@@ -19,18 +19,98 @@ const Criativos = (() => {
     localStorage.setItem(KEY, JSON.stringify(ads));
   }
 
-  function syncViewsParaFunis(ad) {
-    if (!ad.urlAnuncio) return;
-    const funnels = Storage.load();
+  // ── Ligação criativo ↔ funil (por link do anúncio) ────────────────────
+
+  const normUrl = Storage.normUrl;
+
+  // Funis carregados do Supabase; Storage.load() só como fallback.
+  function getFunis() {
+    const g = window._funnelsGlobal;
+    return Array.isArray(g) && g.length ? g : Storage.load();
+  }
+
+  // Índice normUrl → [{ funil, idx, url }] com todos os anúncios de cada
+  // funil (idx 0 = principal). Refeito quando a lista de funis muda.
+  let _idxSrc = null;
+  let _idx    = new Map();
+  function funisIndex() {
+    const funis = getFunis();
+    if (funis !== _idxSrc) {
+      _idxSrc = funis;
+      _idx = new Map();
+      funis.forEach(funil => {
+        const vistos = new Set();
+        Storage.anunciosDoFunil(funil).forEach(({ idx, url }) => {
+          const k = normUrl(url);
+          if (vistos.has(k)) return;
+          vistos.add(k);
+          if (!_idx.has(k)) _idx.set(k, []);
+          _idx.get(k).push({ funil, idx, url });
+        });
+      });
+    }
+    return _idx;
+  }
+
+  function funisDoAnuncio(ad) {
+    const k = normUrl(ad?.urlAnuncio);
+    return k ? (funisIndex().get(k) || []) : [];
+  }
+
+  // Funil do criativo: prefere link idêntico, depois anúncio principal,
+  // depois o primeiro (funis vêm do mais recente para o mais antigo).
+  function findMatch(ad) {
+    const ms = funisDoAnuncio(ad);
+    return ms.find(m => m.url === ad.urlAnuncio)
+        || ms.find(m => m.idx === 0)
+        || ms[0] || null;
+  }
+
+  function findFunil(ad) {
+    return findMatch(ad)?.funil || null;
+  }
+
+  function semFunilHtml(ad) {
+    const motivo = ad.urlAnuncio ? 'Nenhum funil com este link' : 'Criativo sem link do anúncio';
+    return `<span style="color:var(--text-muted)" title="${motivo}">—</span>`;
+  }
+
+  function comHistorico(historico, anterior, novo, dataBase) {
+    const h = Array.isArray(historico) ? [...historico] : [];
+    const hoje = new Date().toISOString().slice(0, 10);
+    if (h.length === 0 && anterior != null) h.push({ data: dataBase || hoje, views: anterior });
+    h.push({ data: hoje, views: novo });
+    return h;
+  }
+
+  // Leva views editadas no criativo para o funil de findFunil (com histórico).
+  // Só age quando o valor mudou em relação ao anterior do criativo.
+  function syncViewsParaFunis(ad, viewsAnterior) {
+    // Views apagadas (null) não vão para o funil: ele mantém o último número.
+    if (ad.views == null || ad.views === viewsAnterior) return;
+    if (!window._saveFunnelsGlobal) return;
+    const m = findMatch(ad);
+    if (!m) return;
+    const f = m.funil;
+    const novo = { ...f };
     let alterou = false;
-    const updated = funnels.map(f => {
-      if (f.urlAnuncio && f.urlAnuncio === ad.urlAnuncio && f.views !== ad.views) {
-        alterou = true;
-        return { ...f, views: ad.views };
-      }
-      return f;
-    });
-    if (alterou) Storage.save(updated);
+
+    if (m.idx === 0 && f.views !== ad.views) {
+      novo.views = ad.views;
+      novo.viewsHistorico = comHistorico(f.viewsHistorico, f.views, ad.views, f.data);
+      alterou = true;
+    }
+    const an = Array.isArray(f.anuncios) ? f.anuncios[m.idx] : null;
+    if (an && an.views !== ad.views) {
+      novo.anuncios = f.anuncios.map((a, i) => i !== m.idx ? a : {
+        ...a,
+        views: ad.views,
+        viewsHistorico: comHistorico(a.viewsHistorico, a.views, ad.views, f.data),
+      });
+      alterou = true;
+    }
+    if (!alterou) return;
+    window._saveFunnelsGlobal(getFunis().map(x => x.id === f.id ? novo : x));
   }
 
   // ── Colunas visíveis ──────────────────────────────────────────────────
@@ -258,13 +338,7 @@ const Criativos = (() => {
       const viewsAnterior = field === 'views' ? ad.views : undefined;
       ad[field] = val;
       saveAds(_ads);
-      if (field === 'views') {
-        if (window.registrarViewsHistoricoFunil && ad.urlAnuncio) {
-          window.registrarViewsHistoricoFunil(ad.urlAnuncio, viewsAnterior, val);
-        }
-        syncViewsParaFunis(ad);
-        if (!document.getElementById('tab-escalada')?.hidden) Escalada.refresh();
-      }
+      if (field === 'views') syncViewsParaFunis(ad, viewsAnterior);
       rerenderRow(id);
     }
 
@@ -333,8 +407,12 @@ const Criativos = (() => {
     const semAtual    = container.dataset.semana || semanas[1] || 'Todas as semanas';
     const anguloAtual = container.dataset.angulo || '';
 
+    // "Sem funil" mostra todos os órfãos, ignorando semana/ângulo/filtro global.
+    const orfaos   = _ads.filter(a => !findFunil(a));
+    const semFunil = container.dataset.semFunil === '1';
+
     const gfPool = GlobalFilters.filter(_ads);
-    const ads    = filteredAds(gfPool, semAtual, anguloAtual);
+    const ads    = semFunil ? orfaos : filteredAds(gfPool, semAtual, anguloAtual);
     const dups = getDuplicates(ads);
     _currentDups = dups;
 
@@ -354,15 +432,21 @@ const Criativos = (() => {
 
       <!-- Filtros -->
       <div class="filters-bar" style="margin-bottom:16px;flex-wrap:wrap;gap:8px;align-items:center">
-        <select id="cr-filter-semana" class="filter-input" style="min-width:180px">
+        <select id="cr-filter-semana" class="filter-input" style="min-width:180px"${semFunil ? ' disabled' : ''}>
           ${semanas.map(s =>
             `<option value="${esc(s)}" ${s===semAtual?'selected':''}>${esc(s)}</option>`
           ).join('')}
         </select>
-        <select id="cr-filter-angulo" class="filter-input">
+        <select id="cr-filter-angulo" class="filter-input"${semFunil ? ' disabled' : ''}>
           <option value="">Todos os ângulos</option>
           ${ANGULOS.map(a => `<option value="${esc(a)}" ${a===anguloAtual?'selected':''}>${esc(a)}</option>`).join('')}
         </select>
+        ${orfaos.length || semFunil ? `
+          <button class="btn btn-secondary btn-sm" id="cr-btn-sem-funil"
+            title="${semFunil ? 'Voltar aos filtros normais' : 'Criativos sem funil correspondente (de todas as semanas): corrija o link ou exclua'}"
+            style="white-space:nowrap${semFunil ? ';border-color:#BA7517;color:#BA7517' : ''}">
+            ⚠ Sem funil: ${orfaos.length}${semFunil ? ' ✕' : ''}
+          </button>` : ''}
         <div style="position:relative" id="cr-cols-wrapper">
           <button class="btn btn-secondary btn-sm" id="cr-cols-btn" style="white-space:nowrap">⊞ Colunas</button>
           <div id="cr-cols-dropdown" style="display:none;position:absolute;top:calc(100% + 4px);right:0;
@@ -484,6 +568,10 @@ const Criativos = (() => {
     });
     document.getElementById('cr-filter-angulo').addEventListener('change', e => {
       container.dataset.angulo = e.target.value; _crPage = 1; render();
+    });
+
+    document.getElementById('cr-btn-sem-funil')?.addEventListener('click', () => {
+      container.dataset.semFunil = semFunil ? '' : '1'; _crPage = 1; render();
     });
 
     document.getElementById('cr-btn-novo').addEventListener('click', () => openModal(null));
@@ -627,7 +715,7 @@ const Criativos = (() => {
             : '<span style="color:var(--text-muted)">—</span>'}
         </td>` : ''}
         ${show('views') ? (() => {
-          const funilId = (window._funnelsGlobal || []).find(f => f.urlAnuncio && f.urlAnuncio === ad.urlAnuncio)?.id;
+          const funilId = findFunil(ad)?.id;
           const histBtn = funilId
             ? `<span onclick="event.stopPropagation();abrirHistoricoViews('${funilId}')" title="Ver histórico" style="cursor:pointer;font-size:11px;opacity:0.6;margin-left:4px">📋</span>`
             : '';
@@ -646,12 +734,12 @@ const Criativos = (() => {
           </button>
         </td>` : ''}
         ${show('tagLateral') ? (() => {
-          const funilId = (window._funnelsGlobal || []).find(f => f.urlAnuncio && f.urlAnuncio === ad.urlAnuncio)?.id;
-          const funil = funilId ? (window._funnelsGlobal || []).find(f => f.id === funilId) : null;
+          const funil   = findFunil(ad);
+          const funilId = funil?.id;
           const tag = funil?.tagLateral || '';
           return `<td>${tag
             ? `<span class="tag-lateral" onclick="editarTagLateral('${funilId}')" title="Clique para editar">${esc(tag)}</span>`
-            : (funilId ? `<button class="btn-add-lateral" onclick="editarTagLateral('${funilId}')">+</button>` : '<span style="color:var(--text-muted)">—</span>')
+            : (funilId ? `<button class="btn-add-lateral" onclick="editarTagLateral('${funilId}')">+</button>` : semFunilHtml(ad))
           }</td>`;
         })() : ''}
         ${show('urlAnuncio') ? `<td data-field="urlAnuncio" style="text-align:center">
@@ -663,7 +751,7 @@ const Criativos = (() => {
         </td>` : ''}
         <td>
           <div class="cr-actions" style="display:flex;gap:2px;justify-content:flex-end">
-            ${(() => { const funilId = (window._funnelsGlobal || []).find(f => f.urlAnuncio && f.urlAnuncio === ad.urlAnuncio)?.id; return funilId ? `<button class="btn btn-sm btn-secondary" onclick="abrirDetalhe('${funilId}')" title="Ver funil">🔗 funil</button>` : ''; })()}
+            ${(() => { const funilId = findFunil(ad)?.id; return funilId ? `<button class="btn btn-sm btn-secondary" onclick="abrirDetalhe('${funilId}')" title="Ver funil">🔗 funil</button>` : ''; })()}
             <button data-action="edit" data-id="${esc(ad.id)}" title="Editar"
               style="border:none;background:none;color:var(--text-muted);padding:3px 5px;
                 font-size:13px;cursor:pointer;line-height:1;border-radius:4px">✏</button>
@@ -680,10 +768,9 @@ const Criativos = (() => {
 
   // Thumb mora no funil (sincroniza com o Supabase), nunca no registro do criativo.
   function getImgCriativo(ad) {
-    if (!ad.urlAnuncio) return null;
     let best = null;
-    (window._funnelsGlobal || []).forEach(f => {
-      if (f.urlAnuncio !== ad.urlAnuncio || !f.imgCriativo) return;
+    funisDoAnuncio(ad).forEach(({ funil: f, idx }) => {
+      if (idx !== 0 || !f.imgCriativo) return;
       if (!best || (f.data || '') > (best.data || '')) best = f;
     });
     return best ? best.imgCriativo : null;
@@ -709,8 +796,8 @@ const Criativos = (() => {
     const isLateral    = dups.some(g => g.length > 1 && g.some(a => a.id === ad.id));
     const needsHook    = ad._importado && !ad.hook;
     const cleanedConta = cleanConta(ad.conta);
-    const funilId      = (window._funnelsGlobal || []).find(f => f.urlAnuncio && f.urlAnuncio === ad.urlAnuncio)?.id;
-    const funil        = funilId ? (window._funnelsGlobal || []).find(f => f.id === funilId) : null;
+    const funil        = findFunil(ad);
+    const funilId      = funil?.id;
     const img          = getImgCriativo(ad);
     const muted        = '<span style="color:var(--text-muted)">—</span>';
     const pill = v => `<span style="background:var(--bg-card, var(--surface));border:0.5px solid var(--border);
@@ -773,7 +860,7 @@ const Criativos = (() => {
             ${show('contas') && isLateral ? `<span style="color:#D85A30;font-size:12px;font-weight:600" title="Lateralizado">🔄</span>` : ''}
             ${show('tagLateral') ? `<div>${tag
               ? `<span class="tag-lateral" onclick="editarTagLateral('${funilId}')" title="Clique para editar">${esc(tag)}</span>`
-              : (funilId ? `<button class="btn-add-lateral" onclick="editarTagLateral('${funilId}')">+</button>` : '')
+              : (funilId ? `<button class="btn-add-lateral" onclick="editarTagLateral('${funilId}')">+</button>` : semFunilHtml(ad))
             }</div>` : ''}
             <div style="margin-left:auto;display:flex;align-items:center;gap:6px">
               ${show('destaque') ? `<button class="btn btn-sm" data-action="star" data-id="${esc(ad.id)}"
@@ -950,8 +1037,7 @@ const Criativos = (() => {
       }
 
       saveAds(_ads);
-      syncViewsParaFunis(record);
-      if (!document.getElementById('tab-escalada')?.hidden) Escalada.refresh();
+      syncViewsParaFunis(record, ad ? ad.views : null);
       close();
       render();
       _showToast?.(isEdit ? 'Criativo atualizado!' : 'Criativo salvo!');
@@ -1062,10 +1148,11 @@ const Criativos = (() => {
     _ads = loadAds();
     let imported = 0;
     if (funis && funis.length) {
-      const existingUrls = new Set(_ads.map(a => a.urlAnuncio).filter(Boolean));
+      const existingUrls = new Set(_ads.map(a => normUrl(a.urlAnuncio)).filter(Boolean));
       funis.forEach(funil => {
-        if (!funil.urlAnuncio || existingUrls.has(funil.urlAnuncio)) return;
-        existingUrls.add(funil.urlAnuncio);
+        const key = normUrl(funil.urlAnuncio);
+        if (!key || existingUrls.has(key)) return;
+        existingUrls.add(key);
         _ads.push({
           id:              Storage.genId(),
           data:            funil.data    || null,
