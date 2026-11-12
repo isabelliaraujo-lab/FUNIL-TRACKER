@@ -29,7 +29,7 @@ let prevFunnels = [];
 const NICHO_COLORS = {
   WL:'#378ADD', DB:'#639922', MM:'#7F77DD', PT:'#BA7517',
   DA:'#1D9E75', ED:'#E24B4A', NR:'#D85A30', VL:'#D4537E',
-  TN:'#888780', LG:'#888780', RJ:'#888780', RE:'#888780',
+  TN:'#888780', PU:'#888780', RJ:'#888780', RE:'#888780',
   PA:'#14B8A6', CP:'#F59E0B', LF:'#8B5CF6'
 };
 
@@ -325,11 +325,12 @@ document.addEventListener('DOMContentLoaded', async () => {
   });
   if (_migrou) saveFunnels(funnels);
 
-  // Migração silenciosa: nichos renomeados (BP→PA, ML→MM)
+  // Migração silenciosa: nichos renomeados (BP→PA, ML→MM, LG→PU)
   let _migrouNicho = false;
   funnels = funnels.map(f => {
     if (f.nicho === 'BP') { _migrouNicho = true; return { ...f, nicho: 'PA' }; }
     if (f.nicho === 'ML') { _migrouNicho = true; return { ...f, nicho: 'MM' }; }
+    if (f.nicho === 'LG') { _migrouNicho = true; return { ...f, nicho: 'PU' }; }
     return f;
   });
   if (_migrouNicho) saveFunnels(funnels);

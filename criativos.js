@@ -11,8 +11,15 @@ const Criativos = (() => {
   // ── Storage próprio ───────────────────────────────────────────────────
 
   function loadAds() {
-    try { return JSON.parse(localStorage.getItem(KEY) || '[]'); }
+    let ads;
+    try { ads = JSON.parse(localStorage.getItem(KEY) || '[]'); }
     catch { return []; }
+    // Nicho renomeado LG → PU: corrige criativos salvos antes da mudança
+    if (ads.some(a => a && a.nicho === 'LG')) {
+      ads = ads.map(a => (a && a.nicho === 'LG') ? { ...a, nicho: 'PU' } : a);
+      try { saveAds(ads); } catch {}
+    }
+    return ads;
   }
 
   function saveAds(ads) {
@@ -86,7 +93,7 @@ const Criativos = (() => {
 
   // ── Constantes ────────────────────────────────────────────────────────
 
-  const NICHOS = ['WL','DB','MM','ED','NR','DA','PT','VL','TN','LG','RJ','RE','BP','PA','LF'];
+  const NICHOS = ['WL','DB','MM','ED','NR','DA','PT','VL','TN','PU','RJ','RE','BP','PA','LF'];
 
   const ANGULOS = [
     'Transformação','Revelação','Autoridade','Urgência',
@@ -98,7 +105,7 @@ const Criativos = (() => {
   const NICHO_COLORS = {
     WL:'#378ADD', DB:'#639922', MM:'#7F77DD', PT:'#BA7517',
     DA:'#1D9E75', ED:'#E24B4A', NR:'#D85A30', VL:'#D4537E',
-    TN:'#888780', LG:'#888780', RJ:'#888780', RE:'#888780', BP:'#14B8A6',
+    TN:'#888780', PU:'#888780', RJ:'#888780', RE:'#888780', BP:'#14B8A6',
     PA:'#14B8A6', LF:'#8B5CF6'
   };
 
