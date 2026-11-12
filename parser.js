@@ -176,6 +176,7 @@ const Parser = (() => {
         adId    = m[1];
         conta   = m[1].trim() + ' - ' + m[2].trim();
         nicho   = m[3].trim().toUpperCase();
+        if (nicho === 'LG') nicho = 'PU';   // nicho renomeado LG → PU (docs antigos)
         produto = Storage.normalizeProduto(m[4]);
       }
     }
