@@ -77,6 +77,24 @@ const Parser = (() => {
     return isUrlLine(line) && /instagram\.com/i.test(line);
   }
 
+  // URL nativa visível (l.facebook.com/l.php) — classificada ANTES de qualquer regra
+  // do formato antigo: os `__` de `__cft__[0]=`, `__tn__=` ou de dentro do `u=`
+  // nunca devem ser lidos como marcadores __URL__.
+  function isNativaLine(line) {
+    return /^https?:\/\/l\.facebook\.com\/l\.php/i.test(String(line).trim());
+  }
+
+  // URL do anúncio: facebook.com (exceto l./lm.facebook.com) nos padrões
+  // {id|slug}/posts/{id}, {id|slug}/videos/{id} ou reel/{id}
+  function isAdUrlPattern(url) {
+    try {
+      const u = new URL(url);
+      const host = u.hostname.toLowerCase();
+      if (!/(^|\.)facebook\.com$/.test(host) || /^(l|lm)\.facebook\.com$/.test(host)) return false;
+      return /^\/(?:[^\/]+\/(?:posts|videos)\/[^\/]+|reel\/\d+)\/?$/i.test(u.pathname);
+    } catch { return false; }
+  }
+
   function extractUrl(line) {
     // Markdown: [texto](url)
     const md = line.match(/\[.*?\]\((https?:\/\/[^)]+)\)/);
@@ -124,16 +142,23 @@ const Parser = (() => {
       }
     }
 
-    // FORMATO B — URL nativa colada como texto (l.facebook.com/l.php) e sem
-    // linha de domínio visível. Guarda a linha e a remove antes das regras atuais.
-    let urlNativaB = null;
+    // URL nativa visível (linha começando com https://l.facebook.com/l.php).
+    // Retirada das linhas ANTES das demais regras, para nunca virar URL do anúncio,
+    // domFinal nem segundo domínio de split.
+    //  - FORMATO B: sem linha de domínio visível → domAnuncio vem do parâmetro `u`.
+    //  - VARIAÇÃO DO FORMATO 2: com domínio em texto simples → domAnuncio é esse
+    //    domínio e a linha nativa vai inteira para domAnuncioFull (prioridade
+    //    sobre o linkMap e sobre o fallback https:// + domínio).
+    let urlNativaB = null, urlNativaVisivel = null;
     const temDominioVisivel = lines.slice(1).some(l =>
-      !isUrlLine(l) && /^[A-Z0-9][A-Z0-9\-]*\.[A-Z]{2,}/i.test(l.split(/\s+/)[0])
+      !isNativaLine(l) && !isUrlLine(l) && /^[A-Z0-9][A-Z0-9\-]*\.[A-Z]{2,}/i.test(l.split(/\s+/)[0])
     );
-    const idxNativa = lines.findIndex(l => /^https:\/\/l\.facebook\.com\/l\.php/i.test(l));
-    if (idxNativa > 0 && !temDominioVisivel) {
-      urlNativaB = lines[idxNativa];
-      lines.splice(idxNativa, 1);
+    const idxNativa = lines.findIndex((l, i) => i > 0 && isNativaLine(l));
+    if (idxNativa > 0) {
+      const nativa = lines[idxNativa].trim();
+      for (let i = lines.length - 1; i > 0; i--) if (isNativaLine(lines[i])) lines.splice(i, 1);
+      if (temDominioVisivel) urlNativaVisivel = nativa;
+      else                   urlNativaB        = nativa;
     }
 
     let adId = null, data = new Date().toISOString().slice(0, 10);
@@ -178,8 +203,11 @@ const Parser = (() => {
     }
 
     // REGRA 3B — URL nativa do Facebook para domAnuncioFull
+    // Prioridade 0: linha nativa visível (variação do formato 2)
+    if (urlNativaVisivel) {
+      domAnuncioFull = urlNativaVisivel;
     // Prioridade 1: linkMap vindo do .docx (hiperlink embutido no domínio visível)
-    if (domAnuncio && linkMap[domAnuncio] &&
+    } else if (domAnuncio && linkMap[domAnuncio] &&
         /l\.facebook\.com\/l\.php/i.test(linkMap[domAnuncio])) {
       domAnuncioFull = linkMap[domAnuncio];
     } else {
@@ -195,7 +223,11 @@ const Parser = (() => {
     }
 
     // REGRA 2 — URL do anúncio (Facebook ou Instagram como fallback)
-    const adLine = lines.find(isFacebookLine) || lines.find(isInstagramLine);
+    // Preferência: link nos padrões posts/videos/reel; depois qualquer facebook.com
+    // que não seja l.facebook.com (mantém formatos antigos como watch/?v=).
+    const adLine = lines.find(l => isFacebookLine(l) && isAdUrlPattern(extractUrl(l))) ||
+                   lines.find(l => isFacebookLine(l) && !/^\W*(https?:\/\/)?l\.facebook\.com/i.test(l.replace(/^_+/, ''))) ||
+                   lines.find(isFacebookLine) || lines.find(isInstagramLine);
     if (adLine) {
       urlAnuncio = extractUrl(adLine) || '';
       urlAnuncioFull = urlAnuncio;
