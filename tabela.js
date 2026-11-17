@@ -220,6 +220,47 @@ const Tabela = (() => {
     };
   }
 
+  // ── Busca por link de anúncio ─────────────────────────────────────────
+  // Normaliza um link para comparação tolerante: minúsculas, sem protocolo,
+  // sem "www." no início e sem barra no final (inclusive antes de "?" ou "#").
+  function normLink(s) {
+    return String(s || '').trim().toLowerCase()
+      .replace(/^[a-z][a-z0-9+.-]*:\/\//, '')
+      .replace(/^www\./, '')
+      .replace(/\/+(?=[?#]|$)/, '')
+      .replace(/\/+$/, '');
+  }
+
+  // Extrai IDs numéricos de anúncio de um link (ex: ?id=123456789 da
+  // Biblioteca de Anúncios da Meta, ad_id=..., /ads/123...).
+  function extrairIdsAnuncio(s) {
+    const ids = [];
+    const re = /(?:[?&#](?:id|ad_id|adid|ad_archive_id)=|\/ads\/(?:library\/)?)(\d{5,})/gi;
+    let m;
+    while ((m = re.exec(String(s || '')))) ids.push(m[1]);
+    return ids;
+  }
+
+  // Todos os links de anúncio de um funil (campo principal + lista de anúncios).
+  function linksAnuncio(row) {
+    const links = [row.urlAnuncio, row.urlAnuncioFull];
+    if (Array.isArray(row.anuncios)) row.anuncios.forEach(a => links.push(a && a.url));
+    return [...new Set(links.filter(Boolean))];
+  }
+
+  function matchLinkAnuncio(row, search) {
+    const links = linksAnuncio(row);
+    if (links.length === 0) return false;
+
+    const termo = normLink(search);
+    if (termo && links.some(l => normLink(l).includes(termo))) return true;
+
+    // Busca por ID: termo só com números, ou link colado com ID diferente na forma
+    const idsTermo = /^\d{5,}$/.test(termo) ? [termo] : extrairIdsAnuncio(search);
+    if (idsTermo.length === 0) return false;
+    return links.some(l => extrairIdsAnuncio(l).some(id => idsTermo.includes(id)));
+  }
+
   function applyFilters(funnels, f, domCounts) {
     return GlobalFilters.filter(funnels).filter(row => {
       if (f.repetido !== '') {
@@ -232,7 +273,7 @@ const Tabela = (() => {
         const hay = [row.conta, row.nicho, row.produto, row.urlAnuncio,
                      row.domAnuncio, row.domFinal, row.obs]
           .filter(Boolean).join(' ').toLowerCase();
-        if (!hay.includes(f.search)) return false;
+        if (!hay.includes(f.search) && !matchLinkAnuncio(row, f.search)) return false;
       }
 
       return true;
