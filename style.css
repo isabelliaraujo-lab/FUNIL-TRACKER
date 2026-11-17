@@ -721,6 +721,7 @@ tbody tr.row-repeated:hover td {
 .nicho-BP { background: #002a2a; color: #2dd4bf; }
 .nicho-PA { background: #002a2a; color: #2dd4bf; }
 .nicho-LF { background: #1a0a2a; color: #c4b5fd; }
+.nicho-FG { background: #2a0a2a; color: #f0abfc; }
 
 /* ── Other tags ── */
 .tag-views       { background: #1a1040; color: #a78bfa; }
